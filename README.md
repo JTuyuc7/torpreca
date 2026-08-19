@@ -1,8 +1,5 @@
 # Torpreca — Sistema de Gestión de Rutas
 
-> Proyecto de Graduación II (PG2) · Universidad Mariano Gálvez de Guatemala · 2026
-> Jaime Israel Tuyuc Tzaj · carné 1990-18-2320
-
 Aplicación móvil multiplataforma con geolocalización en tiempo real para gestión de rutas de la Corporación Torpreca, S.A.
 
 ## Apps
@@ -45,10 +42,3 @@ cd apps/backend && bun dev
 cd apps/dashboard && pnpm dev
 cd apps/mobile && flutter run
 ```
-
-## Documentación
-
-- Contexto del proyecto: https://www.notion.so/Contexto-para-IA-3b79981178b7813e873ef0465f2e275d
-- Plan completo: https://app.notion.com/p/3b29981178b780d68c83c51b6678bc08
-- Diagramas UML: Notion → 📐 Documentación Técnica
-- Modelo de datos: Notion → 🗄️ Modelo de Datos
