@@ -1,0 +1,33 @@
+# Entorno local / herramientas
+.claude/
+
+# Variables de entorno (secretos reales) — template.env sí se versiona
+.env
+.env.local
+.env.*.local
+**/.env
+**/.env.local
+!template.env
+
+# Dependencias
+node_modules/
+.pnpm-store/
+
+# Next.js (dashboard, landing)
+.next/
+out/
+next-env.d.ts
+
+# Flutter (mobile)
+apps/mobile/.dart_tool/
+apps/mobile/.flutter-plugins
+apps/mobile/.flutter-plugins-dependencies
+apps/mobile/build/
+apps/mobile/android/local.properties
+apps/mobile/android/.gradle/
+apps/mobile/android/app/*.jks
+
+# Logs y OS
+*.log
+.DS_Store
+Thumbs.db
