@@ -31,3 +31,4 @@ apps/mobile/android/app/*.jks
 *.log
 .DS_Store
 Thumbs.db
+CLAUDE.md
