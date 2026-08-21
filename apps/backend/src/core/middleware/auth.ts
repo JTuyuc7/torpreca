@@ -1,6 +1,8 @@
 import type { AuthUser } from "@torpreca/shared";
+import { logEvent } from "../audit/log-event";
 import { supabaseAdmin } from "../db/supabase";
 import { ForbiddenError, UnauthorizedError } from "../errors/app-error";
+import { clientIp } from "../http/client-ip";
 import type { Middleware } from "../http/context";
 
 export const auth: Middleware = async (ctx, next) => {
@@ -18,7 +20,19 @@ export const auth: Middleware = async (ctx, next) => {
     .single();
 
   if (dbError || !userRow) throw new UnauthorizedError("User not registered");
-  if (!userRow.active) throw new ForbiddenError("User deactivated");
+
+  if (!userRow.active) {
+    await logEvent({
+      userId: userRow.id,
+      role: userRow.role,
+      action: "access.denied",
+      entity: null,
+      entityId: null,
+      ip: clientIp(ctx),
+      metadata: { path: new URL(ctx.req.url).pathname, reason: "user_deactivated" },
+    });
+    throw new ForbiddenError("User deactivated");
+  }
 
   ctx.user = userRow as AuthUser;
   return next();

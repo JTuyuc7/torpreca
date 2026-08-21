@@ -4,16 +4,12 @@ import { auth } from "../../core/middleware/auth";
 import { rateLimitGeneral } from "../../core/middleware/rate-limit";
 import { requireRole } from "../../core/middleware/role";
 import { validateBody } from "../../core/middleware/validate-zod";
+import { clientIp } from "../../core/http/client-ip";
 import type { Router } from "../../core/http/router";
-import type { Context } from "../../core/http/context";
 import { usersRepository } from "./users.repository";
 import { createUsersService } from "./users.service";
 
 const service = createUsersService(usersRepository);
-
-function clientIp(ctx: Context): string | null {
-  return ctx.req.headers.get("x-forwarded-for");
-}
 
 export function registerUsersRoutes(router: Router) {
   router.get(
