@@ -28,3 +28,9 @@ export const CreateRouteSchema = RouteSchema.pick({
 });
 
 export type CreateRouteInput = z.infer<typeof CreateRouteSchema>;
+
+export const FinishRouteSchema = z.object({
+  drivenKm: z.number().nonnegative(),
+});
+
+export type FinishRouteInput = z.infer<typeof FinishRouteSchema>;
