@@ -31,7 +31,8 @@ export function createRoutesService(repo: RoutesRepository) {
 
     async finish(id: string, driverId: string, drivenKm: number): Promise<Route> {
       const route = await repo.finish(id, driverId, drivenKm);
-      if (!route) throw new AppError(409, "Route cannot be finished (not yours, or not in progress)");
+      if (!route)
+        throw new AppError(409, "Route cannot be finished (not yours, or not in progress)");
       return route;
     },
   };

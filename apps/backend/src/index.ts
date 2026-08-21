@@ -1,7 +1,7 @@
 import { env } from "./core/config/env";
+import { Router } from "./core/http/router";
 import { cors } from "./core/middleware/cors";
 import { securityHeaders } from "./core/middleware/headers";
-import { Router } from "./core/http/router";
 import { registerRoutesRoutes } from "./modules/routes/routes.routes";
 import { registerStopsRoutes } from "./modules/stops/stops.routes";
 import { registerUsersRoutes } from "./modules/users/users.routes";

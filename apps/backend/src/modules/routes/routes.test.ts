@@ -38,14 +38,18 @@ function createFakeRepo(seed: Route[] = []): RoutesRepository {
       return created;
     },
     async start(id, driverId) {
-      const route = routes.find((r) => r.id === id && r.driverId === driverId && r.status === "pending");
+      const route = routes.find(
+        (r) => r.id === id && r.driverId === driverId && r.status === "pending",
+      );
       if (!route) return null;
       route.status = "in_progress";
       route.startTime = new Date().toISOString();
       return route;
     },
     async finish(id, driverId, drivenKm) {
-      const route = routes.find((r) => r.id === id && r.driverId === driverId && r.status === "in_progress");
+      const route = routes.find(
+        (r) => r.id === id && r.driverId === driverId && r.status === "in_progress",
+      );
       if (!route) return null;
       route.status = "completed";
       route.endTime = new Date().toISOString();
@@ -75,8 +79,20 @@ describe("routes.service", () => {
   it("scopes list() to the driver's own routes", async () => {
     const repo = createFakeRepo();
     const service = createRoutesService(repo);
-    await service.create({ code: "R-1", driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: null }, admin.id);
-    await service.create({ code: "R-2", driverId: otherDriver.id, vehicleId: null, date: "2026-08-21", plannedKm: null }, admin.id);
+    await service.create(
+      { code: "R-1", driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: null },
+      admin.id,
+    );
+    await service.create(
+      {
+        code: "R-2",
+        driverId: otherDriver.id,
+        vehicleId: null,
+        date: "2026-08-21",
+        plannedKm: null,
+      },
+      admin.id,
+    );
 
     const driverRoutes = await service.list(driver);
     expect(driverRoutes).toHaveLength(1);
@@ -90,11 +106,19 @@ describe("routes.service", () => {
     const repo = createFakeRepo();
     const service = createRoutesService(repo);
     const route = await service.create(
-      { code: "R-1", driverId: otherDriver.id, vehicleId: null, date: "2026-08-21", plannedKm: null },
+      {
+        code: "R-1",
+        driverId: otherDriver.id,
+        vehicleId: null,
+        date: "2026-08-21",
+        plannedKm: null,
+      },
       admin.id,
     );
 
-    await expect(service.getById(route.id, driver)).rejects.toThrow("This route belongs to another driver");
+    await expect(service.getById(route.id, driver)).rejects.toThrow(
+      "This route belongs to another driver",
+    );
   });
 
   it("throws NotFoundError for a missing id", async () => {
@@ -119,7 +143,13 @@ describe("routes.service", () => {
     const repo = createFakeRepo();
     const service = createRoutesService(repo);
     const route = await service.create(
-      { code: "R-1", driverId: otherDriver.id, vehicleId: null, date: "2026-08-21", plannedKm: null },
+      {
+        code: "R-1",
+        driverId: otherDriver.id,
+        vehicleId: null,
+        date: "2026-08-21",
+        plannedKm: null,
+      },
       admin.id,
     );
 

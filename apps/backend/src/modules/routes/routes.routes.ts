@@ -1,11 +1,11 @@
 import { CreateRouteSchema, FinishRouteSchema } from "@torpreca/shared";
 import { logEvent } from "../../core/audit/log-event";
+import { clientIp } from "../../core/http/client-ip";
+import type { Router } from "../../core/http/router";
 import { auth } from "../../core/middleware/auth";
 import { rateLimitGeneral } from "../../core/middleware/rate-limit";
 import { requireRole } from "../../core/middleware/role";
 import { validateBody } from "../../core/middleware/validate-zod";
-import { clientIp } from "../../core/http/client-ip";
-import type { Router } from "../../core/http/router";
 import { routesRepository } from "./routes.repository";
 import { createRoutesService } from "./routes.service";
 
@@ -44,27 +44,21 @@ export function registerRoutesRoutes(router: Router) {
     },
   );
 
-  router.patch(
-    "/routes/:id/start",
-    auth,
-    requireRole("driver"),
-    rateLimitGeneral,
-    async (ctx) => {
-      const route = await service.start(ctx.params.id!, ctx.user!.id);
+  router.patch("/routes/:id/start", auth, requireRole("driver"), rateLimitGeneral, async (ctx) => {
+    const route = await service.start(ctx.params.id!, ctx.user!.id);
 
-      await logEvent({
-        userId: ctx.user!.id,
-        role: ctx.user!.role,
-        action: "route.started",
-        entity: "routes",
-        entityId: route.id,
-        ip: clientIp(ctx),
-        metadata: null,
-      });
+    await logEvent({
+      userId: ctx.user!.id,
+      role: ctx.user!.role,
+      action: "route.started",
+      entity: "routes",
+      entityId: route.id,
+      ip: clientIp(ctx),
+      metadata: null,
+    });
 
-      return Response.json(route);
-    },
-  );
+    return Response.json(route);
+  });
 
   router.patch(
     "/routes/:id/finish",

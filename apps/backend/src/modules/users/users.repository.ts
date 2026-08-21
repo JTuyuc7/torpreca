@@ -79,7 +79,11 @@ export const usersRepository: UsersRepository = {
   async deactivate(id, deactivatedBy) {
     const { error } = await supabaseAdmin
       .from("users")
-      .update({ active: false, deactivated_at: new Date().toISOString(), deactivated_by: deactivatedBy })
+      .update({
+        active: false,
+        deactivated_at: new Date().toISOString(),
+        deactivated_by: deactivatedBy,
+      })
       .eq("id", id);
     if (error) throw error;
   },
