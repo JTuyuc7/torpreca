@@ -1,8 +1,15 @@
 {
-  "name": "shared",
-  "module": "index.ts",
+  "name": "@torpreca/shared",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
   "type": "module",
   "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "zod": "^4"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },
