@@ -1,6 +1,12 @@
 // Literal values match the Postgres enums `route_status` / `stop_status` / `notification_type`
 // — do not rename without a DB migration.
-export const ROUTE_STATUSES = ["pending", "in_progress", "completed", "delayed", "cancelled"] as const;
+export const ROUTE_STATUSES = [
+  "pending",
+  "in_progress",
+  "completed",
+  "delayed",
+  "cancelled",
+] as const;
 
 export type RouteStatus = (typeof ROUTE_STATUSES)[number];
 

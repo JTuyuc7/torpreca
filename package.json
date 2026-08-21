@@ -4,5 +4,31 @@
   "workspaces": [
     "apps/backend",
     "packages/shared"
-  ]
+  ],
+  "scripts": {
+    "prepare": "husky",
+    "lint": "biome check apps/backend/src packages/shared/src",
+    "lint:fix": "biome check --write apps/backend/src packages/shared/src",
+    "format": "biome format --write apps/backend/src packages/shared/src",
+    "test": "cd apps/backend && bun test"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.9",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.3.0"
+  },
+  "lint-staged": {
+    "apps/backend/src/**/*.ts": [
+      "biome check --write --no-errors-on-unmatched"
+    ],
+    "packages/shared/src/**/*.ts": [
+      "biome check --write --no-errors-on-unmatched"
+    ],
+    "apps/dashboard/**/*.{ts,tsx}": [
+      "pnpm --dir apps/dashboard exec eslint --fix"
+    ],
+    "apps/landing/**/*.{ts,tsx}": [
+      "pnpm --dir apps/landing exec eslint --fix"
+    ]
+  }
 }

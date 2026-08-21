@@ -39,7 +39,11 @@ export const stopsRepository: StopsRepository = {
   },
 
   async getById(id) {
-    const { data, error } = await supabaseAdmin.from("stops").select("*").eq("id", id).maybeSingle();
+    const { data, error } = await supabaseAdmin
+      .from("stops")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
     if (error) throw error;
     return data ? toStop(data) : null;
   },

@@ -44,7 +44,11 @@ export const routesRepository: RoutesRepository = {
   },
 
   async getById(id) {
-    const { data, error } = await supabaseAdmin.from("routes").select("*").eq("id", id).maybeSingle();
+    const { data, error } = await supabaseAdmin
+      .from("routes")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
     if (error) throw error;
     return data ? toRoute(data) : null;
   },

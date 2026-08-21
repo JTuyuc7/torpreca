@@ -1,0 +1,3 @@
+set -e
+cd apps/backend && bun test
+cd ../.. && bun run lint

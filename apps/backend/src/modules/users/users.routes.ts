@@ -1,11 +1,11 @@
 import { CreateUserSchema } from "@torpreca/shared";
 import { logEvent } from "../../core/audit/log-event";
+import { clientIp } from "../../core/http/client-ip";
+import type { Router } from "../../core/http/router";
 import { auth } from "../../core/middleware/auth";
 import { rateLimitGeneral } from "../../core/middleware/rate-limit";
 import { requireRole } from "../../core/middleware/role";
 import { validateBody } from "../../core/middleware/validate-zod";
-import { clientIp } from "../../core/http/client-ip";
-import type { Router } from "../../core/http/router";
 import { usersRepository } from "./users.repository";
 import { createUsersService } from "./users.service";
 
