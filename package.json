@@ -1,0 +1,8 @@
+{
+  "name": "torpreca",
+  "private": true,
+  "workspaces": [
+    "apps/backend",
+    "packages/shared"
+  ]
+}

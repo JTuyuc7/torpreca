@@ -1,8 +1,18 @@
 {
   "name": "backend",
-  "module": "index.ts",
+  "module": "src/index.ts",
   "type": "module",
   "private": true,
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2",
+    "@torpreca/shared": "workspace:*",
+    "zod": "^4"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },
