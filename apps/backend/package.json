@@ -9,6 +9,7 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@asteasolutions/zod-to-openapi": "^9.1.0",
     "@supabase/supabase-js": "^2",
     "@torpreca/shared": "workspace:*",
     "zod": "^4"

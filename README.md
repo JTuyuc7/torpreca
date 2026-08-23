@@ -42,3 +42,11 @@ cd apps/backend && bun dev
 cd apps/dashboard && pnpm dev
 cd apps/mobile && flutter run
 ```
+
+## Documentación de la API (backend)
+
+Con el backend corriendo (`bun dev` en `apps/backend`, puerto por defecto 3000):
+
+- **Spec OpenAPI 3.1:** http://localhost:3000/openapi.json — generado en cada boot a partir de los schemas zod de `packages/shared` (`apps/backend/src/openapi/registry.ts`), no se escribe a mano.
+- **Visor interactivo (Scalar):** http://localhost:3000/docs
+- **Colección Postman:** en Postman, `File → Import` y pegar la URL `http://localhost:3000/openapi.json` (o el archivo descargado) — Postman genera la colección completa a partir del spec, tampoco se mantiene a mano.

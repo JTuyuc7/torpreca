@@ -1,5 +1,5 @@
-import { z } from "zod";
 import { AUDIT_EVENTS } from "../constants/audit-events";
+import { z } from "../zod";
 
 export const AuditLogSchema = z.object({
   id: z.uuid(),
