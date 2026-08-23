@@ -68,8 +68,10 @@ const OnlyActiveQuery = z.object({
 
 const authed = { security: [{ bearerAuth: [] }] };
 
+// Every module route lives under /api/v1 (see Router#withPrefix in index.ts) —
+// /health is the one unversioned route and is registered separately, below.
 function path(config: RouteConfig) {
-  registry.registerPath({ ...authed, ...config });
+  registry.registerPath({ ...authed, ...config, path: `/api/v1${config.path}` });
 }
 
 // --- vehicles ---

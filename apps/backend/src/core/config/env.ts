@@ -4,6 +4,7 @@ const EnvSchema = z.object({
   SUPABASE_URL: z.url(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   SECRET_KEY: z.string().min(1),
+  REQUEST_SIGNING_SECRET: z.string().min(1),
   PORT: z.coerce.number().int().positive().default(3000),
   ALLOWED_ORIGINS: z
     .string()

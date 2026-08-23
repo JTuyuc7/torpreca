@@ -9,9 +9,18 @@ interface Route {
   handler: Handler;
 }
 
+// What module registration functions (registerXRoutes) are typed to accept —
+// either a bare Router or a Router.withPrefix(...) view over one.
+export interface Routable {
+  get(path: string, ...rest: [...Middleware[], Handler]): void;
+  post(path: string, ...rest: [...Middleware[], Handler]): void;
+  patch(path: string, ...rest: [...Middleware[], Handler]): void;
+  delete(path: string, ...rest: [...Middleware[], Handler]): void;
+}
+
 // Deliberately minimal: the closed stack calls for Bun + native WebSocket, no
 // extra HTTP framework. Supports params (":id") and a middleware chain per route.
-export class Router {
+export class Router implements Routable {
   private routes: Route[] = [];
 
   private register(method: string, path: string, middlewares: Middleware[], handler: Handler) {
@@ -58,6 +67,13 @@ export class Router {
     this.register(method, path, middlewares, handler);
   }
 
+  // Returns a view that prefixes every path registered through it (e.g. "/api/v1")
+  // and prepends extraMiddlewares (e.g. `deprecated(...)`) ahead of each route's own.
+  // Routes still end up on this same Router — only how registerXRoutes(...) sees it changes.
+  withPrefix(prefix: string, ...extraMiddlewares: Middleware[]): Routable {
+    return new PrefixedRouter(this, prefix, extraMiddlewares);
+  }
+
   async handle(req: Request): Promise<Response> {
     const url = new URL(req.url);
 
@@ -87,5 +103,35 @@ export class Router {
     }
 
     return Response.json({ error: "Not found" }, { status: 404 });
+  }
+}
+
+class PrefixedRouter implements Routable {
+  constructor(
+    private readonly router: Router,
+    private readonly prefix: string,
+    private readonly extraMiddlewares: Middleware[],
+  ) {}
+
+  get(path: string, ...rest: [...Middleware[], Handler]) {
+    this.delegate("get", path, rest);
+  }
+
+  post(path: string, ...rest: [...Middleware[], Handler]) {
+    this.delegate("post", path, rest);
+  }
+
+  patch(path: string, ...rest: [...Middleware[], Handler]) {
+    this.delegate("patch", path, rest);
+  }
+
+  delete(path: string, ...rest: [...Middleware[], Handler]) {
+    this.delegate("delete", path, rest);
+  }
+
+  private delegate(method: "get" | "post" | "patch" | "delete", path: string, rest: unknown[]) {
+    const handler = rest[rest.length - 1] as Handler;
+    const middlewares = rest.slice(0, -1) as Middleware[];
+    this.router[method](`${this.prefix}${path}`, ...this.extraMiddlewares, ...middlewares, handler);
   }
 }

@@ -1,8 +1,56 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { Router } from "../../core/http/router";
+import type { Row, RpcHandler } from "../../test-support/fake-supabase";
 import { createFakeSupabase } from "../../test-support/fake-supabase";
 
-const fake = createFakeSupabase({ insertDefaults: { stops: { status: "pending" } } });
+// stopsRepository reads/writes customer_name/address through RPCs (they're
+// encrypted at rest) — see stops.repository.test.ts for the same handlers.
+const getStopsReadable: RpcHandler = (tables) => tables.stops ?? [];
+
+const createStopEncrypted: RpcHandler = (tables, args) => {
+  const now = new Date().toISOString();
+  const row: Row = {
+    id: crypto.randomUUID(),
+    route_id: args.p_route_id,
+    order_index: args.p_order_index,
+    customer_name: args.p_customer_name,
+    address: args.p_address,
+    lat: args.p_lat,
+    lng: args.p_lng,
+    instructions: args.p_instructions,
+    status: "pending",
+    estimated_time: null,
+    completed_time: null,
+    created_at: now,
+    updated_at: now,
+  };
+  tables.stops = [...(tables.stops ?? []), row];
+  const { customer_name, address, ...returned } = row;
+  return [returned];
+};
+
+function updateGuarded(tables: Record<string, Row[]>, args: Record<string, unknown>, patch: Row) {
+  const row = (tables.stops ?? []).find((r) => r.id === args.p_id && r.status !== "completed");
+  if (!row) return [];
+  Object.assign(row, patch, { updated_at: new Date().toISOString() });
+  return [row];
+}
+
+const completeStopEncrypted: RpcHandler = (tables, args) =>
+  updateGuarded(tables, args, { status: "completed", completed_time: new Date().toISOString() });
+
+const delayStopEncrypted: RpcHandler = (tables, args) =>
+  updateGuarded(tables, args, { status: "delayed" });
+
+const fake = createFakeSupabase({
+  insertDefaults: { stops: { status: "pending" } },
+  rpcHandlers: {
+    get_stops_readable: getStopsReadable,
+    create_stop_encrypted: createStopEncrypted,
+    complete_stop_encrypted: completeStopEncrypted,
+    delay_stop_encrypted: delayStopEncrypted,
+  },
+});
 mock.module("../../core/db/supabase", () => ({ supabaseAdmin: fake.client }));
 
 const DRIVER_AUTH_ID = "auth-driver";

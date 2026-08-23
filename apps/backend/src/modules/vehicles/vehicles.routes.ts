@@ -1,5 +1,5 @@
 import { CreateVehicleSchema } from "@torpreca/shared";
-import type { Router } from "../../core/http/router";
+import type { Routable } from "../../core/http/router";
 import { auth } from "../../core/middleware/auth";
 import { rateLimitGeneral } from "../../core/middleware/rate-limit";
 import { requireRole } from "../../core/middleware/role";
@@ -9,7 +9,7 @@ import { createVehiclesService } from "./vehicles.service";
 
 const service = createVehiclesService(vehiclesRepository);
 
-export function registerVehiclesRoutes(router: Router) {
+export function registerVehiclesRoutes(router: Routable) {
   router.get("/vehicles", auth, rateLimitGeneral, async (ctx) => {
     const onlyActive = !ctx.req.url.includes("all=true");
     return Response.json(await service.list(onlyActive));
