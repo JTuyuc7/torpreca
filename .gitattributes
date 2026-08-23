@@ -1,0 +1,15 @@
+# Force LF for all text files regardless of a developer's local core.autocrlf —
+# Biome (and every formatter in this repo) writes LF, so checkouts must match.
+* text=auto eol=lf
+
+# Binary assets: never touch line endings.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
