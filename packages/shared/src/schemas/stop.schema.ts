@@ -1,5 +1,5 @@
-import { z } from "zod";
 import { STOP_STATUSES } from "../constants/statuses";
+import { z } from "../zod";
 
 export const StopSchema = z.object({
   id: z.uuid(),

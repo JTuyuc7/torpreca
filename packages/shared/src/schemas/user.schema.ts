@@ -1,5 +1,5 @@
-import { z } from "zod";
 import { ROLES } from "../constants/roles";
+import { z } from "../zod";
 
 // `name` travels as plaintext over the API — the backend encrypts/decrypts it
 // (pgp_sym_encrypt/pgp_sym_decrypt) when reading/writing the DB.

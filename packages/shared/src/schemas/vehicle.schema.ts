@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../zod";
 
 export const VehicleSchema = z.object({
   id: z.uuid(),

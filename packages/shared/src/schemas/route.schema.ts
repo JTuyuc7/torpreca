@@ -1,5 +1,5 @@
-import { z } from "zod";
 import { ROUTE_STATUSES } from "../constants/statuses";
+import { z } from "../zod";
 
 export const RouteSchema = z.object({
   id: z.uuid(),

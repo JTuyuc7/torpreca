@@ -1,5 +1,5 @@
-import { z } from "zod";
 import { ROLES } from "../constants/roles";
+import { z } from "../zod";
 
 // Minimal identity carried in the request context for every authenticated call.
 // Does not include `name` (encrypted PII) — call usuarios.repository explicitly

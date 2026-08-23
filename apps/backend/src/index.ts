@@ -6,6 +6,8 @@ import { registerRoutesRoutes } from "./modules/routes/routes.routes";
 import { registerStopsRoutes } from "./modules/stops/stops.routes";
 import { registerUsersRoutes } from "./modules/users/users.routes";
 import { registerVehiclesRoutes } from "./modules/vehicles/vehicles.routes";
+import { docsPageHtml } from "./openapi/docs-page";
+import { openApiDocument } from "./openapi/document";
 
 const router = new Router();
 registerVehiclesRoutes(router);
@@ -14,6 +16,8 @@ registerRoutesRoutes(router);
 registerStopsRoutes(router);
 
 router.get("/health", () => Response.json({ ok: true }));
+router.get("/openapi.json", () => Response.json(openApiDocument));
+router.get("/docs", () => new Response(docsPageHtml, { headers: { "content-type": "text/html" } }));
 
 const globalMiddlewares = [cors, securityHeaders];
 
