@@ -1,6 +1,14 @@
 import type { CreateStopInput, Stop } from "@torpreca/shared";
+import { env } from "../../core/config/env";
 import { supabaseAdmin } from "../../core/db/supabase";
 
+// customer_name/address are PII (a delivery customer's name and address) —
+// encrypted at rest the same way as users.name. Reads go through the
+// `get_stops_readable` RPC (decrypts both columns); the write paths
+// (`create_stop_encrypted`, `complete_stop_encrypted`, `delay_stop_encrypted`)
+// encrypt/decrypt server-side too — plain insert/update can't touch those
+// columns directly. See users.repository.ts for why the secret key travels
+// as an RPC argument instead of a Postgres GUC.
 function toStop(row: Record<string, unknown>): Stop {
   return {
     id: row.id as string,
@@ -30,8 +38,7 @@ export interface StopsRepository {
 export const stopsRepository: StopsRepository = {
   async listByRoute(routeId) {
     const { data, error } = await supabaseAdmin
-      .from("stops")
-      .select("*")
+      .rpc("get_stops_readable", { p_secret_key: env.SECRET_KEY })
       .eq("route_id", routeId)
       .order("order_index");
     if (error) throw error;
@@ -40,55 +47,48 @@ export const stopsRepository: StopsRepository = {
 
   async getById(id) {
     const { data, error } = await supabaseAdmin
-      .from("stops")
-      .select("*")
+      .rpc("get_stops_readable", { p_secret_key: env.SECRET_KEY })
       .eq("id", id)
       .maybeSingle();
     if (error) throw error;
-    return data ? toStop(data) : null;
+    return data ? toStop(data as Record<string, unknown>) : null;
   },
 
   async create(input) {
     const { data, error } = await supabaseAdmin
-      .from("stops")
-      .insert({
-        route_id: input.routeId,
-        order_index: input.order,
-        customer_name: input.customerName,
-        address: input.address,
-        lat: input.lat,
-        lng: input.lng,
-        instructions: input.instructions,
+      .rpc("create_stop_encrypted", {
+        p_route_id: input.routeId,
+        p_order_index: input.order,
+        p_customer_name: input.customerName,
+        p_address: input.address,
+        p_lat: input.lat,
+        p_lng: input.lng,
+        p_instructions: input.instructions,
+        p_secret_key: env.SECRET_KEY,
       })
-      .select("*")
       .single();
     if (error) throw error;
-    return toStop(data);
+
+    const row = data as Record<string, unknown>;
+    return toStop({ ...row, customer_name: input.customerName, address: input.address });
   },
 
-  // Only succeeds while the stop isn't already completed — the eq() chain is
-  // the state-transition guard, same pattern as routes.repository start/finish.
+  // The guard (only succeeds while not already completed) lives inside the
+  // RPC's WHERE clause now — it needs the secret key to decrypt the row it
+  // returns, so it can't stay a plain .update().eq().neq() chain.
   async complete(id) {
     const { data, error } = await supabaseAdmin
-      .from("stops")
-      .update({ status: "completed", completed_time: new Date().toISOString() })
-      .eq("id", id)
-      .neq("status", "completed")
-      .select("*")
+      .rpc("complete_stop_encrypted", { p_id: id, p_secret_key: env.SECRET_KEY })
       .maybeSingle();
     if (error) throw error;
-    return data ? toStop(data) : null;
+    return data ? toStop(data as Record<string, unknown>) : null;
   },
 
   async delay(id) {
     const { data, error } = await supabaseAdmin
-      .from("stops")
-      .update({ status: "delayed" })
-      .eq("id", id)
-      .neq("status", "completed")
-      .select("*")
+      .rpc("delay_stop_encrypted", { p_id: id, p_secret_key: env.SECRET_KEY })
       .maybeSingle();
     if (error) throw error;
-    return data ? toStop(data) : null;
+    return data ? toStop(data as Record<string, unknown>) : null;
   },
 };

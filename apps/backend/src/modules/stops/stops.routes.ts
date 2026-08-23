@@ -1,7 +1,7 @@
 import { CreateStopSchema } from "@torpreca/shared";
 import { logEvent } from "../../core/audit/log-event";
 import { clientIp } from "../../core/http/client-ip";
-import type { Router } from "../../core/http/router";
+import type { Routable } from "../../core/http/router";
 import { auth } from "../../core/middleware/auth";
 import { rateLimitGeneral } from "../../core/middleware/rate-limit";
 import { requireRole } from "../../core/middleware/role";
@@ -15,7 +15,7 @@ const service = createStopsService(stopsRepository, routesRepository);
 // `routeId` comes from the URL, not the client — validate the rest of the body separately.
 const CreateStopBodySchema = CreateStopSchema.omit({ routeId: true });
 
-export function registerStopsRoutes(router: Router) {
+export function registerStopsRoutes(router: Routable) {
   router.get("/routes/:routeId/stops", auth, rateLimitGeneral, async (ctx) => {
     return Response.json(await service.listByRoute(ctx.params.routeId!, ctx.user!));
   });

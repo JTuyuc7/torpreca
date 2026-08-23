@@ -1,7 +1,7 @@
 import { CreateRouteSchema, FinishRouteSchema } from "@torpreca/shared";
 import { logEvent } from "../../core/audit/log-event";
 import { clientIp } from "../../core/http/client-ip";
-import type { Router } from "../../core/http/router";
+import type { Routable } from "../../core/http/router";
 import { auth } from "../../core/middleware/auth";
 import { rateLimitGeneral } from "../../core/middleware/rate-limit";
 import { requireRole } from "../../core/middleware/role";
@@ -11,7 +11,7 @@ import { createRoutesService } from "./routes.service";
 
 const service = createRoutesService(routesRepository);
 
-export function registerRoutesRoutes(router: Router) {
+export function registerRoutesRoutes(router: Routable) {
   router.get("/routes", auth, rateLimitGeneral, async (ctx) => {
     const date = new URL(ctx.req.url).searchParams.get("date") ?? undefined;
     return Response.json(await service.list(ctx.user!, date));

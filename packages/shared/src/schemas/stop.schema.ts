@@ -1,6 +1,9 @@
 import { STOP_STATUSES } from "../constants/statuses";
 import { z } from "../zod";
 
+// customerName/address travel as plaintext over the API — the backend encrypts/
+// decrypts them (pgp_sym_encrypt/pgp_sym_decrypt) when reading/writing the DB,
+// same pattern as users.name.
 export const StopSchema = z.object({
   id: z.uuid(),
   routeId: z.uuid(),
