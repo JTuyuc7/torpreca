@@ -23,17 +23,32 @@ export function createRoutesService(repo: RoutesRepository) {
       return repo.create(input, createdBy);
     },
 
+    // Ownership is checked here, separately from the state-transition guard
+    // below — a queued sync event replayed for the wrong driver's route
+    // needs to come back as a distinct 403, not get lumped into the same 409
+    // an idempotent replay produces (see modules/sync-queue/sync-queue.service.ts).
     async start(id: string, driverId: string): Promise<Route> {
-      const route = await repo.start(id, driverId);
-      if (!route) throw new AppError(409, "Route cannot be started (not yours, or not pending)");
-      return route;
+      const route = await repo.getById(id);
+      if (!route) throw new NotFoundError("Route not found");
+      if (route.driverId !== driverId) {
+        throw new ForbiddenError("This route belongs to another driver");
+      }
+
+      const started = await repo.start(id, driverId);
+      if (!started) throw new AppError(409, "Route cannot be started (not pending)");
+      return started;
     },
 
     async finish(id: string, driverId: string, drivenKm: number): Promise<Route> {
-      const route = await repo.finish(id, driverId, drivenKm);
-      if (!route)
-        throw new AppError(409, "Route cannot be finished (not yours, or not in progress)");
-      return route;
+      const route = await repo.getById(id);
+      if (!route) throw new NotFoundError("Route not found");
+      if (route.driverId !== driverId) {
+        throw new ForbiddenError("This route belongs to another driver");
+      }
+
+      const finished = await repo.finish(id, driverId, drivenKm);
+      if (!finished) throw new AppError(409, "Route cannot be finished (not in progress)");
+      return finished;
     },
   };
 }

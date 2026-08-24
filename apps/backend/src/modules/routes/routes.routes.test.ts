@@ -95,7 +95,7 @@ describe("routes HTTP routes", () => {
     expect(fake.tables.audit_logs?.[0]).toMatchObject({ action: "route.created" });
   });
 
-  it("PATCH /routes/:id/start as a different driver returns 409", async () => {
+  it("PATCH /routes/:id/start as a different driver returns 403", async () => {
     fake.tables.routes = [
       {
         id: "r1",
@@ -123,7 +123,7 @@ describe("routes HTTP routes", () => {
       }),
     );
 
-    expect(res.status).toBe(409);
+    expect(res.status).toBe(403);
   });
 
   it("PATCH /routes/:id/start as admin returns 403 (driver-only action)", async () => {

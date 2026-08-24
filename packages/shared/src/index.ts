@@ -14,6 +14,7 @@ export * from "./schemas/daily-report.schema";
 export * from "./schemas/location.schema";
 export * from "./schemas/route.schema";
 export * from "./schemas/stop.schema";
+export * from "./schemas/sync-event.schema";
 export * from "./schemas/sync-queue-item.schema";
 export * from "./schemas/user.schema";
 export * from "./schemas/vehicle.schema";
