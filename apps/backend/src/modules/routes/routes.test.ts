@@ -154,7 +154,21 @@ describe("routes.service", () => {
     );
 
     await expect(service.start(route.id, driver.id)).rejects.toThrow(
-      "Route cannot be started (not yours, or not pending)",
+      "This route belongs to another driver",
+    );
+  });
+
+  it("rejects starting a route that isn't pending", async () => {
+    const repo = createFakeRepo();
+    const service = createRoutesService(repo);
+    const route = await service.create(
+      { code: "R-1", driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: null },
+      admin.id,
+    );
+    await service.start(route.id, driver.id);
+
+    await expect(service.start(route.id, driver.id)).rejects.toThrow(
+      "Route cannot be started (not pending)",
     );
   });
 
@@ -181,7 +195,27 @@ describe("routes.service", () => {
     );
 
     await expect(service.finish(route.id, driver.id, 10)).rejects.toThrow(
-      "Route cannot be finished (not yours, or not in progress)",
+      "Route cannot be finished (not in progress)",
+    );
+  });
+
+  it("rejects finishing a route that belongs to another driver", async () => {
+    const repo = createFakeRepo();
+    const service = createRoutesService(repo);
+    const route = await service.create(
+      {
+        code: "R-1",
+        driverId: otherDriver.id,
+        vehicleId: null,
+        date: "2026-08-21",
+        plannedKm: null,
+      },
+      admin.id,
+    );
+    await service.start(route.id, otherDriver.id);
+
+    await expect(service.finish(route.id, driver.id, 10)).rejects.toThrow(
+      "This route belongs to another driver",
     );
   });
 });
