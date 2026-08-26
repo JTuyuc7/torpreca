@@ -18,6 +18,9 @@ node_modules/
 out/
 next-env.d.ts
 
+# Test coverage reports
+coverage/
+
 # Flutter (mobile)
 apps/mobile/.dart_tool/
 apps/mobile/.flutter-plugins
