@@ -10,7 +10,11 @@
     "lint": "biome check apps/backend/src packages/shared/src",
     "lint:fix": "biome check --write apps/backend/src packages/shared/src",
     "format": "biome format --write apps/backend/src packages/shared/src",
-    "test": "cd apps/backend && bun test"
+    "test": "cd apps/backend && bun test",
+    "test:coverage:backend": "cd apps/backend && bun test --coverage",
+    "test:coverage:shared": "cd packages/shared && bun test --coverage",
+    "test:coverage:dashboard": "cd apps/dashboard && pnpm test:coverage",
+    "test:coverage": "bun run test:coverage:backend && bun run test:coverage:shared && bun run test:coverage:dashboard"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.9",
