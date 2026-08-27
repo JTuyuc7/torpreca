@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
+import { buildSignaturePayload, signPayload } from "@torpreca/shared";
 import { env } from "../config/env";
-import { buildSignaturePayload, signPayload } from "../security/hmac";
 import { requestSigning } from "./request-signing";
 
 const ok = async () => Response.json({ ok: true });

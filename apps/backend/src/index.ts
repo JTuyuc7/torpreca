@@ -11,6 +11,7 @@ import {
   type TrackingWs,
 } from "./core/ws/tracking-handlers";
 import { resolveUpgradeData, type TrackingSocketData } from "./core/ws/upgrade";
+import { registerAuthRoutes } from "./modules/auth/auth.routes";
 import { locationsRepository } from "./modules/locations/locations.repository";
 import { registerLocationsRoutes } from "./modules/locations/locations.routes";
 import { createLocationsService } from "./modules/locations/locations.service";
@@ -29,6 +30,7 @@ const router = new Router();
 // /api/v1: all module routes live here. When v2 ships, mount it the same way
 // and add `deprecated({ sunset, link })` as an extra middleware on this v1 group.
 const v1 = router.withPrefix("/api/v1");
+registerAuthRoutes(v1);
 registerVehiclesRoutes(v1);
 registerUsersRoutes(v1);
 registerRoutesRoutes(v1);

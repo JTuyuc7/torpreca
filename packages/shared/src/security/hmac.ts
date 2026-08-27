@@ -1,5 +1,10 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+// Shared between apps/backend (verifies) and apps/dashboard's server-side
+// route handlers (sign, using REQUEST_SIGNING_SECRET as a private env var —
+// never exposed to the browser). Both sides must build the exact same
+// canonical payload or every signed request fails.
+
 const HEX_PATTERN = /^[0-9a-f]+$/i;
 
 // Canonical string both the signer and the verifier hash — order and separators
