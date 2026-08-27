@@ -1,7 +1,7 @@
+import { buildSignaturePayload, verifySignature } from "@torpreca/shared";
 import { env } from "../config/env";
 import { AppError } from "../errors/app-error";
 import type { Middleware } from "../http/context";
-import { buildSignaturePayload, verifySignature } from "../security/hmac";
 
 const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
 

@@ -31,3 +31,8 @@ export function rateLimit(maxRequests: number, windowMs: number): Middleware {
 }
 
 export const rateLimitGeneral = rateLimit(60, 60_000);
+
+// Stricter limit for public, unauthenticated auth-sensitive endpoints
+// (e.g. login-failed logging, future self-signup) — same criteria as
+// documented for POST /auth/register in the self-signup design doc.
+export const rateLimitAuth = rateLimit(5, 60_000);
