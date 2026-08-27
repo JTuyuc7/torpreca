@@ -35,3 +35,4 @@ apps/mobile/android/app/*.jks
 .DS_Store
 Thumbs.db
 CLAUDE.md
+context

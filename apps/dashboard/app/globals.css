@@ -1,26 +1,52 @@
 @import "tailwindcss";
 
+/* Torpreca Design System V2.0 — ver context/dashboard/assets/TorprecaDesignV2.pdf
+   Tokens M3 light/dark. --brand es fijo (no cambia con el tema): identidad de
+   marca para el panel del login y futuros AppBar/Sidebar. --primary sí es
+   tonal (swapea a un azul más claro en dark para mantener contraste sobre
+   fondo oscuro, como hace M3) y es el que se usa en botones/foco. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #fffbfe;
+  --surface: #eef4fb;
+  --brand: #00529e;
+  --primary: #00529e;
+  --secondary: #ea7016;
+  --secondary-hover: #de6e20;
+  --text: #1c1b1f;
+  --outline: #79747e;
+  --error: #b3261e;
+  --decorative: #7e5b34;
 }
 
 @theme inline {
   --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-surface: var(--surface);
+  --color-brand: var(--brand);
+  --color-primary: var(--primary);
+  --color-secondary: var(--secondary);
+  --color-secondary-hover: var(--secondary-hover);
+  --color-text: var(--text);
+  --color-outline: var(--outline);
+  --color-error: var(--error);
+  --color-decorative: var(--decorative);
+  --font-sans: var(--font-roboto);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0c1929;
+    --surface: #152639;
+    --primary: #7dc0f5;
+    --secondary: #ffb06b;
+    --secondary-hover: #ffb06b;
+    --text: #e6e1e5;
+    --outline: #8bafc8;
+    --error: #f2b8b5;
   }
 }
 
 body {
   background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  color: var(--text);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
