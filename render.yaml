@@ -1,0 +1,112 @@
+# Render Blueprint — see context/infra/deploy-plan-cicd.md for the full design.
+#
+# 4 services, all Auto-Deploy: on. Render's own git integration is what
+# triggers every deploy — staging services track `main`, production services
+# track `release` (only ever updated via a reviewed PR from `main`, see
+# .github/workflows/approve-production.yml). No GitHub Actions step ever
+# calls Render directly: no Deploy Hooks, no Render API key.
+#
+# Field names below match Render's Blueprint spec as of this writing —
+# double-check against https://render.com/docs/blueprint-spec before
+# applying, since this file was authored without live access to verify it.
+#
+# Secret values are declared with `sync: false` — Render prompts for the
+# actual value once per service in its dashboard; nothing sensitive lives in
+# this file. See docs/deploy/environment-variables.md for what each one is.
+
+envVarGroups:
+  - name: torpreca-staging-shared
+    envVars:
+      - key: REQUEST_SIGNING_SECRET
+        sync: false
+  - name: torpreca-production-shared
+    envVars:
+      - key: REQUEST_SIGNING_SECRET
+        sync: false
+
+services:
+  - type: web
+    name: torpreca-backend-staging
+    runtime: docker
+    dockerfilePath: ./apps/backend/Dockerfile
+    dockerContext: .
+    plan: pro
+    region: oregon
+    branch: main
+    autoDeploy: true
+    healthCheckPath: /health
+    envVarGroups:
+      - torpreca-staging-shared
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+
+  - type: web
+    name: torpreca-backend-production
+    runtime: docker
+    dockerfilePath: ./apps/backend/Dockerfile
+    dockerContext: .
+    plan: pro
+    region: oregon
+    branch: release
+    autoDeploy: true
+    healthCheckPath: /health
+    envVarGroups:
+      - torpreca-production-shared
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+
+  - type: web
+    name: torpreca-dashboard-staging
+    runtime: node
+    rootDir: apps/dashboard
+    buildCommand: pnpm install --frozen-lockfile && pnpm build
+    startCommand: pnpm start
+    plan: pro
+    region: oregon
+    branch: main
+    autoDeploy: true
+    healthCheckPath: /login
+    envVarGroups:
+      - torpreca-staging-shared
+    envVars:
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: NEXT_PUBLIC_BACKEND_URL
+        sync: false
+
+  - type: web
+    name: torpreca-dashboard-production
+    runtime: node
+    rootDir: apps/dashboard
+    buildCommand: pnpm install --frozen-lockfile && pnpm build
+    startCommand: pnpm start
+    plan: pro
+    region: oregon
+    branch: release
+    autoDeploy: true
+    healthCheckPath: /login
+    envVarGroups:
+      - torpreca-production-shared
+    envVars:
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: NEXT_PUBLIC_BACKEND_URL
+        sync: false
