@@ -29,7 +29,7 @@ beforeEach(() => {
 
 function fillAndSubmit(email: string, password: string) {
   fireEvent.change(screen.getByLabelText(/correo/i), { target: { value: email } });
-  fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: password } });
+  fireEvent.change(screen.getByLabelText("Contraseña"), { target: { value: password } });
   fireEvent.click(screen.getByRole("button", { name: /iniciar sesión/i }));
 }
 

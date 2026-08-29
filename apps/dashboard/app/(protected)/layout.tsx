@@ -3,8 +3,9 @@
 import type { AuthUser } from "@torpreca/shared";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { clearCachedAuthUser, readCachedAuthUser, writeCachedAuthUser } from "../../lib/auth/session-cache";
-import { supabase } from "../../lib/supabase/client";
+import { logout as logoutRequest, verifySession } from "@/lib/api/auth-client";
+import { clearCachedAuthUser, readCachedAuthUser, writeCachedAuthUser } from "@/lib/auth/session-cache";
+import { supabase } from "@/lib/supabase/client";
 import { AuthUserProvider } from "./auth-context";
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
@@ -39,22 +40,18 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
       // backend. This also (re)logs auth.login, which is fine: it only
       // fires once per browser session, not once per navigation, since the
       // cache above short-circuits every mount after the first.
-      const res = await fetch("/api/auth/session", {
-        method: "POST",
-        headers: { authorization: `Bearer ${session.access_token}` },
-      });
+      const result = await verifySession(session.access_token);
 
-      if (!res.ok) {
+      if (!result.ok) {
         await supabase.auth.signOut();
         clearCachedAuthUser();
         if (!cancelled) router.replace("/login");
         return;
       }
 
-      const user = (await res.json()) as AuthUser;
-      writeCachedAuthUser(user);
+      writeCachedAuthUser(result.user);
       if (!cancelled) {
-        setAuthUser(user);
+        setAuthUser(result.user);
         setChecking(false);
       }
     }
@@ -71,10 +68,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     } = await supabase.auth.getSession();
 
     if (session) {
-      await fetch("/api/auth/logout", {
-        method: "POST",
-        headers: { authorization: `Bearer ${session.access_token}` },
-      }).catch(() => {});
+      await logoutRequest(session.access_token);
     }
 
     await supabase.auth.signOut();
