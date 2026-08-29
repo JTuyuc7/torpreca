@@ -47,8 +47,10 @@ cd apps/mobile && flutter run
 
 Staging (`main`) y producción (`release`) corren en Render, con auto-deploy nativo por
 rama — ver `context/infra/deploy-plan-cicd.md` para el diseño completo (topología de
-servicios, gate de aprobación manual, workflows de CI). Convención de variables de
-entorno por ambiente: [docs/deploy/environment-variables.md](docs/deploy/environment-variables.md).
+servicios, gate de aprobación manual, workflows de CI). Cambios de esquema de base de
+datos: [docs/deploy/database-migrations.md](docs/deploy/database-migrations.md) (vía
+Supabase CLI, no SQL manual). Convención de variables de entorno por ambiente:
+[docs/deploy/environment-variables.md](docs/deploy/environment-variables.md).
 
 ## Documentación de la API (backend)
 

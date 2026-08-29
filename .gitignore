@@ -7,6 +7,8 @@
 .env.*.local
 **/.env
 **/.env.local
+# Cualquier .<algo>.env por ambiente (ej. .staging.env, .production.env)
+.*.env
 !template.env
 
 # Dependencias
