@@ -1,0 +1,31 @@
+# Used by apps/backend/Dockerfile, built with the repo root as context.
+# Everything not needed to `bun install` + run the backend stays out of the
+# build context — keeps the image lean and the build fast.
+
+node_modules
+**/node_modules
+.pnpm-store
+
+.git
+.github
+.idea
+.claude
+
+apps/dashboard
+apps/landing
+apps/mobile
+
+context
+*.md
+!README.md
+
+.env
+.env.local
+.env.*.local
+**/.env
+**/.env.local
+
+.next
+out
+coverage
+*.log
