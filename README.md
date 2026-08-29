@@ -43,6 +43,13 @@ cd apps/dashboard && pnpm dev
 cd apps/mobile && flutter run
 ```
 
+## Despliegue
+
+Staging (`main`) y producción (`release`) corren en Render, con auto-deploy nativo por
+rama — ver `context/infra/deploy-plan-cicd.md` para el diseño completo (topología de
+servicios, gate de aprobación manual, workflows de CI). Convención de variables de
+entorno por ambiente: [docs/deploy/environment-variables.md](docs/deploy/environment-variables.md).
+
 ## Documentación de la API (backend)
 
 Con el backend corriendo (`bun dev` en `apps/backend`, puerto por defecto 3000):
