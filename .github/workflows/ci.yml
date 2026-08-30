@@ -49,10 +49,27 @@ jobs:
           version: 10.34.5
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # jsdom@30 requires Node ^22.22.2 || ^24.15.0 || >=26 (its bundled
+          # undici@8's CacheStorage needs a webidl helper Node 20 lacks —
+          # "webidl.util.markAsUncloneable is not a function"). Node 20 was
+          # never actually exercised by CI before this PR: the "dashboard"
+          # job only runs when apps/dashboard files change, and none of the
+          # PRs since ci.yml was added had touched any until this one.
+          node-version: 22
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter dashboard lint
       - run: pnpm --filter dashboard test
+      # Next.js evaluates API route modules at build time to collect their
+      # config — app/api/auth/session/route.ts imports lib/backend/signed-fetch.ts,
+      # which throws if NEXT_PUBLIC_BACKEND_URL/REQUEST_SIGNING_SECRET are
+      # unset (see docs/deploy/environment-variables.md). CI doesn't deploy
+      # anything, so these are placeholder values only, just enough for the
+      # build to complete — the real ones live in Render, per environment.
       - run: pnpm --filter dashboard build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+          NEXT_PUBLIC_BACKEND_URL: https://placeholder-backend.invalid
+          REQUEST_SIGNING_SECRET: ci-placeholder-signing-secret
