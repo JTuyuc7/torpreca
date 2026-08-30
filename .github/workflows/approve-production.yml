@@ -1,0 +1,25 @@
+name: Approve production deploy
+
+# Gate for promoting `main` to production. This job does not deploy
+# anything — Render auto-deploys `torpreca-*-production` natively on push to
+# `release`. This job's only purpose is to sit behind the `production`
+# GitHub Environment's required-reviewer protection rule (see
+# context/infra/deploy-plan-cicd.md, section 3): as long as it's pending
+# approval, the "Merge" button on this PR stays disabled (add this job as a
+# required status check on the `release` branch). Approving it in the
+# Actions tab is what unblocks the merge.
+#
+# Requires the `production` Environment to exist first (Settings >
+# Environments), with the reviewer(s) configured there — TOR-101.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [release]
+
+jobs:
+  approve:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - run: echo "Approved — merging this PR lets Render deploy torpreca-*-production from the release branch."

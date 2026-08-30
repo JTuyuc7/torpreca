@@ -1,0 +1,111 @@
+# Render Blueprint — see context/infra/deploy-plan-cicd.md for the full design.
+#
+# 4 services, all Auto-Deploy: on. Render's own git integration is what
+# triggers every deploy — staging services track `main`, production services
+# track `release` (only ever updated via a reviewed PR from `main`, see
+# .github/workflows/approve-production.yml). No GitHub Actions step ever
+# calls Render directly: no Deploy Hooks, no Render API key.
+#
+# Field names below match Render's Blueprint spec as of this writing —
+# double-check against https://render.com/docs/blueprint-spec before
+# applying, since this file was authored without live access to verify it.
+# (A prior version used a top-level `envVarGroups:` block referenced per
+# service — Render's Blueprint validator rejected that field on `Service`.
+# Removed; each service now declares REQUEST_SIGNING_SECRET directly. To get
+# a single shared value per environment instead of typing it twice, create
+# an Environment Group by hand in the Render dashboard — Environment > Env
+# Groups — and attach it to both services of that environment there; that's
+# a dashboard-level construct, not something this Blueprint file controls.)
+#
+# Secret values are declared with `sync: false` — Render prompts for the
+# actual value once per service in its dashboard; nothing sensitive lives in
+# this file. See docs/deploy/environment-variables.md for what each one is.
+
+services:
+  - type: web
+    name: torpreca-backend-staging
+    runtime: docker
+    dockerfilePath: ./apps/backend/Dockerfile
+    dockerContext: .
+    plan: pro
+    region: oregon
+    branch: main
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: REQUEST_SIGNING_SECRET
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+
+  - type: web
+    name: torpreca-backend-production
+    runtime: docker
+    dockerfilePath: ./apps/backend/Dockerfile
+    dockerContext: .
+    plan: pro
+    region: oregon
+    branch: release
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: REQUEST_SIGNING_SECRET
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+
+  - type: web
+    name: torpreca-dashboard-staging
+    runtime: node
+    # Repo root, not apps/dashboard — pnpm-workspace.yaml lives at the root
+    # and packages/shared is a workspace member (its own runtime deps, e.g.
+    # zod, must actually get installed; a plain subdirectory install can't
+    # see the workspace). Same reasoning as the backend's Docker context.
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter dashboard build
+    startCommand: pnpm --filter dashboard start
+    plan: pro
+    region: oregon
+    branch: main
+    autoDeploy: true
+    healthCheckPath: /login
+    envVars:
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: NEXT_PUBLIC_BACKEND_URL
+        sync: false
+      - key: REQUEST_SIGNING_SECRET
+        sync: false
+
+  - type: web
+    name: torpreca-dashboard-production
+    runtime: node
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter dashboard build
+    startCommand: pnpm --filter dashboard start
+    plan: pro
+    region: oregon
+    branch: release
+    autoDeploy: true
+    healthCheckPath: /login
+    envVars:
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: NEXT_PUBLIC_BACKEND_URL
+        sync: false
+      - key: REQUEST_SIGNING_SECRET
+        sync: false
