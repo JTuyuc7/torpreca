@@ -61,4 +61,15 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter dashboard lint
       - run: pnpm --filter dashboard test
+      # Next.js evaluates API route modules at build time to collect their
+      # config — app/api/auth/session/route.ts imports lib/backend/signed-fetch.ts,
+      # which throws if NEXT_PUBLIC_BACKEND_URL/REQUEST_SIGNING_SECRET are
+      # unset (see docs/deploy/environment-variables.md). CI doesn't deploy
+      # anything, so these are placeholder values only, just enough for the
+      # build to complete — the real ones live in Render, per environment.
       - run: pnpm --filter dashboard build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+          NEXT_PUBLIC_BACKEND_URL: https://placeholder-backend.invalid
+          REQUEST_SIGNING_SECRET: ci-placeholder-signing-secret
