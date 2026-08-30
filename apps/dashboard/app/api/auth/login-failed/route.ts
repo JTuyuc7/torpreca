@@ -1,4 +1,4 @@
-import { callBackend } from "../../../../lib/backend/signed-fetch";
+import { callBackend, passthroughResponse } from "../../../../lib/backend/signed-fetch";
 
 export async function POST(req: Request) {
   const body = await req.text();
@@ -7,5 +7,5 @@ export async function POST(req: Request) {
     body,
     clientIp: req.headers.get("x-forwarded-for"),
   });
-  return new Response(res.body, { status: res.status, headers: res.headers });
+  return passthroughResponse(res);
 }
