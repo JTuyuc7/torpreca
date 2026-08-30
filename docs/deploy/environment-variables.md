@@ -46,11 +46,16 @@ production↔production — but the two environments must use *different* values
 other.
 
 - Generate with `openssl rand -hex 32`.
-- Recommended: use a Render **Environment Group** per environment
-  (`torpreca-staging-shared`, `torpreca-production-shared`) holding this one variable,
-  attached to both services in that environment — this way there's one value to update,
-  not two copies that can drift.
-- If rotating manually instead: update both services in the same maintenance window, and
+- Recommended: create a Render **Environment Group** per environment by hand in the
+  dashboard (`Environment > Env Groups` — `torpreca-staging-shared`,
+  `torpreca-production-shared`), add this one variable there, and attach the group to
+  both services of that environment. This is a dashboard-level construct, not something
+  `render.yaml` declares (an earlier version of this file tried to define
+  `envVarGroups` in the Blueprint itself — Render's validator rejected that field on
+  `Service`, so each service in `render.yaml` just lists `REQUEST_SIGNING_SECRET`
+  individually; the Env Group is what actually keeps the *value* from drifting).
+- If skipping the Env Group and setting it per-service instead: update both services in
+  the same maintenance window, and
   expect every `/api/auth/*` request to fail with a signature error on the dashboard
   until both sides match again.
 
