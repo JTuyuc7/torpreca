@@ -12,12 +12,14 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@asteasolutions/zod-to-openapi": "^9.1.0",
     "@supabase/supabase-js": "^2.112.4",
     "@torpreca/shared": "link:../../packages/shared",
     "lucide-react": "^1.37.0",
     "next": "16.3.1",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "zod": "^4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
