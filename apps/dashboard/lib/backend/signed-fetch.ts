@@ -40,3 +40,20 @@ export async function callBackend(path: string, input: CallBackendInput): Promis
     body: body || undefined,
   });
 }
+
+// Route handlers under app/api/auth/* pass callBackend()'s response straight
+// through to the browser. `fetch()` already transparently decompresses the
+// body for us — but its `Response.headers` still reports the on-the-wire
+// `Content-Encoding` (e.g. "br", since both Render's backend and this
+// dashboard sit behind Cloudflare). Forwarding that header verbatim alongside
+// the already-decoded body tells the browser "this is still compressed",
+// which fails to decode and surfaces as an unhandled exception in
+// res.json() — in production only, since local dev has no compressing proxy
+// in front of the backend. Build a clean Response instead, carrying over
+// only content-type; let the runtime set correct framing for the new body.
+export function passthroughResponse(res: Response): Response {
+  const headers = new Headers();
+  const contentType = res.headers.get("content-type");
+  if (contentType) headers.set("content-type", contentType);
+  return new Response(res.body, { status: res.status, headers });
+}

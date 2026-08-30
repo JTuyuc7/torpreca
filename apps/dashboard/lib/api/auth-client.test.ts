@@ -30,6 +30,22 @@ describe("verifySession", () => {
 
     expect(result).toEqual({ ok: false, status: 403 });
   });
+
+  it("returns ok:false with status 0 instead of throwing when the body can't be parsed as JSON despite a 200", async () => {
+    fetchMock.mockResolvedValue(new Response("not json", { status: 200 }));
+
+    const result = await verifySession("tok");
+
+    expect(result).toEqual({ ok: false, status: 0 });
+  });
+
+  it("returns ok:false with status 0 instead of throwing on a network error", async () => {
+    fetchMock.mockRejectedValue(new Error("network down"));
+
+    const result = await verifySession("tok");
+
+    expect(result).toEqual({ ok: false, status: 0 });
+  });
 });
 
 describe("reportLoginFailed", () => {
