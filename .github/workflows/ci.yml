@@ -51,8 +51,8 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-          cache-dependency-path: apps/dashboard/pnpm-lock.yaml
-      - run: pnpm --dir apps/dashboard install --frozen-lockfile
-      - run: pnpm --dir apps/dashboard lint
-      - run: pnpm --dir apps/dashboard test
-      - run: pnpm --dir apps/dashboard build
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter dashboard lint
+      - run: pnpm --filter dashboard test
+      - run: pnpm --filter dashboard build
