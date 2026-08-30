@@ -69,9 +69,12 @@ services:
   - type: web
     name: torpreca-dashboard-staging
     runtime: node
-    rootDir: apps/dashboard
-    buildCommand: pnpm install --frozen-lockfile && pnpm build
-    startCommand: pnpm start
+    # Repo root, not apps/dashboard — pnpm-workspace.yaml lives at the root
+    # and packages/shared is a workspace member (its own runtime deps, e.g.
+    # zod, must actually get installed; a plain subdirectory install can't
+    # see the workspace). Same reasoning as the backend's Docker context.
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter dashboard build
+    startCommand: pnpm --filter dashboard start
     plan: pro
     region: oregon
     branch: main
@@ -90,9 +93,8 @@ services:
   - type: web
     name: torpreca-dashboard-production
     runtime: node
-    rootDir: apps/dashboard
-    buildCommand: pnpm install --frozen-lockfile && pnpm build
-    startCommand: pnpm start
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter dashboard build
+    startCommand: pnpm --filter dashboard start
     plan: pro
     region: oregon
     branch: release

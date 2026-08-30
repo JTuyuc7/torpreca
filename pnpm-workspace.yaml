@@ -1,0 +1,20 @@
+# pnpm workspace scoped to the pnpm-managed side of the monorepo (dashboard +
+# the shared package it needs) — apps/backend uses bun's own workspace
+# (root package.json's "workspaces" field, bun.lock), not pnpm; apps/landing
+# isn't a workspace member yet, still plain create-next-app boilerplate.
+#
+# packages/shared has its own runtime dependencies (zod,
+# @asteasolutions/zod-to-openapi — packages/shared/package.json) that need to
+# actually be installed for its code to run wherever it's imported. Before
+# this file existed, apps/dashboard consumed it via a plain `link:` (a
+# filesystem symlink, not a real workspace member), so nothing ever
+# installed those dependencies into packages/shared/node_modules except an
+# unrelated `bun install` at the repo root for backend development — which
+# doesn't happen in the dashboard's Render build, causing
+# "Module not found: Can't resolve 'zod'" there despite working locally by
+# accident. Declaring packages/shared as a real pnpm workspace member (and
+# apps/dashboard depending on it via `workspace:*`) makes `pnpm install`
+# install packages/shared's own dependencies correctly, every time.
+packages:
+  - apps/dashboard
+  - packages/shared
