@@ -1,4 +1,4 @@
-import type { ZodEmail, ZodType } from "zod";
+import type { ZodEmail, ZodObject } from "zod";
 import type { Writeable } from "zod/v3";
 import type { $strip } from "zod/v4/core";
 import { ValidationError } from "../errors/app-error";
