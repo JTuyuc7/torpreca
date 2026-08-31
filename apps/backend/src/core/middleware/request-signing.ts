@@ -11,6 +11,13 @@ export const requestSigning: Middleware = async (ctx, next) => {
   const url = new URL(ctx.req.url);
   if (!url.pathname.startsWith("/api/")) return next();
 
+  // /api/v1/mobile/* is the Flutter driver app — it can't hold
+  // REQUEST_SIGNING_SECRET safely (it would ship inside the APK), so it's
+  // authenticated by Supabase JWT + rate limiting only (see
+  // modules/auth/mobile-auth.routes.ts). Everything else under /api/ stays
+  // signed.
+  if (url.pathname.startsWith("/api/v1/mobile/")) return next();
+
   const signature = ctx.req.headers.get("x-signature");
   const timestamp = ctx.req.headers.get("x-timestamp");
   if (!signature || !timestamp) throw new AppError(401, "Missing request signature");
