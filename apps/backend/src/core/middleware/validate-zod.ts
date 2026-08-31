@@ -1,12 +1,8 @@
-import type { ZodEmail, ZodObject } from "zod";
-import type { Writeable } from "zod/v3";
-import type { $strip } from "zod/v4/core";
+import type { ZodType } from "zod";
 import { ValidationError } from "../errors/app-error";
 import type { Middleware } from "../http/context";
 
-export function validateBody(
-  schema: ZodObject<Writeable<{ email: ZodEmail }>, $strip>,
-): Middleware {
+export function validateBody(schema: ZodType): Middleware {
   return async (ctx, next) => {
     let raw: unknown;
     try {
