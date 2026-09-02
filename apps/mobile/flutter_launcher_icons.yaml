@@ -1,0 +1,11 @@
+# Launcher icon config — Play Store ticket "launcher icon"
+# Motif + colors from Notion → Sistema de Diseño (Design System V2):
+# Primary #00529E, Secondary/CTA #EA7016. Source PNGs generated via
+# apps/mobile/assets/icon/generate_icon.py.
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/icon_master.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#00529E"
+  adaptive_icon_foreground: "assets/icon/icon_foreground.png"
