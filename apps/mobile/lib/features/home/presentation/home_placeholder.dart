@@ -71,10 +71,15 @@ class _HomePlaceholderState extends State<HomePlaceholder> {
                 final status = _trackingService.status;
                 final isActive =
                     status == TrackingStatus.tracking || status == TrackingStatus.connecting;
+                final pending = _trackingService.pendingCount;
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(_statusLabel(status)),
+                    if (pending > 0) ...[
+                      const SizedBox(height: 4),
+                      Text('$pending sin sincronizar'),
+                    ],
                     const SizedBox(height: 8),
                     FilledButton(
                       onPressed: _toggleTracking,
