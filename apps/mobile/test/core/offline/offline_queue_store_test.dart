@@ -63,4 +63,21 @@ void main() {
     expect(store.pendingCount, 0);
     expect(store.pending(), isEmpty);
   });
+
+  test('remove() drops an item so it no longer counts as pending', () async {
+    await store.enqueue(
+      SyncQueueItem(
+        id: 'a',
+        eventType: 'location.ping',
+        recordedAt: DateTime.utc(2026, 1, 1),
+        payload: {'lat': 1.0, 'lng': 1.0},
+      ),
+    );
+    expect(store.pendingCount, 1);
+
+    await store.remove('a');
+
+    expect(store.pendingCount, 0);
+    expect(store.pending(), isEmpty);
+  });
 }

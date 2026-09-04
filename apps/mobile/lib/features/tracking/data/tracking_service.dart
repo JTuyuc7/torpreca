@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import '../../../core/api/sync_client.dart';
 import '../../../core/api/ws_ticket_client.dart';
 import '../../../core/env.dart';
 import '../../../core/offline/offline_queue_store.dart';
@@ -23,27 +24,33 @@ enum TrackingStatus { idle, connecting, tracking, error }
 /// queued locally via [OfflineQueueStore] with `synced: false` instead of
 /// being dropped. `status` stays `tracking` through a connection loss —
 /// only a fatal error (GPS permission/services, or the initial connect)
-/// moves it to `error`. Draining the queue back to the backend
-/// (`POST /sync`) is a separate ticket; this one only guarantees nothing
-/// recorded while offline is lost.
+/// moves it to `error`. Every time the socket connects (including the
+/// first time), the queue is drained via `POST /mobile/sync` — there's no
+/// background/periodic retry beyond that, so a queue built up during a long
+/// offline stretch clears out the next time the user restarts tracking
+/// with a connection available.
 ///
 /// Background tracking (app minimized/closed) is a separate ticket — this
 /// only tracks while a screen holding this service stays mounted.
 class TrackingService extends ChangeNotifier {
   TrackingService({
     WsTicketClient? ticketClient,
+    SyncClient? syncClient,
     OfflineQueueStore? queueStore,
     Uuid? uuid,
   }) : _ticketClient = ticketClient ?? WsTicketClient(),
+       _syncClient = syncClient ?? SyncClient(),
        _queueStore = queueStore ?? OfflineQueueStore(),
        _uuid = uuid ?? const Uuid();
 
   static const _pingInterval = Duration(seconds: 8);
 
   final WsTicketClient _ticketClient;
+  final SyncClient _syncClient;
   final OfflineQueueStore _queueStore;
   final Uuid _uuid;
   bool _queueReady = false;
+  bool _draining = false;
 
   WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _channelSub;
@@ -71,6 +78,7 @@ class TrackingService extends ChangeNotifier {
       _pingTimer = Timer.periodic(_pingInterval, (_) => _sendPing());
       _setStatus(TrackingStatus.tracking);
       unawaited(_sendPing());
+      unawaited(_drainOfflineQueue(accessToken));
     } catch (error) {
       _fail(error.toString());
     }
@@ -145,6 +153,33 @@ class TrackingService extends ChangeNotifier {
         ),
       );
       notifyListeners();
+    }
+  }
+
+  /// Sends every currently-queued item to `POST /mobile/sync` and drops
+  /// the ones the backend confirms it applied (or already had — see
+  /// `SyncItemOutcome.shouldRetry`). A network failure here just leaves the
+  /// queue untouched for the next connect; it doesn't affect `status` or
+  /// stop live pinging.
+  Future<void> _drainOfflineQueue(String accessToken) async {
+    if (_draining) return;
+    final items = _queueStore.pending();
+    if (items.isEmpty) return;
+
+    _draining = true;
+    try {
+      final outcomes = await _syncClient.sync(accessToken, items);
+      for (var i = 0; i < outcomes.length && i < items.length; i++) {
+        if (!outcomes[i].shouldRetry) {
+          await _queueStore.remove(items[i].id);
+        }
+      }
+      notifyListeners();
+    } catch (_) {
+      // Still offline, or the backend rejected the batch — retry on the
+      // next successful connect.
+    } finally {
+      _draining = false;
     }
   }
 
