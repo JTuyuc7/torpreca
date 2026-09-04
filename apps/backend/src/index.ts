@@ -22,7 +22,10 @@ import { registerStopsRoutes } from "./modules/stops/stops.routes";
 import { registerSyncQueueRoutes } from "./modules/sync-queue/sync-queue.routes";
 import { registerUsersRoutes } from "./modules/users/users.routes";
 import { registerVehiclesRoutes } from "./modules/vehicles/vehicles.routes";
-import { registerWsTicketsRoutes } from "./modules/ws-tickets/ws-tickets.routes";
+import {
+  registerMobileWsTicketsRoutes,
+  registerWsTicketsRoutes,
+} from "./modules/ws-tickets/ws-tickets.routes";
 import { docsPageHtml } from "./openapi/docs-page";
 import { openApiDocument } from "./openapi/document";
 
@@ -39,6 +42,7 @@ registerRoutesRoutes(v1);
 registerStopsRoutes(v1);
 registerLocationsRoutes(v1);
 registerWsTicketsRoutes(v1);
+registerMobileWsTicketsRoutes(v1);
 registerSyncQueueRoutes(v1);
 
 // Unversioned infra routes — not signed, not tied to an API version.
