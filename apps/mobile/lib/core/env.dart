@@ -11,6 +11,11 @@ class Env {
   static String get supabaseAnonKey => _require('SUPABASE_ANON_KEY');
   static String get backendUrl => _require('BACKEND_URL');
 
+  /// `BACKEND_URL` with the scheme swapped for the WebSocket equivalent
+  /// (http→ws, https→wss) — same host/port, used to open `/ws`.
+  static String get backendWsUrl =>
+      backendUrl.replaceFirst(RegExp(r'^http'), 'ws');
+
   static String _require(String key) {
     final value = dotenv.env[key];
     if (value == null || value.isEmpty || value.startsWith('TODO_')) {
