@@ -32,6 +32,14 @@ class OfflineQueueStore {
     return _requireBox.put(item.id, item.toMap());
   }
 
+  /// Drops an item once the backend confirms it's been applied (or was
+  /// already applied — `SyncItemOutcome.status == "conflict"` also counts,
+  /// see `SyncClient`). An "error" outcome is *not* removed — it stays
+  /// queued for the next sync attempt.
+  Future<void> remove(String id) {
+    return _requireBox.delete(id);
+  }
+
   /// Pending (unsynced) items, oldest `recordedAt` first — the order the
   /// backend needs to replay them in once a sync ticket sends this batch.
   List<SyncQueueItem> pending() {

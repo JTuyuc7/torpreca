@@ -99,6 +99,13 @@ async function buildRouter() {
   return router;
 }
 
+async function buildMobileRouter() {
+  const { registerMobileSyncQueueRoutes } = await import("./sync-queue.routes");
+  const router = new Router();
+  registerMobileSyncQueueRoutes(router);
+  return router;
+}
+
 beforeEach(() => {
   fake.reset({ routes: [], stops: [], locations: [], sync_queue: [], users: [], audit_logs: [] });
   seedUsers();
@@ -107,6 +114,14 @@ beforeEach(() => {
 
 function post(body: unknown) {
   return new Request("http://x/sync", {
+    method: "POST",
+    headers: { authorization: "Bearer t", "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+function postMobile(body: unknown) {
+  return new Request("http://x/mobile/sync", {
     method: "POST",
     headers: { authorization: "Bearer t", "content-type": "application/json" },
     body: JSON.stringify(body),
@@ -197,5 +212,55 @@ describe("sync-queue HTTP routes", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { results: { status: string }[] };
     expect(body.results.map((r) => r.status)).toEqual(["applied", "applied", "conflict"]);
+  });
+});
+
+describe("mobile sync-queue HTTP routes", () => {
+  it("POST /mobile/sync without a token returns 401", async () => {
+    const router = await buildMobileRouter();
+    const res = await router.handle(new Request("http://x/mobile/sync", { method: "POST" }));
+    expect(res.status).toBe(401);
+  });
+
+  it("POST /mobile/sync as admin returns 403 (driver-only)", async () => {
+    fake.setAuthUser({ id: ADMIN_AUTH_ID });
+    const router = await buildMobileRouter();
+
+    const res = await router.handle(
+      postMobile([
+        {
+          eventType: "stop.completed",
+          recordedAt: "2026-08-24T10:00:00.000Z",
+          payload: { stopId: STOP_ID },
+        },
+      ]),
+    );
+
+    expect(res.status).toBe(403);
+  });
+
+  it("POST /mobile/sync as driver processes the batch same as /sync", async () => {
+    fake.setAuthUser({ id: DRIVER_AUTH_ID });
+    const router = await buildMobileRouter();
+
+    const res = await router.handle(
+      postMobile([
+        {
+          eventType: "location.ping",
+          recordedAt: "2026-08-24T10:00:00.000Z",
+          payload: {
+            routeId: ROUTE_ID,
+            lat: 14.6,
+            lng: -90.5,
+            speed: 10,
+            recordedAt: "2026-08-24T10:00:00.000Z",
+          },
+        },
+      ]),
+    );
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { results: { status: string }[] };
+    expect(body.results.map((r) => r.status)).toEqual(["applied"]);
   });
 });

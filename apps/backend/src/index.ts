@@ -19,7 +19,10 @@ import { createLocationsService } from "./modules/locations/locations.service";
 import { routesRepository } from "./modules/routes/routes.repository";
 import { registerRoutesRoutes } from "./modules/routes/routes.routes";
 import { registerStopsRoutes } from "./modules/stops/stops.routes";
-import { registerSyncQueueRoutes } from "./modules/sync-queue/sync-queue.routes";
+import {
+  registerMobileSyncQueueRoutes,
+  registerSyncQueueRoutes,
+} from "./modules/sync-queue/sync-queue.routes";
 import { registerUsersRoutes } from "./modules/users/users.routes";
 import { registerVehiclesRoutes } from "./modules/vehicles/vehicles.routes";
 import {
@@ -44,6 +47,7 @@ registerLocationsRoutes(v1);
 registerWsTicketsRoutes(v1);
 registerMobileWsTicketsRoutes(v1);
 registerSyncQueueRoutes(v1);
+registerMobileSyncQueueRoutes(v1);
 
 // Unversioned infra routes — not signed, not tied to an API version.
 router.get("/health", () => Response.json({ ok: true }));
