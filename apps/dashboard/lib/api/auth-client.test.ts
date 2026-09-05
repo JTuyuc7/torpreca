@@ -11,7 +11,7 @@ beforeEach(() => {
 describe("verifySession", () => {
   it("returns ok:true with the parsed AuthUser on success", async () => {
     fetchMock.mockResolvedValue(
-      new Response(JSON.stringify({ id: "u1", role: "admin", active: true }), { status: 200 }),
+      new Response(JSON.stringify({ id: "u1", role: "admin", status: "active" }), { status: 200 }),
     );
 
     const result = await verifySession("tok");
@@ -20,7 +20,7 @@ describe("verifySession", () => {
       "/api/auth/session",
       expect.objectContaining({ method: "POST", headers: { authorization: "Bearer tok" } }),
     );
-    expect(result).toEqual({ ok: true, user: { id: "u1", role: "admin", active: true } });
+    expect(result).toEqual({ ok: true, user: { id: "u1", role: "admin", status: "active" } });
   });
 
   it("returns ok:false with the response status on failure", async () => {

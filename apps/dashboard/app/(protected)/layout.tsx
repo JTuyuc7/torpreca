@@ -1,6 +1,7 @@
 "use client";
 
 import type { AuthUser } from "@torpreca/shared";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { logout as logoutRequest, verifySession } from "@/lib/api/auth-client";
@@ -82,7 +83,12 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     <AuthUserProvider user={authUser}>
       <div className="flex flex-1 flex-col bg-background">
         <header className="flex items-center justify-between border-b border-outline/30 bg-surface px-6 py-3">
-          <span className="text-sm text-text">Torpreca — {authUser.role}</span>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-text">Torpreca — {authUser.role}</span>
+            <Link href="/drivers/pending" className="text-sm text-primary hover:underline">
+              Conductores por aprobar
+            </Link>
+          </div>
           <button
             type="button"
             onClick={handleLogout}

@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import type { AuthUser } from "@torpreca/shared";
 import { mintTicket, redeemTicket } from "./ticket-store";
 
-const user: AuthUser = { id: "driver-1", role: "driver", active: true };
+const user: AuthUser = { id: "driver-1", role: "driver", status: "active" };
 
 describe("ticket-store", () => {
   it("mints a ticket that redeems back to the same user", () => {

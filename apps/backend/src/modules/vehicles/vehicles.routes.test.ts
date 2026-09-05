@@ -13,7 +13,7 @@ function seedUser(role: "driver" | "supervisor" | "admin" | "super_admin", activ
       id: "user-1",
       auth_user_id: AUTH_USER_ID,
       role,
-      active,
+      status: active ? "active" : "deactivated",
       created_at: "t",
       updated_at: "t",
     },

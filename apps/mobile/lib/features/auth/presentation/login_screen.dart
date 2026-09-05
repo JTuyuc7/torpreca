@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show AuthException;
 
 import '../data/auth_repository.dart';
+import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, required this.authRepository});
@@ -43,6 +44,8 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       // No navigation here on purpose: main.dart listens to
       // Supabase's onAuthStateChange and swaps the screen reactively.
+    } on AccountNotReadyException catch (e) {
+      setState(() => _errorMessage = e.message);
     } on AuthException catch (e) {
       setState(() => _errorMessage = e.message);
     } catch (_) {
@@ -136,6 +139,17 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Text('Ingresar'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: _isLoading
+                        ? null
+                        : () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => RegisterScreen(authRepository: widget.authRepository),
+                              ),
+                            ),
+                    child: const Text('¿No tienes cuenta? Regístrate'),
                   ),
                 ],
               ),

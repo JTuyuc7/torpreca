@@ -10,8 +10,10 @@ import {
   CreateUserSchema,
   CreateVehicleSchema,
   FinishRouteSchema,
+  ReviewUserSchema,
   RouteSchema,
   StopSchema,
+  USER_STATUSES,
   UserSchema,
   VehicleSchema,
   z,
@@ -54,6 +56,7 @@ const Vehicle = registry.register("Vehicle", VehicleSchema);
 const CreateVehicle = registry.register("CreateVehicle", CreateVehicleSchema);
 const User = registry.register("User", UserSchema);
 const CreateUser = registry.register("CreateUser", CreateUserSchema);
+const ReviewUser = registry.register("ReviewUser", ReviewUserSchema);
 const Route = registry.register("Route", RouteSchema);
 const CreateRoute = registry.register("CreateRoute", CreateRouteSchema);
 const FinishRoute = registry.register("FinishRoute", FinishRouteSchema);
@@ -64,6 +67,12 @@ const IdParam = z.object({ id: z.uuid() });
 const RouteIdParam = z.object({ routeId: z.uuid() });
 const OnlyActiveQuery = z.object({
   all: z.enum(["true", "false"]).optional().describe("Set to 'true' to include inactive rows"),
+});
+const UserStatusQuery = z.object({
+  status: z
+    .enum([...USER_STATUSES, "all"])
+    .optional()
+    .describe("Filter by status; defaults to 'active'. 'all' lifts the filter."),
 });
 
 const authed = { security: [{ bearerAuth: [] }] };
@@ -124,7 +133,7 @@ path({
   path: "/users",
   tags: ["Users"],
   summary: "List users",
-  request: { query: OnlyActiveQuery },
+  request: { query: UserStatusQuery },
   responses: { 200: jsonResponse("Users", z.array(User)), 401: unauthorized, 403: forbidden },
 });
 path({
@@ -159,6 +168,24 @@ path({
     401: unauthorized,
     403: forbidden,
     404: notFound,
+  },
+});
+path({
+  method: "patch",
+  path: "/users/{id}/review",
+  tags: ["Users"],
+  summary: "Approve or reject a pending driver registration",
+  request: {
+    params: IdParam,
+    body: { content: { "application/json": { schema: ReviewUser } } },
+  },
+  responses: {
+    200: jsonResponse("User reviewed", User),
+    400: badRequest,
+    401: unauthorized,
+    403: forbidden,
+    404: notFound,
+    409: { description: "User is not pending review" },
   },
 });
 

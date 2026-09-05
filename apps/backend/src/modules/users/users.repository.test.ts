@@ -18,9 +18,11 @@ const createUserEncrypted: RpcHandler = (tables, args) => {
     id: crypto.randomUUID(),
     auth_user_id: args.p_auth_user_id,
     role: args.p_role,
-    active: true,
+    status: args.p_status ?? "active",
     deactivated_at: null,
     deactivated_by: null,
+    reviewed_at: null,
+    reviewed_by: null,
     created_at: now,
     updated_at: now,
   };
@@ -51,11 +53,22 @@ describe("usersRepository", () => {
       authUserId: "auth-1",
       name: "Juan Pérez",
       role: "driver",
-      active: true,
+      status: "active",
     });
   });
 
-  it("list() reads through get_users_readable and filters onlyActive", async () => {
+  it("create() with an explicit status passes it through as p_status (self-registration path)", async () => {
+    const { usersRepository } = await import("./users.repository");
+
+    const user = await usersRepository.create(
+      { authUserId: "auth-2", name: "Driver Nuevo", role: "driver" },
+      "pending",
+    );
+
+    expect(user.status).toBe("pending");
+  });
+
+  it("list() reads through get_users_readable, defaulting to status=active", async () => {
     const { usersRepository } = await import("./users.repository");
     fake.reset({
       users: [
@@ -64,28 +77,33 @@ describe("usersRepository", () => {
           auth_user_id: "a1",
           name: "Activo",
           role: "driver",
-          active: true,
+          status: "active",
           deactivated_at: null,
           deactivated_by: null,
+          reviewed_at: null,
+          reviewed_by: null,
           created_at: "t",
           updated_at: "t",
         },
         {
           id: "2",
           auth_user_id: "a2",
-          name: "Inactivo",
+          name: "Pendiente",
           role: "driver",
-          active: false,
-          deactivated_at: "t",
-          deactivated_by: "1",
+          status: "pending",
+          deactivated_at: null,
+          deactivated_by: null,
+          reviewed_at: null,
+          reviewed_by: null,
           created_at: "t",
           updated_at: "t",
         },
       ],
     });
 
-    expect((await usersRepository.list(true)).map((u) => u.id)).toEqual(["1"]);
-    expect((await usersRepository.list(false)).map((u) => u.id)).toEqual(["1", "2"]);
+    expect((await usersRepository.list()).map((u) => u.id)).toEqual(["1"]);
+    expect((await usersRepository.list("pending")).map((u) => u.id)).toEqual(["2"]);
+    expect((await usersRepository.list("all")).map((u) => u.id)).toEqual(["1", "2"]);
   });
 
   it("getByAuthUserId returns null when not found", async () => {
@@ -93,7 +111,7 @@ describe("usersRepository", () => {
     expect(await usersRepository.getByAuthUserId("missing")).toBeNull();
   });
 
-  it("deactivate records deactivatedAt/deactivatedBy via a plain update", async () => {
+  it("deactivate sets status=deactivated + deactivatedAt/deactivatedBy via a plain update", async () => {
     const { usersRepository } = await import("./users.repository");
     fake.reset({
       users: [
@@ -102,9 +120,11 @@ describe("usersRepository", () => {
           auth_user_id: "a1",
           name: "Juan",
           role: "driver",
-          active: true,
+          status: "active",
           deactivated_at: null,
           deactivated_by: null,
+          reviewed_at: null,
+          reviewed_by: null,
           created_at: "t",
           updated_at: "t",
         },
@@ -112,6 +132,57 @@ describe("usersRepository", () => {
     });
 
     await usersRepository.deactivate("1", "admin-1");
-    expect(fake.tables.users?.[0]).toMatchObject({ active: false, deactivated_by: "admin-1" });
+    expect(fake.tables.users?.[0]).toMatchObject({
+      status: "deactivated",
+      deactivated_by: "admin-1",
+    });
+  });
+
+  it("review('approve') sets status=active + reviewedAt/reviewedBy", async () => {
+    const { usersRepository } = await import("./users.repository");
+    fake.reset({
+      users: [
+        {
+          id: "1",
+          auth_user_id: "a1",
+          name: "Driver",
+          role: "driver",
+          status: "pending",
+          deactivated_at: null,
+          deactivated_by: null,
+          reviewed_at: null,
+          reviewed_by: null,
+          created_at: "t",
+          updated_at: "t",
+        },
+      ],
+    });
+
+    await usersRepository.review("1", "approve", "admin-1");
+    expect(fake.tables.users?.[0]).toMatchObject({ status: "active", reviewed_by: "admin-1" });
+  });
+
+  it("review('reject') sets status=rejected", async () => {
+    const { usersRepository } = await import("./users.repository");
+    fake.reset({
+      users: [
+        {
+          id: "1",
+          auth_user_id: "a1",
+          name: "Driver",
+          role: "driver",
+          status: "pending",
+          deactivated_at: null,
+          deactivated_by: null,
+          reviewed_at: null,
+          reviewed_by: null,
+          created_at: "t",
+          updated_at: "t",
+        },
+      ],
+    });
+
+    await usersRepository.review("1", "reject", "admin-1");
+    expect(fake.tables.users?.[0]).toMatchObject({ status: "rejected" });
   });
 });

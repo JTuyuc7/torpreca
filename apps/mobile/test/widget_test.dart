@@ -22,6 +22,14 @@ class _FakeAuthRepository implements AuthRepository {
 
   @override
   Future<void> signOut() async {}
+
+  @override
+  Future<String?> register({
+    required String email,
+    required String password,
+    required String name,
+    required String signupCode,
+  }) async => null;
 }
 
 Widget _wrap(AuthRepository repository) {
@@ -64,5 +72,15 @@ void main() {
 
     expect(repository.signInCalled, isTrue);
     expect(find.text('No se pudo iniciar sesión. Intenta de nuevo.'), findsOneWidget);
+  });
+
+  testWidgets('tapping "Regístrate" navigates to RegisterScreen', (tester) async {
+    await tester.pumpWidget(_wrap(_FakeAuthRepository()));
+
+    await tester.tap(find.text('¿No tienes cuenta? Regístrate'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Crear cuenta'), findsWidgets);
+    expect(find.widgetWithText(TextFormField, 'Código de invitación'), findsOneWidget);
   });
 }

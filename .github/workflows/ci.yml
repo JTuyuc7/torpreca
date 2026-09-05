@@ -46,6 +46,7 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-role-key
           SECRET_KEY: ci-placeholder-secret-key
           REQUEST_SIGNING_SECRET: ci-placeholder-signing-secret
+          SIGNUP_CODE: ci-placeholder-signup-code
           ALLOWED_ORIGINS: http://localhost:3000
       - run: cd packages/shared && bun test
       - run: cd apps/backend && bunx tsc --noEmit

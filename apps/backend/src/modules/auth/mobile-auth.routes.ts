@@ -1,5 +1,8 @@
-import { LoginFailedSchema } from "@torpreca/shared";
+import { LoginFailedSchema, RegisterSchema } from "@torpreca/shared";
 import { logEvent } from "../../core/audit/log-event";
+import { env } from "../../core/config/env";
+import { supabaseAdmin } from "../../core/db/supabase";
+import { AppError } from "../../core/errors/app-error";
 import { clientIp } from "../../core/http/client-ip";
 import type { Routable } from "../../core/http/router";
 import { auth } from "../../core/middleware/auth";
@@ -15,6 +18,54 @@ import { validateBody } from "../../core/middleware/validate-zod";
 // (supabase_flutter signInWithPassword) — these endpoints only confirm the
 // token belongs to a driver and write the audit_logs row the client can't.
 export function registerMobileAuthRoutes(router: Routable) {
+  // Public — no `auth` middleware, nobody has a token yet. See the
+  // self-signup design doc for the full flow. Doesn't touch `public.users`
+  // at all: the row is created lazily, `status = 'pending'`, the first time
+  // this account makes an authenticated request with a confirmed email (see
+  // core/middleware/auth.ts) — so an email that's never confirmed never
+  // shows up in the admin's approval queue.
+  router.post("/mobile/auth/register", rateLimitAuth, validateBody(RegisterSchema), async (ctx) => {
+    const { email, password, name, signupCode } = ctx.body as {
+      email: string;
+      password: string;
+      name: string;
+      signupCode: string;
+    };
+
+    // Same generic failure for a bad code or an already-registered email —
+    // don't give an attacker a way to tell which one it was.
+    if (signupCode !== env.SIGNUP_CODE) {
+      throw new AppError(400, "Invalid registration details");
+    }
+
+    const { error: createError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: false,
+      user_metadata: { name },
+    });
+    if (createError) {
+      throw new AppError(400, "Invalid registration details");
+    }
+
+    // auth.admin.createUser() doesn't send a confirmation email on its own
+    // the way client-side signUp() does — resend triggers Supabase's own
+    // native confirmation email using the project's configured sender.
+    await supabaseAdmin.auth.resend({ type: "signup", email });
+
+    await logEvent({
+      userId: null,
+      role: null,
+      action: "auth.registered",
+      entity: null,
+      entityId: null,
+      ip: clientIp(ctx),
+      metadata: { email },
+    });
+
+    return new Response(null, { status: 204 });
+  });
+
   router.post(
     "/mobile/auth/session",
     auth,
