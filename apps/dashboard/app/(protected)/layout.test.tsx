@@ -41,7 +41,7 @@ describe("ProtectedLayout", () => {
     getSession.mockResolvedValue({ data: { session: { access_token: "tok" } } });
     window.sessionStorage.setItem(
       "torpreca:auth-user",
-      JSON.stringify({ id: "u1", role: "admin", active: true }),
+      JSON.stringify({ id: "u1", role: "admin", status: "active" }),
     );
 
     render(

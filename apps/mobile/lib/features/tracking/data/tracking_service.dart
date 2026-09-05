@@ -62,6 +62,13 @@ class TrackingService extends ChangeNotifier {
   String? _errorMessage;
   String? get errorMessage => _errorMessage;
 
+  /// True only when the last failure was specifically the device's Location
+  /// toggle being off (not a permission denial or a connection failure) —
+  /// the one case where the UI can offer a direct fix (open Settings)
+  /// instead of just showing an error string.
+  bool _locationServicesDisabled = false;
+  bool get isLocationServicesDisabled => _locationServicesDisabled;
+
   int get pendingCount => _queueReady ? _queueStore.pendingCount : 0;
 
   Future<void> start(String accessToken) async {
@@ -79,6 +86,8 @@ class TrackingService extends ChangeNotifier {
       _setStatus(TrackingStatus.tracking);
       unawaited(_sendPing());
       unawaited(_drainOfflineQueue(accessToken));
+    } on LocationServiceDisabledException catch (error) {
+      _fail(error.toString(), locationServicesDisabled: true);
     } catch (error) {
       _fail(error.toString());
     }
@@ -127,10 +136,13 @@ class TrackingService extends ChangeNotifier {
       position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
       );
-    } catch (error) {
+    } on LocationServiceDisabledException catch (error) {
       // A GPS read failure is fatal (permission revoked, services turned
       // off mid-session) — unlike a dropped socket, there's nothing to
       // queue, so this does stop tracking.
+      _fail(error.toString(), locationServicesDisabled: true);
+      return;
+    } catch (error) {
       _fail(error.toString());
       return;
     }
@@ -201,10 +213,12 @@ class TrackingService extends ChangeNotifier {
   }
 
   Future<void> _ensureLocationPermission() async {
-    if (!await Geolocator.isLocationServiceEnabled()) {
-      throw StateError('Location services are disabled');
-    }
-
+    // Ask for the OS permission dialog *before* checking whether location
+    // services (GPS) are toggled on — these are two independent checks, and
+    // requestPermission() must run regardless of the services state or the
+    // user never even sees the Android permission prompt (e.g. on a fresh
+    // install with GPS off, checking services-enabled first bails out here
+    // before ever reaching requestPermission()).
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
@@ -213,9 +227,16 @@ class TrackingService extends ChangeNotifier {
         permission == LocationPermission.deniedForever) {
       throw StateError('Location permission denied');
     }
+
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      // geolocator's own exception type — lets the UI offer a direct
+      // "open settings" action instead of just showing raw error text
+      // (see TrackingService.isLocationServicesDisabled below).
+      throw const LocationServiceDisabledException();
+    }
   }
 
-  void _fail(String message) {
+  void _fail(String message, {bool locationServicesDisabled = false}) {
     _pingTimer?.cancel();
     _pingTimer = null;
     _channelSub?.cancel();
@@ -223,12 +244,16 @@ class TrackingService extends ChangeNotifier {
     _channel?.sink.close();
     _channel = null;
     _errorMessage = message;
+    _locationServicesDisabled = locationServicesDisabled;
     _setStatus(TrackingStatus.error);
   }
 
   void _setStatus(TrackingStatus status) {
     _status = status;
-    if (status != TrackingStatus.error) _errorMessage = null;
+    if (status != TrackingStatus.error) {
+      _errorMessage = null;
+      _locationServicesDisabled = false;
+    }
     notifyListeners();
   }
 

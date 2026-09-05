@@ -57,7 +57,7 @@ describe("LoginPage", () => {
       error: null,
     });
     fetchMock.mockResolvedValue(
-      new Response(JSON.stringify({ id: "u1", role: "admin", active: true }), { status: 200 }),
+      new Response(JSON.stringify({ id: "u1", role: "admin", status: "active" }), { status: 200 }),
     );
 
     render(<LoginPage />);

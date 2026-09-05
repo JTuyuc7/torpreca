@@ -69,9 +69,9 @@ function createFakeStopsRepo(seed: Stop[] = []): StopsRepository {
   };
 }
 
-const driver: AuthUser = { id: "driver-1", role: "driver", active: true };
-const otherDriver: AuthUser = { id: "driver-2", role: "driver", active: true };
-const admin: AuthUser = { id: "admin-1", role: "admin", active: true };
+const driver: AuthUser = { id: "driver-1", role: "driver", status: "active" };
+const otherDriver: AuthUser = { id: "driver-2", role: "driver", status: "active" };
+const admin: AuthUser = { id: "admin-1", role: "admin", status: "active" };
 
 const baseRoute: Route = {
   id: "route-1",

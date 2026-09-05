@@ -1,4 +1,5 @@
 import { ROLES } from "../constants/roles";
+import { USER_STATUSES } from "../constants/statuses";
 import { z } from "../zod";
 
 // Minimal identity carried in the request context for every authenticated call.
@@ -7,7 +8,7 @@ import { z } from "../zod";
 export const AuthUserSchema = z.object({
   id: z.uuid(),
   role: z.enum(ROLES),
-  active: z.boolean(),
+  status: z.enum(USER_STATUSES),
 });
 
 export type AuthUser = z.infer<typeof AuthUserSchema>;

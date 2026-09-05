@@ -13,7 +13,7 @@ function seedUser(role: "driver" | "supervisor" | "admin" | "super_admin") {
       id: "user-1",
       auth_user_id: AUTH_USER_ID,
       role,
-      active: true,
+      status: "active",
       deactivated_at: null,
       deactivated_by: null,
       created_at: "t",
@@ -64,8 +64,8 @@ describe("auth HTTP routes", () => {
       );
 
       expect(res.status).toBe(200);
-      const body = (await res.json()) as { id: string; role: string; active: boolean };
-      expect(body).toMatchObject({ id: "user-1", role, active: true });
+      const body = (await res.json()) as { id: string; role: string; status: string };
+      expect(body).toMatchObject({ id: "user-1", role, status: "active" });
       expect(fake.tables.audit_logs).toHaveLength(1);
       expect(fake.tables.audit_logs?.[0]).toMatchObject({
         action: "auth.login",

@@ -3,7 +3,7 @@ import type { AuthUser } from "@torpreca/shared";
 import { mintTicket } from "./ticket-store";
 import { resolveUpgradeData } from "./upgrade";
 
-const user: AuthUser = { id: "driver-1", role: "driver", active: true };
+const user: AuthUser = { id: "driver-1", role: "driver", status: "active" };
 
 describe("resolveUpgradeData", () => {
   it("returns the user + a ping bucket for a valid ticket", () => {

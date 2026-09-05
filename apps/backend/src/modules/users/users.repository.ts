@@ -1,4 +1,4 @@
-import type { CreateUserInput, User } from "@torpreca/shared";
+import type { CreateUserInput, User, UserStatus } from "@torpreca/shared";
 import { env } from "../../core/config/env";
 import { supabaseAdmin } from "../../core/db/supabase";
 
@@ -15,28 +15,34 @@ function toUser(row: Record<string, unknown>): User {
     authUserId: row.auth_user_id as string,
     name: row.name as string,
     role: row.role as User["role"],
-    active: row.active as boolean,
+    status: row.status as UserStatus,
     deactivatedAt: row.deactivated_at as string | null,
     deactivatedBy: row.deactivated_by as string | null,
+    reviewedAt: row.reviewed_at as string | null,
+    reviewedBy: row.reviewed_by as string | null,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
   };
 }
 
 export interface UsersRepository {
-  list(onlyActive?: boolean): Promise<User[]>;
+  // `undefined`/omitted defaults to "active" (today's behavior); pass "all"
+  // for no filter, or an exact status (e.g. "pending", for the dashboard's
+  // approval queue).
+  list(status?: UserStatus | "all"): Promise<User[]>;
   getById(id: string): Promise<User | null>;
   getByAuthUserId(authUserId: string): Promise<User | null>;
-  create(input: CreateUserInput): Promise<User>;
+  create(input: CreateUserInput, status?: UserStatus): Promise<User>;
   deactivate(id: string, deactivatedBy: string): Promise<void>;
+  review(id: string, decision: "approve" | "reject", reviewedBy: string): Promise<void>;
 }
 
 export const usersRepository: UsersRepository = {
-  async list(onlyActive = true) {
+  async list(status = "active") {
     let query = supabaseAdmin
       .rpc("get_users_readable", { p_secret_key: env.SECRET_KEY })
       .order("created_at");
-    if (onlyActive) query = query.eq("active", true);
+    if (status !== "all") query = query.eq("status", status);
 
     const { data, error } = await query;
     if (error) throw error;
@@ -61,13 +67,14 @@ export const usersRepository: UsersRepository = {
     return data ? toUser(data as Record<string, unknown>) : null;
   },
 
-  async create(input) {
+  async create(input, status = "active") {
     const { data, error } = await supabaseAdmin
       .rpc("create_user_encrypted", {
         p_auth_user_id: input.authUserId,
         p_name: input.name,
         p_role: input.role,
         p_secret_key: env.SECRET_KEY,
+        p_status: status,
       })
       .single();
     if (error) throw error;
@@ -80,9 +87,21 @@ export const usersRepository: UsersRepository = {
     const { error } = await supabaseAdmin
       .from("users")
       .update({
-        active: false,
+        status: "deactivated",
         deactivated_at: new Date().toISOString(),
         deactivated_by: deactivatedBy,
+      })
+      .eq("id", id);
+    if (error) throw error;
+  },
+
+  async review(id, decision, reviewedBy) {
+    const { error } = await supabaseAdmin
+      .from("users")
+      .update({
+        status: decision === "approve" ? "active" : "rejected",
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: reviewedBy,
       })
       .eq("id", id);
     if (error) throw error;

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../auth/data/auth_repository.dart';
@@ -85,6 +86,14 @@ class _HomePlaceholderState extends State<HomePlaceholder> {
                       onPressed: _toggleTracking,
                       child: Text(isActive ? 'Detener seguimiento' : 'Iniciar seguimiento'),
                     ),
+                    if (status == TrackingStatus.error &&
+                        _trackingService.isLocationServicesDisabled) ...[
+                      const SizedBox(height: 8),
+                      OutlinedButton(
+                        onPressed: () => Geolocator.openLocationSettings(),
+                        child: const Text('Abrir ajustes de ubicación'),
+                      ),
+                    ],
                   ],
                 );
               },

@@ -9,7 +9,7 @@ import {
   type TrackingWs,
 } from "./tracking-handlers";
 
-const user: AuthUser = { id: "driver-1", role: "driver", active: true };
+const user: AuthUser = { id: "driver-1", role: "driver", status: "active" };
 
 const location: Location = {
   id: "l1",

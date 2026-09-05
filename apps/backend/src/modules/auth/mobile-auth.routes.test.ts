@@ -13,7 +13,7 @@ function seedUser(role: "driver" | "supervisor" | "admin" | "super_admin") {
       id: "user-1",
       auth_user_id: AUTH_USER_ID,
       role,
-      active: true,
+      status: "active",
       deactivated_at: null,
       deactivated_by: null,
       created_at: "t",
@@ -47,8 +47,8 @@ describe("mobile-auth HTTP routes", () => {
     );
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { id: string; role: string; active: boolean };
-    expect(body).toMatchObject({ id: "user-1", role: "driver", active: true });
+    const body = (await res.json()) as { id: string; role: string; status: string };
+    expect(body).toMatchObject({ id: "user-1", role: "driver", status: "active" });
     expect(fake.tables.audit_logs).toHaveLength(1);
     expect(fake.tables.audit_logs?.[0]).toMatchObject({
       action: "auth.login",
@@ -131,6 +131,99 @@ describe("mobile-auth HTTP routes", () => {
 
     expect(res.status).toBe(400);
     expect(fake.tables.audit_logs ?? []).toHaveLength(0);
+  });
+
+  it("POST /mobile/auth/register with a valid code creates the auth user and resends the confirmation email", async () => {
+    const router = await buildRouter();
+
+    const res = await router.handle(
+      new Request("http://x/mobile/auth/register", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-forwarded-for": "9.9.9.1" },
+        body: JSON.stringify({
+          email: "nuevo-driver@example.com",
+          password: "hunter22222",
+          name: "Nuevo Driver",
+          signupCode: process.env.SIGNUP_CODE,
+        }),
+      }),
+    );
+
+    expect(res.status).toBe(204);
+    expect(fake.authAdmin.createdUsers).toHaveLength(1);
+    expect(fake.authAdmin.createdUsers[0]).toMatchObject({
+      email: "nuevo-driver@example.com",
+      user_metadata: { name: "Nuevo Driver" },
+    });
+    expect(fake.authAdmin.resendCalls).toHaveLength(1);
+    // No `users` row yet — created lazily on first authenticated request (see auth.ts).
+    expect(fake.tables.users ?? []).toHaveLength(0);
+    expect(fake.tables.audit_logs?.[0]).toMatchObject({ action: "auth.registered" });
+  });
+
+  it("POST /mobile/auth/register with a wrong signup code returns 400 and doesn't call Supabase Auth", async () => {
+    const router = await buildRouter();
+
+    const res = await router.handle(
+      new Request("http://x/mobile/auth/register", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-forwarded-for": "9.9.9.2" },
+        body: JSON.stringify({
+          email: "nuevo-driver@example.com",
+          password: "hunter22222",
+          name: "Nuevo Driver",
+          signupCode: "wrong-code",
+        }),
+      }),
+    );
+
+    expect(res.status).toBe(400);
+    expect(fake.authAdmin.createdUsers).toHaveLength(0);
+  });
+
+  it("POST /mobile/auth/register with an invalid body (short password) returns 400", async () => {
+    const router = await buildRouter();
+
+    const res = await router.handle(
+      new Request("http://x/mobile/auth/register", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-forwarded-for": "9.9.9.3" },
+        body: JSON.stringify({
+          email: "nuevo-driver@example.com",
+          password: "short",
+          name: "Nuevo Driver",
+          signupCode: process.env.SIGNUP_CODE,
+        }),
+      }),
+    );
+
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /mobile/auth/register is rate limited after 5 requests per IP", async () => {
+    const router = await buildRouter();
+
+    const makeRequest = () =>
+      router.handle(
+        new Request("http://x/mobile/auth/register", {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-forwarded-for": "9.9.9.7" },
+          body: JSON.stringify({
+            email: "nuevo-driver@example.com",
+            password: "hunter22222",
+            name: "Nuevo Driver",
+            signupCode: process.env.SIGNUP_CODE,
+          }),
+        }),
+      );
+
+    for (let i = 0; i < 5; i++) {
+      const res = await makeRequest();
+      expect(res.status).toBe(204);
+    }
+
+    const res = await makeRequest();
+    expect(res.status).toBe(429);
   });
 
   it("POST /mobile/auth/login-failed is rate limited after 5 requests per IP", async () => {
