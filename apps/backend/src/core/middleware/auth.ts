@@ -1,8 +1,8 @@
-import type { AccountStatusCode, AuthUser } from "@torpreca/shared";
+import type { AuthUser } from "@torpreca/shared";
 import { logEvent } from "../audit/log-event";
 import { env } from "../config/env";
 import { supabaseAdmin } from "../db/supabase";
-import { AccountStatusError, UnauthorizedError } from "../errors/app-error";
+import { type AccountStatusCode, AccountStatusError, UnauthorizedError } from "../errors/app-error";
 import { clientIp } from "../http/client-ip";
 import type { Middleware } from "../http/context";
 
