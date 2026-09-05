@@ -43,7 +43,7 @@ Widget _wrap(AuthRepository repository) {
 }
 
 Future<void> _fillForm(WidgetTester tester) async {
-  await tester.enterText(find.widgetWithText(TextFormField, 'Nombre completo'), 'Nuevo Driver');
+  await tester.enterText(find.widgetWithText(TextFormField, 'Nombre y Apellido'), 'Nuevo Driver');
   await tester.enterText(find.widgetWithText(TextFormField, 'Correo'), 'nuevo@torpreca.com');
   await tester.enterText(find.widgetWithText(TextFormField, 'Contraseña'), 'password123');
   await tester.enterText(find.widgetWithText(TextFormField, 'Código de invitación'), 'the-code');
@@ -53,7 +53,7 @@ void main() {
   testWidgets('renders all the registration fields', (tester) async {
     await tester.pumpWidget(_wrap(_FakeAuthRepository()));
 
-    expect(find.widgetWithText(TextFormField, 'Nombre completo'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, 'Nombre y Apellido'), findsOneWidget);
     expect(find.widgetWithText(TextFormField, 'Correo'), findsOneWidget);
     expect(find.widgetWithText(TextFormField, 'Contraseña'), findsOneWidget);
     expect(find.widgetWithText(TextFormField, 'Código de invitación'), findsOneWidget);

@@ -5,9 +5,16 @@ import '../data/auth_repository.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, required this.authRepository});
+  const LoginScreen({super.key, required this.authRepository, this.initialError});
 
   final AuthRepository authRepository;
+
+  /// Set by `AuthGate` when it just signed a driver back out because the
+  /// backend rejected their account status (pending/rejected/deactivated) —
+  /// shown once, since a fresh `LoginScreen`/`_LoginScreenState` is created
+  /// exactly when that happens (see AuthGate's doc comment for why this
+  /// can't just be caught here as an exception from `signIn()`).
+  final String? initialError;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -20,7 +27,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _obscurePassword = true;
   bool _isLoading = false;
-  String? _errorMessage;
+  late String? _errorMessage = widget.initialError;
 
   @override
   void dispose() {
@@ -43,9 +50,9 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordController.text,
       );
       // No navigation here on purpose: main.dart listens to
-      // Supabase's onAuthStateChange and swaps the screen reactively.
-    } on AccountNotReadyException catch (e) {
-      setState(() => _errorMessage = e.message);
+      // Supabase's onAuthStateChange and swaps the screen reactively (and
+      // itself checks the account status before showing HomePlaceholder —
+      // see AuthGate's doc comment).
     } on AuthException catch (e) {
       setState(() => _errorMessage = e.message);
     } catch (_) {
