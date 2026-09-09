@@ -1,4 +1,4 @@
-import type { CreateUserInput, User, UserStatus } from "@torpreca/shared";
+import type { CreateUserInput, Role, User, UserStatus } from "@torpreca/shared";
 import { env } from "../../core/config/env";
 import { supabaseAdmin } from "../../core/db/supabase";
 
@@ -14,6 +14,7 @@ function toUser(row: Record<string, unknown>): User {
     id: row.id as string,
     authUserId: row.auth_user_id as string,
     name: row.name as string,
+    email: row.email as string,
     role: row.role as User["role"],
     status: row.status as UserStatus,
     deactivatedAt: row.deactivated_at as string | null,
@@ -34,7 +35,12 @@ export interface UsersRepository {
   getByAuthUserId(authUserId: string): Promise<User | null>;
   create(input: CreateUserInput, status?: UserStatus): Promise<User>;
   deactivate(id: string, deactivatedBy: string): Promise<void>;
-  review(id: string, decision: "approve" | "reject", reviewedBy: string): Promise<void>;
+  review(
+    id: string,
+    decision: "approve" | "reject",
+    reviewedBy: string,
+    role?: Role,
+  ): Promise<void>;
 }
 
 export const usersRepository: UsersRepository = {
@@ -74,13 +80,14 @@ export const usersRepository: UsersRepository = {
         p_name: input.name,
         p_role: input.role,
         p_secret_key: env.SECRET_KEY,
+        p_email: input.email,
         p_status: status,
       })
       .single();
     if (error) throw error;
 
     const row = data as Record<string, unknown>;
-    return toUser({ ...row, name: input.name });
+    return toUser({ ...row, name: input.name, email: input.email });
   },
 
   async deactivate(id, deactivatedBy) {
@@ -95,13 +102,14 @@ export const usersRepository: UsersRepository = {
     if (error) throw error;
   },
 
-  async review(id, decision, reviewedBy) {
+  async review(id, decision, reviewedBy, role) {
     const { error } = await supabaseAdmin
       .from("users")
       .update({
         status: decision === "approve" ? "active" : "rejected",
         reviewed_at: new Date().toISOString(),
         reviewed_by: reviewedBy,
+        ...(decision === "approve" && role ? { role } : {}),
       })
       .eq("id", id);
     if (error) throw error;

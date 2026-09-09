@@ -1,4 +1,4 @@
-import { CreateUserSchema, ReviewUserSchema, USER_STATUSES } from "@torpreca/shared";
+import { CreateUserSchema, ReviewUserSchema, type Role, USER_STATUSES } from "@torpreca/shared";
 import { logEvent } from "../../core/audit/log-event";
 import { clientIp } from "../../core/http/client-ip";
 import type { Routable } from "../../core/http/router";
@@ -46,7 +46,14 @@ export function registerUsersRoutes(router: Routable) {
   router.post(
     "/users",
     auth,
-    requireRole("admin", "super_admin"),
+    // super_admin only: this is how admin/supervisor accounts get created
+    // (linking an already-existing Supabase Auth user to a `users` profile)
+    // — an "admin" granting another admin/supervisor account would be
+    // self-service privilege escalation without oversight. Backlogged
+    // (session 08 sep 2026): a real invite flow via the Supabase Admin API
+    // would remove the need for a super_admin to manually copy-paste an
+    // authUserId here at all.
+    requireRole("super_admin"),
     rateLimitGeneral,
     validateBody(CreateUserSchema),
     async (ctx) => {
@@ -73,8 +80,8 @@ export function registerUsersRoutes(router: Routable) {
     rateLimitGeneral,
     validateBody(ReviewUserSchema),
     async (ctx) => {
-      const { decision } = ctx.body as { decision: "approve" | "reject" };
-      const user = await service.review(ctx.params.id!, decision, ctx.user!.id);
+      const { decision, role } = ctx.body as { decision: "approve" | "reject"; role?: Role };
+      const user = await service.review(ctx.params.id!, decision, ctx.user!.id, role);
 
       await logEvent({
         userId: ctx.user!.id,
