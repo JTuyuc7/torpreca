@@ -6,6 +6,7 @@ describe("CreateUserSchema", () => {
     const result = CreateUserSchema.safeParse({
       authUserId: "550e8400-e29b-41d4-a716-446655440000",
       name: "Juan Perez",
+      email: "juan.perez@torpreca.gt",
       role: "driver",
     });
 

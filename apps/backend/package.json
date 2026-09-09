@@ -13,7 +13,7 @@
     "@asteasolutions/zod-to-openapi": "^9.1.0",
     "@supabase/supabase-js": "^2",
     "@torpreca/shared": "workspace:*",
-    "zod": "^4"
+    "zod": "4.5.4"
   },
   "devDependencies": {
     "@types/bun": "latest"
