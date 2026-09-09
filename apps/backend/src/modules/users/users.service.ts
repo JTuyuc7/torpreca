@@ -1,4 +1,4 @@
-import type { CreateUserInput, User, UserStatus } from "@torpreca/shared";
+import type { CreateUserInput, Role, User, UserStatus } from "@torpreca/shared";
 import { AppError, NotFoundError } from "../../core/errors/app-error";
 import type { UsersRepository } from "./users.repository";
 
@@ -30,12 +30,17 @@ export function createUsersService(repo: UsersRepository) {
       await repo.deactivate(id, deactivatedBy);
     },
 
-    async review(id: string, decision: "approve" | "reject", reviewedBy: string): Promise<User> {
+    async review(
+      id: string,
+      decision: "approve" | "reject",
+      reviewedBy: string,
+      role?: Role,
+    ): Promise<User> {
       const user = await this.getById(id);
       if (user.status !== "pending") {
         throw new AppError(409, `User is not pending review (status: ${user.status})`);
       }
-      await repo.review(id, decision, reviewedBy);
+      await repo.review(id, decision, reviewedBy, role);
       return this.getById(id);
     },
   };

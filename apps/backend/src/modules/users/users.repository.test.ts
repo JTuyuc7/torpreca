@@ -46,12 +46,14 @@ describe("usersRepository", () => {
     const user = await usersRepository.create({
       authUserId: "auth-1",
       name: "Juan Pérez",
+      email: "juan@torpreca.gt",
       role: "driver",
     });
 
     expect(user).toMatchObject({
       authUserId: "auth-1",
       name: "Juan Pérez",
+      email: "juan@torpreca.gt",
       role: "driver",
       status: "active",
     });
@@ -61,7 +63,7 @@ describe("usersRepository", () => {
     const { usersRepository } = await import("./users.repository");
 
     const user = await usersRepository.create(
-      { authUserId: "auth-2", name: "Driver Nuevo", role: "driver" },
+      { authUserId: "auth-2", name: "Driver Nuevo", email: "driver2@torpreca.gt", role: "driver" },
       "pending",
     );
 
@@ -160,6 +162,30 @@ describe("usersRepository", () => {
 
     await usersRepository.review("1", "approve", "admin-1");
     expect(fake.tables.users?.[0]).toMatchObject({ status: "active", reviewed_by: "admin-1" });
+  });
+
+  it("review('approve') with a role promotes the user to it", async () => {
+    const { usersRepository } = await import("./users.repository");
+    fake.reset({
+      users: [
+        {
+          id: "1",
+          auth_user_id: "a1",
+          name: "Driver",
+          role: "driver",
+          status: "pending",
+          deactivated_at: null,
+          deactivated_by: null,
+          reviewed_at: null,
+          reviewed_by: null,
+          created_at: "t",
+          updated_at: "t",
+        },
+      ],
+    });
+
+    await usersRepository.review("1", "approve", "admin-1", "supervisor");
+    expect(fake.tables.users?.[0]).toMatchObject({ status: "active", role: "supervisor" });
   });
 
   it("review('reject') sets status=rejected", async () => {

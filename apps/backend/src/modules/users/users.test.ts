@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { User, UserStatus } from "@torpreca/shared";
+import type { Role, User, UserStatus } from "@torpreca/shared";
 import type { UsersRepository } from "./users.repository";
 import { createUsersService } from "./users.service";
 
@@ -22,6 +22,7 @@ function createFakeRepo(seed: User[] = []): UsersRepository {
         id: crypto.randomUUID(),
         authUserId: input.authUserId,
         name: input.name,
+        email: input.email,
         role: input.role,
         status,
         deactivatedAt: null,
@@ -42,12 +43,13 @@ function createFakeRepo(seed: User[] = []): UsersRepository {
         user.deactivatedBy = deactivatedBy;
       }
     },
-    async review(id, decision, reviewedBy) {
+    async review(id, decision, reviewedBy, role?: Role) {
       const user = users.find((u) => u.id === id);
       if (user) {
         user.status = decision === "approve" ? "active" : "rejected";
         user.reviewedAt = new Date().toISOString();
         user.reviewedBy = reviewedBy;
+        if (decision === "approve" && role) user.role = role;
       }
     },
   };
@@ -59,6 +61,7 @@ describe("users.service", () => {
     const user = await service.create({
       authUserId: crypto.randomUUID(),
       name: "Juan Pérez",
+      email: "juan@torpreca.gt",
       role: "driver",
     });
 
@@ -73,6 +76,7 @@ describe("users.service", () => {
         id: "1",
         authUserId,
         name: "Juan Pérez",
+        email: "juan@torpreca.gt",
         role: "driver",
         status: "active",
         deactivatedAt: null,
@@ -86,7 +90,12 @@ describe("users.service", () => {
     const service = createUsersService(repo);
 
     await expect(
-      service.create({ authUserId, name: "Otro Nombre", role: "supervisor" }),
+      service.create({
+        authUserId,
+        name: "Otro Nombre",
+        email: "otro@torpreca.gt",
+        role: "supervisor",
+      }),
     ).rejects.toThrow("User with this auth_user_id already exists");
   });
 
@@ -101,6 +110,7 @@ describe("users.service", () => {
         id: "1",
         authUserId: crypto.randomUUID(),
         name: "Juan Pérez",
+        email: "juan@torpreca.gt",
         role: "driver",
         status: "active",
         deactivatedAt: null,
@@ -126,6 +136,7 @@ describe("users.service", () => {
           id: "1",
           authUserId: crypto.randomUUID(),
           name: "Driver Nuevo",
+          email: "driver-nuevo@torpreca.gt",
           role: "driver",
           status: "pending",
           deactivatedAt: null,
@@ -145,6 +156,12 @@ describe("users.service", () => {
       expect(user.reviewedBy).toBe("admin-id");
     });
 
+    it("approve with a role promotes the user to it", async () => {
+      const service = createUsersService(pendingRepo());
+      const user = await service.review("1", "approve", "admin-id", "supervisor");
+      expect(user.role).toBe("supervisor");
+    });
+
     it("reject sets status=rejected", async () => {
       const service = createUsersService(pendingRepo());
       const user = await service.review("1", "reject", "admin-id");
@@ -157,6 +174,7 @@ describe("users.service", () => {
           id: "1",
           authUserId: crypto.randomUUID(),
           name: "Ya activo",
+          email: "ya-activo@torpreca.gt",
           role: "driver",
           status: "active",
           deactivatedAt: null,

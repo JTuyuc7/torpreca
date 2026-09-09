@@ -65,7 +65,7 @@ describe("users HTTP routes", () => {
     expect(res.status).toBe(403);
   });
 
-  it("POST /users as supervisor returns 403 (only admin/super_admin can create)", async () => {
+  it("POST /users as supervisor returns 403 (only super_admin can create)", async () => {
     seedUser("supervisor");
     const router = await buildRouter();
 
@@ -73,14 +73,19 @@ describe("users HTTP routes", () => {
       new Request("http://x/users", {
         method: "POST",
         headers: { authorization: "Bearer t", "content-type": "application/json" },
-        body: JSON.stringify({ authUserId: crypto.randomUUID(), name: "Nuevo", role: "driver" }),
+        body: JSON.stringify({
+          authUserId: crypto.randomUUID(),
+          name: "Nuevo",
+          email: "nuevo@torpreca.gt",
+          role: "driver",
+        }),
       }),
     );
 
     expect(res.status).toBe(403);
   });
 
-  it("POST /users as admin creates a user and logs user.created", async () => {
+  it("POST /users as admin returns 403 (only super_admin can create)", async () => {
     seedUser("admin");
     const router = await buildRouter();
 
@@ -90,15 +95,40 @@ describe("users HTTP routes", () => {
         headers: { authorization: "Bearer t", "content-type": "application/json" },
         body: JSON.stringify({
           authUserId: crypto.randomUUID(),
+          name: "Nuevo",
+          email: "nuevo@torpreca.gt",
+          role: "driver",
+        }),
+      }),
+    );
+
+    expect(res.status).toBe(403);
+  });
+
+  it("POST /users as super_admin creates a user and logs user.created", async () => {
+    seedUser("super_admin");
+    const router = await buildRouter();
+
+    const res = await router.handle(
+      new Request("http://x/users", {
+        method: "POST",
+        headers: { authorization: "Bearer t", "content-type": "application/json" },
+        body: JSON.stringify({
+          authUserId: crypto.randomUUID(),
           name: "Nuevo Conductor",
+          email: "conductor@torpreca.gt",
           role: "driver",
         }),
       }),
     );
 
     expect(res.status).toBe(201);
-    const body = (await res.json()) as { name: string; role: string };
-    expect(body).toMatchObject({ name: "Nuevo Conductor", role: "driver" });
+    const body = (await res.json()) as { name: string; email: string; role: string };
+    expect(body).toMatchObject({
+      name: "Nuevo Conductor",
+      email: "conductor@torpreca.gt",
+      role: "driver",
+    });
     expect(fake.tables.audit_logs).toHaveLength(1);
     expect(fake.tables.audit_logs?.[0]).toMatchObject({ action: "user.created" });
   });
@@ -187,6 +217,35 @@ describe("users HTTP routes", () => {
     expect(body).toMatchObject({ status: "active", reviewedBy: "user-1" });
     expect(fake.tables.audit_logs).toHaveLength(1);
     expect(fake.tables.audit_logs?.[0]).toMatchObject({ action: "user.approved" });
+  });
+
+  it("PATCH /users/:id/review approve with a role promotes the user to it", async () => {
+    seedUser("admin");
+    fake.tables.users?.push({
+      id: "user-2",
+      auth_user_id: "auth-2",
+      role: "driver",
+      status: "pending",
+      deactivated_at: null,
+      deactivated_by: null,
+      reviewed_at: null,
+      reviewed_by: null,
+      created_at: "t",
+      updated_at: "t",
+    });
+    const router = await buildRouter();
+
+    const res = await router.handle(
+      new Request("http://x/users/user-2/review", {
+        method: "PATCH",
+        headers: { authorization: "Bearer t", "content-type": "application/json" },
+        body: JSON.stringify({ decision: "approve", role: "supervisor" }),
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { status: string; role: string };
+    expect(body).toMatchObject({ status: "active", role: "supervisor" });
   });
 
   it("PATCH /users/:id/review reject sets status=rejected and logs user.rejected", async () => {

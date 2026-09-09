@@ -46,6 +46,7 @@ export const auth: Middleware = async (ctx, next) => {
         p_name: (authData.user.user_metadata?.name as string | undefined) ?? authData.user.email,
         p_role: "driver",
         p_secret_key: env.SECRET_KEY,
+        p_email: authData.user.email,
         p_status: "pending",
       })
       .single();
