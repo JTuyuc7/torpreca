@@ -4,9 +4,10 @@ import type { AuthUser, Role } from "@torpreca/shared";
 import { FileText, LayoutDashboard, LogOut, Menu, Route, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { logout as logoutRequest, verifySession } from "@/lib/api/auth-client";
 import { clearCachedAuthUser, readCachedAuthUser, writeCachedAuthUser } from "@/lib/auth/session-cache";
+import { readStoredSidebarCollapsed, writeStoredSidebarCollapsed } from "@/lib/preferences/sidebar";
 import { supabase } from "@/lib/supabase/client";
 import { AuthUserProvider } from "./auth-context";
 
@@ -155,7 +156,49 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [checking, setChecking] = useState(true);
-  const [collapsed, setCollapsed] = useState(false);
+  // Lazy initializer (not a plain `useState(false)` + effect): this layout
+  // never renders real content on its first pass anyway (see `if (checking
+  // || !authUser) return null` below) — checking/authUser are only ever
+  // resolved client-side — so there's no server-rendered sidebar output to
+  // mismatch against, and reading localStorage straight from the initializer
+  // avoids the extra collapsed-then-expands flash a mount effect would cause.
+  const [collapsed, setCollapsed] = useState(readStoredSidebarCollapsed);
+
+  function toggleCollapsed() {
+    setCollapsed((c) => {
+      const next = !c;
+      writeStoredSidebarCollapsed(next);
+      return next;
+    });
+  }
+
+  // Set right before this tab's own signOut() call, so the onAuthStateChange
+  // listener below can tell "I just logged myself out" (silent redirect)
+  // apart from "signed out elsewhere" (another tab, or an expired/revoked
+  // session) — the latter shows a message explaining why the user landed
+  // back on /login.
+  const loggingOutHereRef = useRef(false);
+
+  // Supabase persists its session in localStorage (not cookies) and already
+  // fires a `storage` event to every open tab on sign-out — this listener is
+  // what actually reacts to it. Without it, a tab stays on a protected page
+  // showing stale data/actions against a session that no longer exists,
+  // until the user happens to navigate or reload.
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event !== "SIGNED_OUT") return;
+      clearCachedAuthUser();
+      if (loggingOutHereRef.current) {
+        loggingOutHereRef.current = false;
+        router.replace("/login");
+      } else {
+        router.replace("/login?reason=signed-out-elsewhere");
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [router]);
 
   useEffect(() => {
     let cancelled = false;
@@ -187,8 +230,11 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
       const result = await verifySession(session.access_token);
 
       if (!result.ok) {
+        // Silent redirect (not the "signed out elsewhere" messaging below):
+        // this is a rejected/invalid session on first load, not a real
+        // sign-out event from another tab.
+        loggingOutHereRef.current = true;
         await supabase.auth.signOut();
-        clearCachedAuthUser();
         if (!cancelled) router.replace("/login");
         return;
       }
@@ -215,9 +261,11 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
       await logoutRequest(session.access_token);
     }
 
+    loggingOutHereRef.current = true;
+    // clearCachedAuthUser() + the /login redirect happen in the
+    // onAuthStateChange listener above, triggered by this signOut() call —
+    // single place for that logic, shared with the cross-tab case.
     await supabase.auth.signOut();
-    clearCachedAuthUser();
-    router.replace("/login");
   }
 
   if (checking || !authUser) return null;
@@ -234,7 +282,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
           authUser={authUser}
           onLogout={handleLogout}
           collapsed={collapsed}
-          onToggleCollapsed={() => setCollapsed((c) => !c)}
+          onToggleCollapsed={toggleCollapsed}
         />
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</div>
       </div>

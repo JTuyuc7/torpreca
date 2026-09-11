@@ -1,11 +1,12 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, test } from "vitest";
-import Home from "./page";
+import HomePage from "./page";
 
-describe("Home page", () => {
-  test("renders the getting-started heading", () => {
-    render(<Home />);
+describe("HomePage", () => {
+  test("renders the placeholder for the not-yet-built panel principal", () => {
+    render(<HomePage />);
 
-    expect(screen.getByText(/edit the/i)).toBeInTheDocument();
+    expect(screen.getByText("Panel principal")).toBeInTheDocument();
+    expect(document.title).toBe("Panel principal · Torpreca");
   });
 });

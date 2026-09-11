@@ -71,6 +71,7 @@ export function useUsers() {
     users: usersQuery.data,
     isLoading: usersQuery.isLoading,
     error: usersQuery.error?.message ?? null,
+    refetch: usersQuery.refetch,
     createUser: createUserMutation,
     deactivateUser: deactivateUserMutation,
     reviewUser: reviewUserMutation,

@@ -5,10 +5,12 @@ import { CreateUserSchema, PROMOTABLE_ROLES, type Role, type User, z } from "@to
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useAuthUser } from "@/app/(protected)/auth-context";
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { Section } from "@/components/ui/section";
 import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { usePageTitle } from "@/lib/hooks/use-page-title";
 import { useUsers } from "@/lib/hooks/use-users";
 
 // Roles assignable from the manual creation form — "driver" is excluded:
@@ -38,7 +40,8 @@ function FieldError({ children }: { children: React.ReactNode }) {
 }
 
 export default function UsersPage() {
-  const { users, isLoading, error, createUser, deactivateUser, reviewUser } = useUsers();
+  usePageTitle("Gestión de usuarios");
+  const { users, isLoading, error, refetch, createUser, deactivateUser, reviewUser } = useUsers();
   // POST /users (link an existing Supabase Auth user to a new profile) is
   // super_admin-only on the backend — granting another admin/supervisor
   // account is privilege escalation, so it shouldn't be self-service for a
@@ -78,21 +81,9 @@ export default function UsersPage() {
         <p className="text-sm text-outline">Conductores, supervisores y administradores.</p>
       </div>
 
-      {error && (
-        <p role="alert" className="text-sm text-error">
-          {error}
-        </p>
-      )}
-      {reviewUser.isError && (
-        <p role="alert" className="text-sm text-error">
-          {reviewUser.error.message}
-        </p>
-      )}
-      {deactivateUser.isError && (
-        <p role="alert" className="text-sm text-error">
-          {deactivateUser.error.message}
-        </p>
-      )}
+      {error && <ErrorBanner message={error} onRetry={() => refetch()} />}
+      {reviewUser.isError && <ErrorBanner message={reviewUser.error.message} />}
+      {deactivateUser.isError && <ErrorBanner message={deactivateUser.error.message} />}
 
       {isLoading && (
         <div className="flex flex-col gap-6" aria-busy="true" aria-label="Cargando usuarios">
