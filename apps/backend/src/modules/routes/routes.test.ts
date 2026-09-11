@@ -37,6 +37,12 @@ function createFakeRepo(seed: Route[] = []): RoutesRepository {
       routes.push(created);
       return created;
     },
+    async update(id, patch) {
+      const route = routes.find((r) => r.id === id && r.status === "pending");
+      if (!route) return null;
+      Object.assign(route, patch);
+      return route;
+    },
     async start(id, driverId) {
       const route = routes.find(
         (r) => r.id === id && r.driverId === driverId && r.status === "pending",
@@ -124,6 +130,38 @@ describe("routes.service", () => {
   it("throws NotFoundError for a missing id", async () => {
     const service = createRoutesService(createFakeRepo());
     await expect(service.getById("no-existe", admin)).rejects.toThrow("Route not found");
+  });
+
+  it("updates a pending route", async () => {
+    const repo = createFakeRepo();
+    const service = createRoutesService(repo);
+    const route = await service.create(
+      { code: "R-1", driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: 10 },
+      admin.id,
+    );
+
+    const updated = await service.update(route.id, { driverId: otherDriver.id, plannedKm: 20 });
+    expect(updated.driverId).toBe(otherDriver.id);
+    expect(updated.plannedKm).toBe(20);
+  });
+
+  it("rejects updating a route that isn't pending", async () => {
+    const repo = createFakeRepo();
+    const service = createRoutesService(repo);
+    const route = await service.create(
+      { code: "R-1", driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: null },
+      admin.id,
+    );
+    await service.start(route.id, driver.id);
+
+    await expect(service.update(route.id, { plannedKm: 20 })).rejects.toThrow(
+      "Route cannot be edited (not pending)",
+    );
+  });
+
+  it("throws NotFoundError updating a missing route", async () => {
+    const service = createRoutesService(createFakeRepo());
+    await expect(service.update("no-existe", { plannedKm: 20 })).rejects.toThrow("Route not found");
   });
 
   it("starts a route owned by the driver", async () => {

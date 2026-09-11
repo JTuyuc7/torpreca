@@ -15,6 +15,9 @@ function createFakeRoutesRepo(seed: Route[]): RoutesRepository {
     async create() {
       throw new Error("not used in these tests");
     },
+    async update() {
+      throw new Error("not used in these tests");
+    },
     async start() {
       throw new Error("not used in these tests");
     },

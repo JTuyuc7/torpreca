@@ -1,8 +1,12 @@
 "use client";
 
-import { PROMOTABLE_ROLES, type Role, type User } from "@torpreca/shared";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { CreateUserSchema, PROMOTABLE_ROLES, type Role, type User, z } from "@torpreca/shared";
 import { useState } from "react";
+import { useForm } from "react-hook-form";
 import { useAuthUser } from "@/app/(protected)/auth-context";
+import { Section } from "@/components/ui/section";
+import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { useUsers } from "@/lib/hooks/use-users";
@@ -12,8 +16,15 @@ import { useUsers } from "@/lib/hooks/use-users";
 // /mobile/auth/register), landing "pending" and showing up in the queue
 // below instead. super_admin is also excluded (CLAUDE.md: "super_admin no se
 // puede crear desde la UI — solo desde la DB"). Existing rows of either role
-// still show up in the table.
-const ASSIGNABLE_ROLES: Role[] = ["supervisor", "admin"];
+// still show up in the table. `as const` (not just `Role[]`) so it can feed
+// z.enum below — a plain array of the union type isn't narrow enough for it.
+const ASSIGNABLE_ROLES = ["supervisor", "admin"] as const;
+
+// Narrows CreateUserSchema's `role` (the full ROLES enum) down to just the
+// two roles this form is allowed to submit — reuses the backend's exact
+// field validation (uuid/email/min-length) instead of re-declaring it.
+const CreateUserFormSchema = CreateUserSchema.extend({ role: z.enum(ASSIGNABLE_ROLES) });
+type CreateUserFormValues = z.infer<typeof CreateUserFormSchema>;
 
 const STATUS_LABELS: Record<User["status"], string> = {
   pending: "Pendiente",
@@ -22,27 +33,8 @@ const STATUS_LABELS: Record<User["status"], string> = {
   deactivated: "Desactivado",
 };
 
-// Shared by every section card below so the page reads as one system instead
-// of loosely stacked blocks — the exact gap the user flagged between
-// "Conductores por aprobar" and the table underneath it.
-function Section({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="flex flex-col gap-4 rounded-lg border border-outline/20 bg-surface p-5">
-      <div>
-        <h2 className="text-sm font-semibold text-text">{title}</h2>
-        {description && <p className="text-xs text-outline">{description}</p>}
-      </div>
-      {children}
-    </section>
-  );
+function FieldError({ children }: { children: React.ReactNode }) {
+  return <p className="text-xs text-error">{children}</p>;
 }
 
 export default function UsersPage() {
@@ -58,24 +50,22 @@ export default function UsersPage() {
   // supervisor/admin right at approval time instead of a separate step.
   const [pendingRoles, setPendingRoles] = useState<Record<string, Role>>({});
 
-  const [authUserId, setAuthUserId] = useState("");
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState<Role>(ASSIGNABLE_ROLES[0]);
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isValid },
+  } = useForm<CreateUserFormValues>({
+    resolver: zodResolver(CreateUserFormSchema),
+    mode: "onChange",
+    defaultValues: { authUserId: "", name: "", email: "", role: ASSIGNABLE_ROLES[0] },
+  });
 
-  function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    createUser.mutate(
-      { authUserId, name, email, role },
-      {
-        onSuccess: () => {
-          setAuthUserId("");
-          setName("");
-          setEmail("");
-          setRole(ASSIGNABLE_ROLES[0]);
-        },
-      },
-    );
+  function onCreate(values: CreateUserFormValues) {
+    createUser.mutate(values, {
+      onSuccess: () =>
+        reset({ authUserId: "", name: "", email: "", role: ASSIGNABLE_ROLES[0] }),
+    });
   }
 
   const pendingUsers = users?.filter((u) => u.status === "pending") ?? [];
@@ -112,196 +102,206 @@ export default function UsersPage() {
         </div>
       )}
 
-      {users !== undefined && pendingUsers.length > 0 && (
-        <Section title="Conductores por aprobar">
-          <ul className="flex flex-col gap-2">
-            {pendingUsers.map((user) => {
-              const selectedRole = pendingRoles[user.id] ?? "driver";
-              const isReviewing = reviewUser.isPending && reviewUser.variables?.id === user.id;
-              return (
-                <li
-                  key={user.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-outline/30 bg-background px-4 py-3"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-text">{user.name}</p>
-                    <p className="text-xs text-outline">{user.email}</p>
-                    <p className="text-xs text-outline">
-                      Solicitado el {new Date(user.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex flex-col gap-1">
-                      <label htmlFor={`role-${user.id}`} className="text-[10px] text-outline">
-                        Aprobar como
-                      </label>
-                      <select
-                        id={`role-${user.id}`}
-                        value={selectedRole}
-                        onChange={(e) =>
-                          setPendingRoles((prev) => ({ ...prev, [user.id]: e.target.value as Role }))
-                        }
-                        disabled={isReviewing}
-                        className="h-9 rounded-md border border-outline/30 bg-surface px-2 text-sm text-text"
-                      >
-                        {PROMOTABLE_ROLES.map((r) => (
-                          <option key={r} value={r}>
-                            {r}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={isReviewing}
-                      onClick={() =>
-                        reviewUser.mutate({ id: user.id, decision: "approve", role: selectedRole })
-                      }
-                      className="flex h-9 items-center gap-1.5 self-end rounded-md bg-primary px-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
+      {users !== undefined && (
+        <div className="flex flex-col gap-6 animate-fade-in">
+          {pendingUsers.length > 0 && (
+            <Section title="Conductores por aprobar">
+              <ul className="flex flex-col gap-2">
+                {pendingUsers.map((user) => {
+                  const selectedRole = pendingRoles[user.id] ?? "driver";
+                  const isReviewing =
+                    reviewUser.isPending && reviewUser.variables?.id === user.id;
+                  return (
+                    <li
+                      key={user.id}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-outline/30 bg-background px-4 py-3"
                     >
-                      {isReviewing && <Spinner className="h-3.5 w-3.5" />}
-                      Aprobar
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isReviewing}
-                      onClick={() => reviewUser.mutate({ id: user.id, decision: "reject" })}
-                      className="flex h-9 items-center gap-1.5 self-end rounded-md border border-error px-3 text-sm font-medium text-error transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
-                    >
-                      {isReviewing && <Spinner className="h-3.5 w-3.5" />}
-                      Rechazar
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </Section>
-      )}
-
-      {users !== undefined && isSuperAdmin && (
-        <Section title="Agregar usuario" description="Supervisores y administradores — vincula un Auth User ID ya creado en Supabase.">
-          <form onSubmit={handleCreate} className="flex flex-wrap items-end gap-3">
-            <div className="flex flex-col gap-1">
-              <label htmlFor="authUserId" className="text-xs text-outline">
-                Auth User ID (Supabase)
-              </label>
-              <input
-                id="authUserId"
-                required
-                value={authUserId}
-                onChange={(e) => setAuthUserId(e.target.value)}
-                className="h-9 rounded-md border border-outline/30 bg-background px-2 text-sm text-text"
-                placeholder="uuid"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label htmlFor="name" className="text-xs text-outline">
-                Nombre
-              </label>
-              <input
-                id="name"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="h-9 rounded-md border border-outline/30 bg-background px-2 text-sm text-text"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label htmlFor="email" className="text-xs text-outline">
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="h-9 rounded-md border border-outline/30 bg-background px-2 text-sm text-text"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label htmlFor="role" className="text-xs text-outline">
-                Rol
-              </label>
-              <select
-                id="role"
-                value={role}
-                onChange={(e) => setRole(e.target.value as Role)}
-                className="h-9 rounded-md border border-outline/30 bg-background px-2 text-sm text-text"
-              >
-                {ASSIGNABLE_ROLES.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button
-              type="submit"
-              disabled={createUser.isPending}
-              className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
-            >
-              {createUser.isPending && <Spinner className="h-3.5 w-3.5" />}
-              {createUser.isPending ? "Creando..." : "Crear usuario"}
-            </button>
-            {createUser.isError && (
-              <p role="alert" className="w-full text-sm text-error">
-                {createUser.error.message}
-              </p>
-            )}
-          </form>
-        </Section>
-      )}
-
-      {users !== undefined && otherUsers.length === 0 && pendingUsers.length === 0 && (
-        <p className="text-sm text-outline">No hay usuarios registrados.</p>
-      )}
-
-      {otherUsers.length > 0 && (
-        <Section title="Todos los usuarios">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-outline/30 text-xs text-outline">
-                <th className="py-2">Usuario</th>
-                <th className="py-2">Rol</th>
-                <th className="py-2">Estado</th>
-                <th className="py-2">Creado</th>
-                <th className="py-2">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {otherUsers.map((user) => {
-                const isDeactivating =
-                  deactivateUser.isPending && deactivateUser.variables === user.id;
-                return (
-                  <tr key={user.id} className="border-b border-outline/10 text-text">
-                    <td className="py-2.5">
-                      <p className="font-medium">{user.name}</p>
-                      <p className="text-xs text-outline">{user.email}</p>
-                    </td>
-                    <td className="py-2.5">{user.role}</td>
-                    <td className="py-2.5">{STATUS_LABELS[user.status]}</td>
-                    <td className="py-2.5">{new Date(user.createdAt).toLocaleDateString()}</td>
-                    <td className="py-2.5">
-                      {user.status !== "deactivated" && (
+                      <div>
+                        <p className="text-sm font-medium text-text">{user.name}</p>
+                        <p className="text-xs text-outline">{user.email}</p>
+                        <p className="text-xs text-outline">
+                          Solicitado el {new Date(user.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex flex-col gap-1">
+                          <label htmlFor={`role-${user.id}`} className="text-[10px] text-outline">
+                            Aprobar como
+                          </label>
+                          <Select
+                            id={`role-${user.id}`}
+                            value={selectedRole}
+                            onChange={(e) =>
+                              setPendingRoles((prev) => ({
+                                ...prev,
+                                [user.id]: e.target.value as Role,
+                              }))
+                            }
+                            disabled={isReviewing}
+                          >
+                            {PROMOTABLE_ROLES.map((r) => (
+                              <option key={r} value={r}>
+                                {r}
+                              </option>
+                            ))}
+                          </Select>
+                        </div>
                         <button
                           type="button"
-                          disabled={isDeactivating}
-                          onClick={() => deactivateUser.mutate(user.id)}
-                          className="flex h-9 items-center gap-1.5 rounded-md border border-error px-3 text-sm font-medium text-error transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
+                          disabled={isReviewing}
+                          onClick={() =>
+                            reviewUser.mutate({
+                              id: user.id,
+                              decision: "approve",
+                              role: selectedRole,
+                            })
+                          }
+                          className="flex h-9 items-center gap-1.5 self-end rounded-md bg-primary px-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
                         >
-                          {isDeactivating && <Spinner className="h-3.5 w-3.5" />}
-                          Desactivar
+                          {isReviewing && <Spinner className="h-3.5 w-3.5" />}
+                          Aprobar
                         </button>
-                      )}
-                    </td>
+                        <button
+                          type="button"
+                          disabled={isReviewing}
+                          onClick={() => reviewUser.mutate({ id: user.id, decision: "reject" })}
+                          className="flex h-9 items-center gap-1.5 self-end rounded-md border border-error px-3 text-sm font-medium text-error transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
+                        >
+                          {isReviewing && <Spinner className="h-3.5 w-3.5" />}
+                          Rechazar
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </Section>
+          )}
+
+          {isSuperAdmin && (
+            <Section
+              title="Agregar usuario"
+              description="Supervisores y administradores — vincula un Auth User ID ya creado en Supabase."
+            >
+              <form
+                onSubmit={handleSubmit(onCreate)}
+                noValidate
+                className="flex flex-wrap items-end gap-3"
+              >
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="authUserId" className="text-xs text-outline">
+                    Auth User ID (Supabase)
+                  </label>
+                  <input
+                    id="authUserId"
+                    {...register("authUserId")}
+                    className="h-9 rounded-md border border-outline/30 bg-background px-2 text-sm text-text"
+                    placeholder="uuid"
+                  />
+                  {errors.authUserId && <FieldError>ID inválido (debe ser un UUID).</FieldError>}
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="name" className="text-xs text-outline">
+                    Nombre
+                  </label>
+                  <input
+                    id="name"
+                    {...register("name")}
+                    className="h-9 rounded-md border border-outline/30 bg-background px-2 text-sm text-text"
+                  />
+                  {errors.name && <FieldError>Requerido.</FieldError>}
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="email" className="text-xs text-outline">
+                    Email
+                  </label>
+                  <input
+                    id="email"
+                    type="email"
+                    {...register("email")}
+                    className="h-9 rounded-md border border-outline/30 bg-background px-2 text-sm text-text"
+                  />
+                  {errors.email && <FieldError>Correo inválido.</FieldError>}
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="role" className="text-xs text-outline">
+                    Rol
+                  </label>
+                  <Select id="role" {...register("role")}>
+                    {ASSIGNABLE_ROLES.map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <button
+                  type="submit"
+                  disabled={!isValid || createUser.isPending}
+                  className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
+                >
+                  {createUser.isPending && <Spinner className="h-3.5 w-3.5" />}
+                  {createUser.isPending ? "Creando..." : "Crear usuario"}
+                </button>
+                {createUser.isError && (
+                  <p role="alert" className="w-full text-sm text-error">
+                    {createUser.error.message}
+                  </p>
+                )}
+              </form>
+            </Section>
+          )}
+
+          {otherUsers.length === 0 && pendingUsers.length === 0 && (
+            <p className="text-sm text-outline">No hay usuarios registrados.</p>
+          )}
+
+          {otherUsers.length > 0 && (
+            <Section title="Todos los usuarios">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-outline/30 text-xs text-outline">
+                    <th className="py-2">Usuario</th>
+                    <th className="py-2">Rol</th>
+                    <th className="py-2">Estado</th>
+                    <th className="py-2">Creado</th>
+                    <th className="py-2">Acciones</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </Section>
+                </thead>
+                <tbody>
+                  {otherUsers.map((user) => {
+                    const isDeactivating =
+                      deactivateUser.isPending && deactivateUser.variables === user.id;
+                    return (
+                      <tr key={user.id} className="border-b border-outline/10 text-text">
+                        <td className="py-2.5">
+                          <p className="font-medium">{user.name}</p>
+                          <p className="text-xs text-outline">{user.email}</p>
+                        </td>
+                        <td className="py-2.5">{user.role}</td>
+                        <td className="py-2.5">{STATUS_LABELS[user.status]}</td>
+                        <td className="py-2.5">{new Date(user.createdAt).toLocaleDateString()}</td>
+                        <td className="py-2.5">
+                          {user.status !== "deactivated" && (
+                            <button
+                              type="button"
+                              disabled={isDeactivating}
+                              onClick={() => deactivateUser.mutate(user.id)}
+                              className="flex h-9 items-center gap-1.5 rounded-md border border-error px-3 text-sm font-medium text-error transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
+                            >
+                              {isDeactivating && <Spinner className="h-3.5 w-3.5" />}
+                              Desactivar
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </Section>
+          )}
+        </div>
       )}
     </div>
   );

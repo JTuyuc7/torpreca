@@ -129,14 +129,17 @@ describe("UsersPage", () => {
     await waitFor(() => expect(screen.getByText("No hay usuarios registrados.")).toBeInTheDocument());
 
     fireEvent.change(screen.getByLabelText("Auth User ID (Supabase)"), {
-      target: { value: "auth-2" },
+      target: { value: "11111111-1111-4111-8111-111111111112" },
     });
     fireEvent.change(screen.getByLabelText("Nombre"), { target: { value: "Nuevo Supervisor" } });
     fireEvent.change(screen.getByLabelText("Email"), {
       target: { value: "supervisor@torpreca.gt" },
     });
     fireEvent.change(screen.getByLabelText("Rol"), { target: { value: "supervisor" } });
-    fireEvent.click(screen.getByRole("button", { name: "Crear usuario" }));
+
+    const submitButton = screen.getByRole("button", { name: "Crear usuario" });
+    await waitFor(() => expect(submitButton).not.toBeDisabled());
+    fireEvent.click(submitButton);
 
     await waitFor(() => expect(screen.getByText("Nuevo Supervisor")).toBeInTheDocument());
     expect(fetchMock).toHaveBeenLastCalledWith(
@@ -144,7 +147,7 @@ describe("UsersPage", () => {
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({
-          authUserId: "auth-2",
+          authUserId: "11111111-1111-4111-8111-111111111112",
           name: "Nuevo Supervisor",
           email: "supervisor@torpreca.gt",
           role: "supervisor",
