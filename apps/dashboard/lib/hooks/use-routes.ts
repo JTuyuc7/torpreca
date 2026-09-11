@@ -64,6 +64,7 @@ export function useRoutes() {
     routes: routesQuery.data,
     isLoading: routesQuery.isLoading,
     error: routesQuery.error?.message ?? null,
+    refetch: routesQuery.refetch,
     createRoute: createRouteMutation,
     updateRoute: updateRouteMutation,
   };

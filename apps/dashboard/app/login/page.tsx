@@ -1,11 +1,28 @@
 "use client";
 
-import { Eye, EyeOff, Mail } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { type FormEvent, useState } from "react";
+import { Eye, EyeOff, Info, Mail } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { type FormEvent, Suspense, useState } from "react";
 import { reportLoginFailed, verifySession } from "@/lib/api/auth-client";
 import { writeCachedAuthUser } from "@/lib/auth/session-cache";
+import { usePageTitle } from "@/lib/hooks/use-page-title";
 import { supabase } from "@/lib/supabase/client";
+
+// useSearchParams() opts the component reading it into fully dynamic
+// rendering unless isolated behind a Suspense boundary — kept as its own
+// leaf component so the rest of the (otherwise static) login page isn't
+// affected by that.
+function SignedOutElsewhereNotice() {
+  const params = useSearchParams();
+  if (params.get("reason") !== "signed-out-elsewhere") return null;
+
+  return (
+    <div className="mt-4 flex items-center gap-2 rounded-md border border-outline/30 bg-surface px-3 py-2 text-sm text-text">
+      <Info size={16} className="shrink-0 text-outline" />
+      <span>Tu sesión se cerró (aquí o en otra pestaña). Inicia sesión de nuevo.</span>
+    </div>
+  );
+}
 
 // Layout fiel al mockup W01 — Login Admin (Design System V2.0, ver
 // context/dashboard/assets/TorprecaDesignV2.pdf): panel de marca fijo a la
@@ -17,6 +34,7 @@ import { supabase } from "@/lib/supabase/client";
 // números todavía.
 
 export default function LoginPage() {
+  usePageTitle("Iniciar sesión");
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -75,6 +93,10 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="w-full max-w-sm">
           <h2 className="text-2xl text-text">Iniciar sesión</h2>
           <p className="mt-1 text-sm text-outline">Accede al panel de administración</p>
+
+          <Suspense fallback={null}>
+            <SignedOutElsewhereNotice />
+          </Suspense>
 
           <div className="mt-8">
             <label className="mb-1 block text-xs text-outline" htmlFor="email">

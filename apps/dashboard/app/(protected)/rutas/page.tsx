@@ -4,10 +4,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { CreateRouteSchema, type Route, type User, type Vehicle, z } from "@torpreca/shared";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { Section } from "@/components/ui/section";
 import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { usePageTitle } from "@/lib/hooks/use-page-title";
 import { useRoutes } from "@/lib/hooks/use-routes";
 import { useUsers } from "@/lib/hooks/use-users";
 import { useVehicles } from "@/lib/hooks/use-vehicles";
@@ -297,7 +299,8 @@ function RouteEditRow({
 }
 
 export default function RutasPage() {
-  const { routes, isLoading, error, createRoute, updateRoute } = useRoutes();
+  usePageTitle("Gestión de rutas");
+  const { routes, isLoading, error, refetch, createRoute, updateRoute } = useRoutes();
   const { users } = useUsers();
   const { vehicles } = useVehicles();
 
@@ -316,16 +319,8 @@ export default function RutasPage() {
         <p className="text-sm text-outline">Crear, asignar y editar rutas de reparto.</p>
       </div>
 
-      {error && (
-        <p role="alert" className="text-sm text-error">
-          {error}
-        </p>
-      )}
-      {updateRoute.isError && (
-        <p role="alert" className="text-sm text-error">
-          {updateRoute.error.message}
-        </p>
-      )}
+      {error && <ErrorBanner message={error} onRetry={() => refetch()} />}
+      {updateRoute.isError && <ErrorBanner message={updateRoute.error.message} />}
 
       {isLoading && (
         <div className="flex flex-col gap-6" aria-busy="true" aria-label="Cargando rutas">

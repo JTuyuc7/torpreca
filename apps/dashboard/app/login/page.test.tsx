@@ -2,7 +2,11 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const push = vi.fn();
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push, replace: vi.fn() }) }));
+let searchParams = new URLSearchParams();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push, replace: vi.fn() }),
+  useSearchParams: () => searchParams,
+}));
 
 const signInWithPassword = vi.fn();
 const signOut = vi.fn();
@@ -25,6 +29,7 @@ beforeEach(() => {
   signOut.mockReset();
   fetchMock.mockReset();
   vi.stubGlobal("fetch", fetchMock);
+  searchParams = new URLSearchParams();
 });
 
 function fillAndSubmit(email: string, password: string) {
@@ -81,5 +86,19 @@ describe("LoginPage", () => {
     );
     expect(signOut).toHaveBeenCalled();
     expect(push).not.toHaveBeenCalled();
+  });
+
+  it("shows the signed-out-elsewhere notice when redirected here with that reason", () => {
+    searchParams = new URLSearchParams("reason=signed-out-elsewhere");
+
+    render(<LoginPage />);
+
+    expect(screen.getByText(/tu sesión se cerró/i)).toBeInTheDocument();
+  });
+
+  it("shows no notice on a plain visit to /login", () => {
+    render(<LoginPage />);
+
+    expect(screen.queryByText(/tu sesión se cerró/i)).not.toBeInTheDocument();
   });
 });
