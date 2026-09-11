@@ -29,6 +29,13 @@ export const CreateRouteSchema = RouteSchema.pick({
 
 export type CreateRouteInput = z.infer<typeof CreateRouteSchema>;
 
+// Every field optional: a PATCH can touch just one of them (e.g. only
+// reassigning the vehicle). Only allowed while the route is still `pending`
+// — enforced by the repository's update() guard, same pattern as start/finish.
+export const UpdateRouteSchema = CreateRouteSchema.partial();
+
+export type UpdateRouteInput = z.infer<typeof UpdateRouteSchema>;
+
 export const FinishRouteSchema = z.object({
   drivenKm: z.number().nonnegative(),
 });

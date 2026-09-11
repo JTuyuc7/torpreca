@@ -32,6 +32,9 @@ function createFakeRoutesRepo(seed: Route[]): RoutesRepository {
     async create() {
       throw new Error("not used in these tests");
     },
+    async update() {
+      throw new Error("not used in these tests");
+    },
     async start(id, driverId) {
       const route = seed.find(
         (r) => r.id === id && r.driverId === driverId && r.status === "pending",

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const replace = vi.fn();
@@ -70,5 +70,32 @@ describe("ProtectedLayout", () => {
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
     expect(signOut).toHaveBeenCalled();
     expect(screen.queryByText("secret")).not.toBeInTheDocument();
+  });
+
+  it("collapses the sidebar to icon-only when the toggle is clicked", async () => {
+    getSession.mockResolvedValue({ data: { session: { access_token: "tok" } } });
+    window.sessionStorage.setItem(
+      "torpreca:auth-user",
+      JSON.stringify({ id: "u1", role: "admin", status: "active" }),
+    );
+
+    render(
+      <ProtectedLayout>
+        <p>secret</p>
+      </ProtectedLayout>,
+    );
+    await waitFor(() => expect(screen.getByText("secret")).toBeInTheDocument());
+
+    expect(screen.getByText("TORPRECA")).toBeInTheDocument();
+    expect(screen.getByText("Conductores")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Colapsar menú" }));
+
+    expect(screen.queryByText("TORPRECA")).not.toBeInTheDocument();
+    expect(screen.queryByText("Conductores")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Conductores" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Expandir menú" }));
+    expect(screen.getByText("TORPRECA")).toBeInTheDocument();
   });
 });

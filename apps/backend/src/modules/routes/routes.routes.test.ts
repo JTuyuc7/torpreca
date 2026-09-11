@@ -95,6 +95,81 @@ describe("routes HTTP routes", () => {
     expect(fake.tables.audit_logs?.[0]).toMatchObject({ action: "route.created" });
   });
 
+  it("PATCH /routes/:id as supervisor edits a pending route and logs route.updated", async () => {
+    fake.tables.users!.push({
+      id: "sup-1",
+      auth_user_id: "auth-sup",
+      role: "supervisor",
+      status: "active",
+      created_at: "t",
+      updated_at: "t",
+    });
+    fake.tables.routes = [
+      {
+        id: "r1",
+        code: "R-1",
+        driver_id: "driver-1",
+        vehicle_id: null,
+        created_by: "admin-1",
+        date: "2026-08-22",
+        status: "pending",
+        planned_km: 10,
+        driven_km: 0,
+        start_time: null,
+        end_time: null,
+        created_at: "t",
+        updated_at: "t",
+      },
+    ];
+    fake.setAuthUser({ id: "auth-sup" });
+    const router = await buildRouter();
+
+    const res = await router.handle(
+      new Request("http://x/routes/r1", {
+        method: "PATCH",
+        headers: { authorization: "Bearer t", "content-type": "application/json" },
+        body: JSON.stringify({ plannedKm: 25 }),
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { plannedKm: number };
+    expect(body.plannedKm).toBe(25);
+    expect(fake.tables.audit_logs?.[0]).toMatchObject({ action: "route.updated" });
+  });
+
+  it("PATCH /routes/:id as driver returns 403 (only admin/supervisor/super_admin edit)", async () => {
+    fake.tables.routes = [
+      {
+        id: "r1",
+        code: "R-1",
+        driver_id: "driver-1",
+        vehicle_id: null,
+        created_by: "admin-1",
+        date: "2026-08-22",
+        status: "pending",
+        planned_km: 10,
+        driven_km: 0,
+        start_time: null,
+        end_time: null,
+        created_at: "t",
+        updated_at: "t",
+      },
+    ];
+    asDriver();
+    const router = await buildRouter();
+
+    const res = await router.handle(
+      new Request("http://x/routes/r1", {
+        method: "PATCH",
+        headers: { authorization: "Bearer t", "content-type": "application/json" },
+        body: JSON.stringify({ plannedKm: 25 }),
+      }),
+    );
+
+    expect(res.status).toBe(403);
+  });
+
   it("PATCH /routes/:id/start as a different driver returns 403", async () => {
     fake.tables.routes = [
       {

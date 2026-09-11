@@ -1,4 +1,4 @@
-import type { AuthUser, CreateRouteInput, Route } from "@torpreca/shared";
+import type { AuthUser, CreateRouteInput, Route, UpdateRouteInput } from "@torpreca/shared";
 import { AppError, ForbiddenError, NotFoundError } from "../../core/errors/app-error";
 import type { RoutesRepository } from "./routes.repository";
 
@@ -21,6 +21,15 @@ export function createRoutesService(repo: RoutesRepository) {
 
     async create(input: CreateRouteInput, createdBy: string): Promise<Route> {
       return repo.create(input, createdBy);
+    },
+
+    async update(id: string, patch: UpdateRouteInput): Promise<Route> {
+      const existing = await repo.getById(id);
+      if (!existing) throw new NotFoundError("Route not found");
+
+      const updated = await repo.update(id, patch);
+      if (!updated) throw new AppError(409, "Route cannot be edited (not pending)");
+      return updated;
     },
 
     // Ownership is checked here, separately from the state-transition guard

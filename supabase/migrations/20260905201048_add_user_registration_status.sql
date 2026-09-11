@@ -1,3 +1,11 @@
+-- Patched 11 sep 2026: pgp_sym_encrypt/pgp_sym_decrypt below were unqualified
+-- (worked on staging by search_path coincidence, but `supabase db push`
+-- against production failed with "function pgp_sym_decrypt(bytea, text)
+-- does not exist" — same root cause documented in
+-- 20260908203000_add_user_email.sql, just never backported here). Since
+-- staging already has this migration applied, editing its content doesn't
+-- re-run it there — only matters for this first real apply to production.
+--
 -- Adds explicit approval-state tracking for driver self-registration
 -- (Notion: "Diseño — Auto-registro de conductores (self-signup)", 20-21 ago
 -- 2026; implemented 05 sep 2026 as TOR-84/85). `status` replaces the
@@ -57,7 +65,7 @@ CREATE FUNCTION public.create_user_encrypted (
 BEGIN
     RETURN QUERY
     INSERT INTO public.users (auth_user_id, name, role, status)
-    VALUES (p_auth_user_id, pgp_sym_encrypt(p_name, p_secret_key), p_role, p_status)
+    VALUES (p_auth_user_id, extensions.pgp_sym_encrypt(p_name, p_secret_key), p_role, p_status)
     RETURNING users.id, users.auth_user_id, users.role, users.status, users.created_at, users.updated_at;
 END;
 $function$;
@@ -89,7 +97,7 @@ CREATE FUNCTION public.get_users_readable (
     SELECT
         id,
         auth_user_id,
-        pgp_sym_decrypt(name, p_secret_key)::text AS name,
+        extensions.pgp_sym_decrypt(name, p_secret_key)::text AS name,
         role,
         status,
         deactivated_at,

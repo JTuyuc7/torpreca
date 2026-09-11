@@ -13,6 +13,7 @@ import {
   ReviewUserSchema,
   RouteSchema,
   StopSchema,
+  UpdateRouteSchema,
   USER_STATUSES,
   UserSchema,
   VehicleSchema,
@@ -59,6 +60,7 @@ const CreateUser = registry.register("CreateUser", CreateUserSchema);
 const ReviewUser = registry.register("ReviewUser", ReviewUserSchema);
 const Route = registry.register("Route", RouteSchema);
 const CreateRoute = registry.register("CreateRoute", CreateRouteSchema);
+const UpdateRoute = registry.register("UpdateRoute", UpdateRouteSchema);
 const FinishRoute = registry.register("FinishRoute", FinishRouteSchema);
 const Stop = registry.register("Stop", StopSchema);
 const CreateStop = registry.register("CreateStop", CreateStopSchema.omit({ routeId: true }));
@@ -222,6 +224,24 @@ path({
     400: badRequest,
     401: unauthorized,
     403: forbidden,
+  },
+});
+path({
+  method: "patch",
+  path: "/routes/{id}",
+  tags: ["Routes"],
+  summary: "Edit a pending route (reassign driver/vehicle, change code/date/plannedKm)",
+  request: {
+    params: IdParam,
+    body: { content: { "application/json": { schema: UpdateRoute } } },
+  },
+  responses: {
+    200: jsonResponse("Route updated", Route),
+    400: badRequest,
+    401: unauthorized,
+    403: forbidden,
+    404: notFound,
+    409: errorResponse("Route is not pending"),
   },
 });
 path({

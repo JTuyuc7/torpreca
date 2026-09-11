@@ -9,6 +9,7 @@ export const AUDIT_EVENTS = [
   "user.approved",
   "user.rejected",
   "route.created",
+  "route.updated",
   "route.started",
   "route.finished",
   "stop.completed",

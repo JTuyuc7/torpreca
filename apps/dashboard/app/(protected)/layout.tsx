@@ -1,7 +1,7 @@
 "use client";
 
 import type { AuthUser, Role } from "@torpreca/shared";
-import { FileText, LayoutDashboard, Route, Users } from "lucide-react";
+import { FileText, LayoutDashboard, LogOut, Menu, Route, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -13,13 +13,13 @@ import { AuthUserProvider } from "./auth-context";
 // Mirrors the sidebar nav in context/dashboard/assets/TorprecaDesignV2.pdf.
 // "Conductores" is the mockup's label for people-management, which today
 // lives at /users (TOR-42 — covers drivers, supervisors and admins, not only
-// drivers). Panel Principal/Rutas/Reportes have no screen yet (TOR-12,
-// TOR-30, TOR-24) — shown disabled so the shell matches the approved design
-// without linking to pages that don't exist.
+// drivers). Panel Principal/Reportes have no screen yet (TOR-12, TOR-24) —
+// shown disabled so the shell matches the approved design without linking to
+// pages that don't exist. "Rutas" (TOR-30) got its screen at /rutas.
 const NAV_ITEMS: { label: string; href: string; enabled: boolean; icon: typeof Users }[] = [
   { label: "Panel Principal", href: "/", enabled: false, icon: LayoutDashboard },
   { label: "Conductores", href: "/users", enabled: true, icon: Users },
-  { label: "Rutas", href: "/rutas", enabled: false, icon: Route },
+  { label: "Rutas", href: "/rutas", enabled: true, icon: Route },
   { label: "Reportes", href: "/reportes", enabled: false, icon: FileText },
 ];
 
@@ -35,16 +35,43 @@ const ROLE_LABELS: Record<Role, string> = {
 // the shell, which follows the light/dark M3 tokens. See the mockup in
 // context/dashboard/assets/TorprecaDesignV2.pdf: the sidebar looks identical
 // in both screenshots, only the main content area's tokens flip.
-function Sidebar({ authUser, onLogout }: { authUser: AuthUser; onLogout: () => void }) {
+function Sidebar({
+  authUser,
+  onLogout,
+  collapsed,
+  onToggleCollapsed,
+}: {
+  authUser: AuthUser;
+  onLogout: () => void;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
+}) {
   const pathname = usePathname();
   const roleLabel = ROLE_LABELS[authUser.role];
 
   return (
-    <aside className="flex w-60 flex-col justify-between bg-brand">
+    <aside
+      className={`flex flex-col justify-between overflow-hidden bg-brand transition-[width] duration-200 ${collapsed ? "w-16" : "w-60"}`}
+    >
       <div>
-        <div className="px-5 py-5">
-          <p className="text-lg font-semibold tracking-tight text-white">TORPRECA</p>
-          <p className="text-xs text-white/60">Administración</p>
+        <div
+          className={`flex items-center py-5 ${collapsed ? "justify-center px-2" : "justify-between px-5"}`}
+        >
+          {!collapsed && (
+            <div>
+              <p className="text-lg font-semibold tracking-tight text-white">TORPRECA</p>
+              <p className="text-xs text-white/60">Administración</p>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={onToggleCollapsed}
+            aria-label={collapsed ? "Expandir menú" : "Colapsar menú"}
+            title={collapsed ? "Expandir menú" : "Colapsar menú"}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-white/80 transition-colors hover:bg-white/10 cursor-pointer"
+          >
+            <Menu size={18} />
+          </button>
         </div>
         <nav className="flex flex-col gap-1 px-3">
           {NAV_ITEMS.map((item) => {
@@ -54,11 +81,16 @@ function Sidebar({ authUser, onLogout }: { authUser: AuthUser; onLogout: () => v
               return (
                 <span
                   key={item.href}
-                  className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-white/40"
+                  title={collapsed ? item.label : undefined}
+                  className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm text-white/40 ${collapsed ? "justify-center px-0" : ""}`}
                 >
                   <Icon size={16} />
-                  <span className="flex-1">{item.label}</span>
-                  <span className="text-[10px] uppercase tracking-wide">Próx.</span>
+                  {!collapsed && (
+                    <>
+                      <span className="flex-1">{item.label}</span>
+                      <span className="text-[10px] uppercase tracking-wide">Próx.</span>
+                    </>
+                  )}
                 </span>
               );
             }
@@ -66,7 +98,8 @@ function Sidebar({ authUser, onLogout }: { authUser: AuthUser; onLogout: () => v
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                title={collapsed ? item.label : undefined}
+                className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${collapsed ? "justify-center px-0" : ""} ${
                   // text-brand (dark, fixed) instead of white: --secondary is
                   // theme-tonal (a light peach in dark mode, see globals.css)
                   // — white text on it failed contrast, especially in dark
@@ -75,27 +108,44 @@ function Sidebar({ authUser, onLogout }: { authUser: AuthUser; onLogout: () => v
                 }`}
               >
                 <Icon size={16} />
-                {item.label}
+                {!collapsed && item.label}
               </Link>
             );
           })}
         </nav>
       </div>
 
-      <div className="flex items-center gap-3 border-t border-white/10 px-5 py-4">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-sm font-medium text-brand">
+      <div
+        className={`flex border-t border-white/10 py-4 ${collapsed ? "flex-col items-center gap-2 px-2" : "items-center gap-3 px-5"}`}
+      >
+        <span
+          title={collapsed ? roleLabel : undefined}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-sm font-medium text-brand"
+        >
           {roleLabel[0]}
         </span>
-        <div className="flex flex-1 flex-col">
-          <span className="text-sm text-white">{roleLabel}</span>
+        {collapsed ? (
           <button
             type="button"
             onClick={onLogout}
-            className="text-left text-xs font-medium text-white/70 hover:text-white hover:underline cursor-pointer"
+            title="Cerrar sesión"
+            aria-label="Cerrar sesión"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-white/70 transition-colors hover:bg-white/10 hover:text-white cursor-pointer"
           >
-            Cerrar sesión
+            <LogOut size={16} />
           </button>
-        </div>
+        ) : (
+          <div className="flex flex-1 flex-col">
+            <span className="text-sm text-white">{roleLabel}</span>
+            <button
+              type="button"
+              onClick={onLogout}
+              className="text-left text-xs font-medium text-white/70 hover:text-white hover:underline cursor-pointer"
+            >
+              Cerrar sesión
+            </button>
+          </div>
+        )}
       </div>
     </aside>
   );
@@ -105,6 +155,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [checking, setChecking] = useState(true);
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -179,7 +230,12 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
           usual flexbox fix needed for its own overflow-y-auto to actually
           kick in instead of growing the row past h-screen. */}
       <div className="flex h-screen bg-background">
-        <Sidebar authUser={authUser} onLogout={handleLogout} />
+        <Sidebar
+          authUser={authUser}
+          onLogout={handleLogout}
+          collapsed={collapsed}
+          onToggleCollapsed={() => setCollapsed((c) => !c)}
+        />
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</div>
       </div>
     </AuthUserProvider>
