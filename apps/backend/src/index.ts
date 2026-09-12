@@ -13,6 +13,7 @@ import {
 import { resolveUpgradeData, type TrackingSocketData } from "./core/ws/upgrade";
 import { registerAuthRoutes } from "./modules/auth/auth.routes";
 import { registerMobileAuthRoutes } from "./modules/auth/mobile-auth.routes";
+import { registerDashboardRoutes } from "./modules/dashboard/dashboard.routes";
 import { locationsRepository } from "./modules/locations/locations.repository";
 import { registerLocationsRoutes } from "./modules/locations/locations.routes";
 import { createLocationsService } from "./modules/locations/locations.service";
@@ -44,6 +45,7 @@ registerUsersRoutes(v1);
 registerRoutesRoutes(v1);
 registerStopsRoutes(v1);
 registerLocationsRoutes(v1);
+registerDashboardRoutes(v1);
 registerWsTicketsRoutes(v1);
 registerMobileWsTicketsRoutes(v1);
 registerSyncQueueRoutes(v1);

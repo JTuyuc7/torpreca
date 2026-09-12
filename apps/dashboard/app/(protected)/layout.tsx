@@ -14,14 +14,14 @@ import { AuthUserProvider } from "./auth-context";
 // Mirrors the sidebar nav in context/dashboard/assets/TorprecaDesignV2.pdf.
 // "Conductores" is the mockup's label for people-management, which today
 // lives at /users (TOR-42 — covers drivers, supervisors and admins, not only
-// drivers). Panel Principal/Reportes have no screen yet (TOR-12, TOR-24) —
-// shown disabled so the shell matches the approved design without linking to
-// pages that don't exist. "Rutas" (TOR-30) got its screen at /rutas.
-// "Vehículos" (TOR-44) isn't in that mockup at all — added because the
-// screen needs to be reachable from somewhere; slotted next to Rutas since
-// both feed the same route-assignment workflow.
+// drivers). Reportes has no screen yet (TOR-24) — shown disabled so the
+// shell matches the approved design without linking to a page that doesn't
+// exist. "Rutas" (TOR-30) got its screen at /rutas. "Panel Principal"
+// (TOR-12) got its screen at "/". "Vehículos" (TOR-44) isn't in that mockup
+// at all — added because the screen needs to be reachable from somewhere;
+// slotted next to Rutas since both feed the same route-assignment workflow.
 const NAV_ITEMS: { label: string; href: string; enabled: boolean; icon: typeof Users }[] = [
-  { label: "Panel Principal", href: "/", enabled: false, icon: LayoutDashboard },
+  { label: "Panel Principal", href: "/", enabled: true, icon: LayoutDashboard },
   { label: "Conductores", href: "/users", enabled: true, icon: Users },
   { label: "Rutas", href: "/rutas", enabled: true, icon: Route },
   { label: "Vehículos", href: "/vehiculos", enabled: true, icon: Truck },

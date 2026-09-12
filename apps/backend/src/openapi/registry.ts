@@ -9,6 +9,7 @@ import {
   CreateStopSchema,
   CreateUserSchema,
   CreateVehicleSchema,
+  DashboardSummarySchema,
   FinishRouteSchema,
   ReviewUserSchema,
   RouteSchema,
@@ -354,6 +355,20 @@ path({
     403: forbidden,
     404: notFound,
     409: errorResponse("Stop not in a delayable state"),
+  },
+});
+
+// --- dashboard ---
+const DashboardSummary = registry.register("DashboardSummary", DashboardSummarySchema);
+path({
+  method: "get",
+  path: "/dashboard/summary",
+  tags: ["Dashboard"],
+  summary: "Fleet-wide counts for the dashboard home screen",
+  responses: {
+    200: jsonResponse("Summary", DashboardSummary),
+    401: unauthorized,
+    403: forbidden,
   },
 });
 
