@@ -14,6 +14,7 @@ import {
   RouteSchema,
   StopSchema,
   UpdateRouteSchema,
+  UpdateVehicleSchema,
   USER_STATUSES,
   UserSchema,
   VehicleSchema,
@@ -55,6 +56,7 @@ const badRequest = errorResponse("Body failed zod validation");
 
 const Vehicle = registry.register("Vehicle", VehicleSchema);
 const CreateVehicle = registry.register("CreateVehicle", CreateVehicleSchema);
+const UpdateVehicle = registry.register("UpdateVehicle", UpdateVehicleSchema);
 const User = registry.register("User", UserSchema);
 const CreateUser = registry.register("CreateUser", CreateUserSchema);
 const ReviewUser = registry.register("ReviewUser", ReviewUserSchema);
@@ -113,6 +115,24 @@ path({
     400: badRequest,
     401: unauthorized,
     403: forbidden,
+  },
+});
+path({
+  method: "patch",
+  path: "/vehicles/{id}",
+  tags: ["Vehicles"],
+  summary: "Edit a vehicle (also used to reactivate it via active: true)",
+  request: {
+    params: IdParam,
+    body: { content: { "application/json": { schema: UpdateVehicle } } },
+  },
+  responses: {
+    200: jsonResponse("Vehicle updated", Vehicle),
+    400: badRequest,
+    401: unauthorized,
+    403: forbidden,
+    404: notFound,
+    409: errorResponse("A vehicle with that plate already exists"),
   },
 });
 path({

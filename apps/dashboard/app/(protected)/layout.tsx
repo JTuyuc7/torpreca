@@ -1,7 +1,7 @@
 "use client";
 
 import type { AuthUser, Role } from "@torpreca/shared";
-import { FileText, LayoutDashboard, LogOut, Menu, Route, Users } from "lucide-react";
+import { FileText, LayoutDashboard, LogOut, Menu, Route, Truck, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -17,10 +17,14 @@ import { AuthUserProvider } from "./auth-context";
 // drivers). Panel Principal/Reportes have no screen yet (TOR-12, TOR-24) —
 // shown disabled so the shell matches the approved design without linking to
 // pages that don't exist. "Rutas" (TOR-30) got its screen at /rutas.
+// "Vehículos" (TOR-44) isn't in that mockup at all — added because the
+// screen needs to be reachable from somewhere; slotted next to Rutas since
+// both feed the same route-assignment workflow.
 const NAV_ITEMS: { label: string; href: string; enabled: boolean; icon: typeof Users }[] = [
   { label: "Panel Principal", href: "/", enabled: false, icon: LayoutDashboard },
   { label: "Conductores", href: "/users", enabled: true, icon: Users },
   { label: "Rutas", href: "/rutas", enabled: true, icon: Route },
+  { label: "Vehículos", href: "/vehiculos", enabled: true, icon: Truck },
   { label: "Reportes", href: "/reportes", enabled: false, icon: FileText },
 ];
 

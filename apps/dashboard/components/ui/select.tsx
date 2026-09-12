@@ -20,7 +20,7 @@ export const Select = forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<H
         <select
           ref={ref}
           {...rest}
-          className={`h-9 w-full appearance-none rounded-md border border-outline/30 bg-background px-2 pr-8 text-sm text-text ${className}`}
+          className={`h-9 w-full appearance-none rounded-md border border-outline bg-background px-2 pr-8 text-sm text-text outline-none transition-colors focus:ring-1 focus:ring-primary ${className}`}
         />
         <ChevronDown
           size={14}

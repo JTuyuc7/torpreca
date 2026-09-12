@@ -3,8 +3,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CreateRouteSchema, type Route, type User, type Vehicle, z } from "@torpreca/shared";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { type Resolver, useForm } from "react-hook-form";
 import { ErrorBanner } from "@/components/ui/error-banner";
+import { Input } from "@/components/ui/input";
 import { Section } from "@/components/ui/section";
 import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -70,8 +71,25 @@ function generateRouteCode(date: string, existingForDate: number): string {
 // Reusing CreateRouteSchema instead of hand-rolling a parallel one means the
 // "plannedKm can't be negative" rule (and everything else) comes from the
 // exact same schema the backend validates against — one source of truth.
-const RouteFormSchema = CreateRouteSchema.omit({ code: true });
+//
+// `plannedKm` gets a preprocess step (paired with `valueAsNumber: true` on
+// the input, not a custom `setValueAs`) — see the identical note on
+// VehicleFormSchema in app/(protected)/vehiculos/page.tsx for the real
+// react-hook-form 7.87 + React 19 bug this works around: register(field,
+// { setValueAs }) on an untouched type="number" input hands the resolver the
+// raw DOM node instead of its value, silently breaking validation.
+const RouteFormSchema = CreateRouteSchema.omit({ code: true }).extend({
+  plannedKm: z.preprocess(
+    (v) => (typeof v === "number" && Number.isNaN(v) ? null : v),
+    CreateRouteSchema.shape.plannedKm,
+  ),
+});
 type RouteFormValues = z.infer<typeof RouteFormSchema>;
+
+// See the identical note on vehicleResolver in vehiculos/page.tsx: the
+// preprocess step above types its input as `unknown`, which doesn't line up
+// with Resolver<TFieldValues> — the runtime input is always `number | null`.
+const routeResolver = zodResolver(RouteFormSchema) as Resolver<RouteFormValues>;
 
 function CreateRouteForm({
   drivers,
@@ -91,7 +109,7 @@ function CreateRouteForm({
     reset,
     formState: { errors, isValid },
   } = useForm<RouteFormValues>({
-    resolver: zodResolver(RouteFormSchema),
+    resolver: routeResolver,
     mode: "onChange",
     defaultValues: { driverId: "", vehicleId: null, date: todayIsoDate(), plannedKm: null },
   });
@@ -116,23 +134,18 @@ function CreateRouteForm({
           <label htmlFor="code" className="text-xs text-outline">
             Código (autogenerado)
           </label>
-          <input
+          <Input
             id="code"
             disabled
             value={generatedCode}
-            className="h-9 w-32 rounded-md border border-outline/30 bg-surface px-2 text-sm text-outline"
+            className="w-32 bg-surface text-outline"
           />
         </div>
         <div className="flex flex-col gap-1">
           <label htmlFor="date" className="text-xs text-outline">
             Fecha
           </label>
-          <input
-            id="date"
-            type="date"
-            {...register("date")}
-            className="h-9 rounded-md border border-outline/30 bg-background px-2 text-sm text-text"
-          />
+          <Input id="date" type="date" {...register("date")} />
           {errors.date && <FieldError>Selecciona una fecha.</FieldError>}
         </div>
         <div className="flex flex-col gap-1">
@@ -171,12 +184,12 @@ function CreateRouteForm({
           <label htmlFor="plannedKm" className="text-xs text-outline">
             Km planeados
           </label>
-          <input
+          <Input
             id="plannedKm"
             type="number"
             min={0}
-            {...register("plannedKm", { setValueAs: (v) => (v === "" ? null : Number(v)) })}
-            className="h-9 w-28 rounded-md border border-outline/30 bg-background px-2 text-sm text-text"
+            {...register("plannedKm", { valueAsNumber: true })}
+            className="w-28"
           />
           {errors.plannedKm && <FieldError>Debe ser 0 o mayor.</FieldError>}
         </div>
@@ -212,7 +225,7 @@ function RouteEditRow({
     handleSubmit,
     formState: { errors, isValid },
   } = useForm<RouteFormValues>({
-    resolver: zodResolver(RouteFormSchema),
+    resolver: routeResolver,
     mode: "onChange",
     defaultValues: {
       driverId: route.driverId,
@@ -232,9 +245,9 @@ function RouteEditRow({
   // "Guardar" triggers handleSubmit directly from a plain button click
   // instead — a documented react-hook-form pattern for row-level editing.
   return (
-    <tr className="border-b border-outline/10 text-text">
-      <td className="py-3 font-medium">{route.code}</td>
-      <td className="py-3">
+    <tr className="border-b border-outline/10 align-middle text-text">
+      <td className="py-3 pr-4 font-medium">{route.code}</td>
+      <td className="py-3 pr-4">
         <Select {...register("driverId")}>
           {drivers.map((d) => (
             <option key={d.id} value={d.id}>
@@ -243,7 +256,7 @@ function RouteEditRow({
           ))}
         </Select>
       </td>
-      <td className="py-3">
+      <td className="py-3 pr-4">
         <Select {...register("vehicleId", { setValueAs: (v) => (v === "" ? null : v) })}>
           <option value="">Sin vehículo</option>
           {vehicles.map((v) => (
@@ -253,23 +266,19 @@ function RouteEditRow({
           ))}
         </Select>
       </td>
-      <td className="py-3">
-        <input
-          type="date"
-          {...register("date")}
-          className="h-9 rounded-md border border-outline/30 bg-background px-2 text-sm text-text"
-        />
+      <td className="py-3 pr-4">
+        <Input type="date" {...register("date")} />
         {errors.date && <FieldError>Requerida</FieldError>}
       </td>
-      <td className="py-3">
+      <td className="py-3 pr-4">
         <StatusBadge status={route.status} />
       </td>
-      <td className="py-3">
-        <input
+      <td className="py-3 pr-4">
+        <Input
           type="number"
           min={0}
-          {...register("plannedKm", { setValueAs: (v) => (v === "" ? null : Number(v)) })}
-          className="h-9 w-24 rounded-md border border-outline/30 bg-background px-2 text-sm text-text"
+          {...register("plannedKm", { valueAsNumber: true })}
+          className="w-24"
         />
         {errors.plannedKm && <FieldError>≥ 0</FieldError>}
       </td>
@@ -288,7 +297,7 @@ function RouteEditRow({
             type="button"
             disabled={isSaving}
             onClick={onCancel}
-            className="flex h-9 items-center rounded-md border border-outline/30 px-3 text-sm font-medium text-text transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
+            className="flex h-9 items-center rounded-md border border-outline px-3 text-sm font-medium text-text transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
           >
             Cancelar
           </button>
@@ -305,10 +314,13 @@ export default function RutasPage() {
   const { vehicles } = useVehicles();
 
   const drivers = users?.filter((u) => u.role === "driver" && u.status === "active") ?? [];
-  const activeVehicles = vehicles ?? [];
+  // Assignment dropdowns only offer active vehicles, but plate lookups for
+  // already-assigned routes must still resolve an inactive one by id instead
+  // of falling back to showing the raw uuid.
+  const activeVehicles = vehicles?.filter((v) => v.active) ?? [];
   const driverName = (id: string) => users?.find((u) => u.id === id)?.name ?? id;
   const vehiclePlate = (id: string | null) =>
-    id ? (activeVehicles.find((v) => v.id === id)?.plate ?? id) : "—";
+    id ? (vehicles?.find((v) => v.id === id)?.plate ?? id) : "—";
 
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -345,12 +357,12 @@ export default function RutasPage() {
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-outline/30 text-xs text-outline">
-                    <th className="py-2">Código</th>
-                    <th className="py-2">Conductor</th>
-                    <th className="py-2">Vehículo</th>
-                    <th className="py-2">Fecha</th>
-                    <th className="py-2">Estado</th>
-                    <th className="py-2">Km (plan/real)</th>
+                    <th className="py-2 pr-4">Código</th>
+                    <th className="py-2 pr-4">Conductor</th>
+                    <th className="py-2 pr-4">Vehículo</th>
+                    <th className="py-2 pr-4">Fecha</th>
+                    <th className="py-2 pr-4">Estado</th>
+                    <th className="py-2 pr-4">Km (plan/real)</th>
                     <th className="py-2">Acciones</th>
                   </tr>
                 </thead>
@@ -374,14 +386,14 @@ export default function RutasPage() {
                         key={route.id}
                         className="border-b border-outline/10 text-text transition-colors hover:bg-outline/5"
                       >
-                        <td className="py-3 font-medium">{route.code}</td>
-                        <td className="py-3">{driverName(route.driverId)}</td>
-                        <td className="py-3">{vehiclePlate(route.vehicleId)}</td>
-                        <td className="py-3">{route.date}</td>
-                        <td className="py-3">
+                        <td className="py-3 pr-4 font-medium">{route.code}</td>
+                        <td className="py-3 pr-4">{driverName(route.driverId)}</td>
+                        <td className="py-3 pr-4">{vehiclePlate(route.vehicleId)}</td>
+                        <td className="py-3 pr-4">{route.date}</td>
+                        <td className="py-3 pr-4">
                           <StatusBadge status={route.status} />
                         </td>
-                        <td className="py-3 tabular-nums">
+                        <td className="py-3 pr-4 tabular-nums">
                           {route.plannedKm ?? "—"} / {route.drivenKm}
                         </td>
                         <td className="py-3">
@@ -389,7 +401,7 @@ export default function RutasPage() {
                             <button
                               type="button"
                               onClick={() => setEditingId(route.id)}
-                              className="flex h-9 items-center rounded-md border border-outline/30 px-3 text-sm font-medium text-text transition-opacity hover:opacity-90 cursor-pointer"
+                              className="flex h-9 items-center rounded-md border border-outline px-3 text-sm font-medium text-text transition-opacity hover:opacity-90 cursor-pointer"
                             >
                               Editar
                             </button>

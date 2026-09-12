@@ -77,13 +77,19 @@ describe("vehicles HTTP routes", () => {
       new Request("http://x/vehicles", {
         method: "POST",
         headers: { authorization: "Bearer t", "content-type": "application/json" },
-        body: JSON.stringify({ plate: "P123ABC", model: "Hilux", capacity: 2 }),
+        body: JSON.stringify({
+          plate: "P123ABC",
+          model: "Hilux",
+          capacity: 2,
+          category: "light_vehicle",
+          notes: null,
+        }),
       }),
     );
 
     expect(res.status).toBe(201);
-    const body = (await res.json()) as { plate: string; active: boolean };
-    expect(body).toMatchObject({ plate: "P123ABC", active: true });
+    const body = (await res.json()) as { plate: string; active: boolean; category: string };
+    expect(body).toMatchObject({ plate: "P123ABC", active: true, category: "light_vehicle" });
   });
 
   it("GET /vehicles/:id for a missing vehicle returns 404", async () => {
@@ -95,6 +101,60 @@ describe("vehicles HTTP routes", () => {
     );
 
     expect(res.status).toBe(404);
+  });
+
+  it("PATCH /vehicles/:id as driver returns 403", async () => {
+    seedUser("driver");
+    fake.tables.vehicles = [
+      {
+        id: "v1",
+        plate: "P123ABC",
+        model: "Hilux",
+        capacity: 2,
+        active: true,
+        created_at: "t",
+        updated_at: "t",
+      },
+    ];
+    const router = await buildRouter();
+
+    const res = await router.handle(
+      new Request("http://x/vehicles/v1", {
+        method: "PATCH",
+        headers: { authorization: "Bearer t", "content-type": "application/json" },
+        body: JSON.stringify({ model: "Hilux 4x4" }),
+      }),
+    );
+
+    expect(res.status).toBe(403);
+  });
+
+  it("PATCH /vehicles/:id as admin edits fields and can reactivate", async () => {
+    seedUser("admin");
+    fake.tables.vehicles = [
+      {
+        id: "v1",
+        plate: "P123ABC",
+        model: "Hilux",
+        capacity: 2,
+        active: false,
+        created_at: "t",
+        updated_at: "t",
+      },
+    ];
+    const router = await buildRouter();
+
+    const res = await router.handle(
+      new Request("http://x/vehicles/v1", {
+        method: "PATCH",
+        headers: { authorization: "Bearer t", "content-type": "application/json" },
+        body: JSON.stringify({ model: "Hilux 4x4", active: true }),
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { model: string; active: boolean };
+    expect(body).toMatchObject({ model: "Hilux 4x4", active: true });
   });
 
   it("DELETE /vehicles/:id deactivates it (204)", async () => {

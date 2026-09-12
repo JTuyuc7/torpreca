@@ -19,9 +19,17 @@ describe("vehiclesRepository", () => {
       plate: "P123ABC",
       model: "Hilux",
       capacity: 2,
+      category: "light_vehicle",
+      notes: null,
     });
 
-    expect(vehicle).toMatchObject({ plate: "P123ABC", model: "Hilux", capacity: 2, active: true });
+    expect(vehicle).toMatchObject({
+      plate: "P123ABC",
+      model: "Hilux",
+      capacity: 2,
+      category: "light_vehicle",
+      active: true,
+    });
     expect(typeof vehicle.id).toBe("string");
     expect(typeof vehicle.createdAt).toBe("string");
   });
@@ -81,6 +89,56 @@ describe("vehiclesRepository", () => {
 
     const vehicle = await vehiclesRepository.getByPlate("P123ABC");
     expect(vehicle?.id).toBe("1");
+  });
+
+  it("update() applies a partial patch, including reactivating", async () => {
+    const { vehiclesRepository } = await import("./vehicles.repository");
+    fake.reset({
+      vehicles: [
+        {
+          id: "1",
+          plate: "P123ABC",
+          model: "Hilux",
+          capacity: 2,
+          active: false,
+          created_at: "t",
+          updated_at: "t",
+        },
+      ],
+    });
+
+    const updated = await vehiclesRepository.update("1", { model: "Hilux 4x4", active: true });
+    expect(updated).toMatchObject({ model: "Hilux 4x4", active: true, plate: "P123ABC" });
+  });
+
+  it("update() applies category and notes", async () => {
+    const { vehiclesRepository } = await import("./vehicles.repository");
+    fake.reset({
+      vehicles: [
+        {
+          id: "1",
+          plate: "P123ABC",
+          model: "Hilux",
+          capacity: 2,
+          category: "light_vehicle",
+          notes: null,
+          active: true,
+          created_at: "t",
+          updated_at: "t",
+        },
+      ],
+    });
+
+    const updated = await vehiclesRepository.update("1", {
+      category: "truck",
+      notes: "Revisión pendiente",
+    });
+    expect(updated).toMatchObject({ category: "truck", notes: "Revisión pendiente" });
+  });
+
+  it("update() returns null for a missing id", async () => {
+    const { vehiclesRepository } = await import("./vehicles.repository");
+    expect(await vehiclesRepository.update("missing", { model: "X" })).toBeNull();
   });
 
   it("deactivate sets active to false in place", async () => {

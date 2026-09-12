@@ -13,7 +13,7 @@ const roboto = Roboto({
 });
 
 export const metadata: Metadata = {
-  title: "Torpreca — Panel administrativo",
+  title: "Torpreca - Panel administrativo",
   description: "Gestión de rutas, conductores y reportes en tiempo real.",
 };
 
