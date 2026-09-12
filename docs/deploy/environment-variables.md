@@ -35,6 +35,7 @@ any of these is missing or malformed:
 | `NEXT_PUBLIC_SUPABASE_URL` | plain, public | Same value as that environment's backend `SUPABASE_URL` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | plain, public | anon key only — never the service role key |
 | `NEXT_PUBLIC_BACKEND_URL` | plain, public | Points at `torpreca-backend-staging`/`-production`'s URL for that same environment |
+| `NEXT_PUBLIC_MAPBOX_TOKEN` | plain, public | Same public (`pk.`) token in both environments — it's scoped per app (dashboard vs mobile, see TOR-70), not per environment, so staging and production share this value |
 | `REQUEST_SIGNING_SECRET` | **Secret** | Server-only (read in `lib/backend/signed-fetch.ts`, never exposed to the browser) — must be byte-identical to the backend's value in the same environment, see below |
 
 ## Keeping `REQUEST_SIGNING_SECRET` in sync (highest-risk step, no automated guard)
