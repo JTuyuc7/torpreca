@@ -12,6 +12,7 @@ export * from "./schemas/audit-log.schema";
 export * from "./schemas/auth-event.schema";
 export * from "./schemas/auth-user.schema";
 export * from "./schemas/daily-report.schema";
+export * from "./schemas/dashboard.schema";
 export * from "./schemas/location.schema";
 export * from "./schemas/route.schema";
 export * from "./schemas/stop.schema";
