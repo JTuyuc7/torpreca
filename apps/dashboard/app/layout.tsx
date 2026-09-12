@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Roboto } from "next/font/google";
 import "./globals.css";
+import { Providers } from "./providers";
 
 // Tipografía del Design System V2.0 (context/dashboard/assets/TorprecaDesignV2.pdf) —
 // pesos 400/500 cubren toda la escala M3 usada ahí (Display/Headline/Title/Body
@@ -12,14 +13,16 @@ const roboto = Roboto({
 });
 
 export const metadata: Metadata = {
-  title: "Torpreca — Panel administrativo",
+  title: "Torpreca - Panel administrativo",
   description: "Gestión de rutas, conductores y reportes en tiempo real.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="es" className={`${roboto.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }

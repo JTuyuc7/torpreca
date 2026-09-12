@@ -9,9 +9,14 @@ import {
   CreateStopSchema,
   CreateUserSchema,
   CreateVehicleSchema,
+  DashboardSummarySchema,
   FinishRouteSchema,
+  ReviewUserSchema,
   RouteSchema,
   StopSchema,
+  UpdateRouteSchema,
+  UpdateVehicleSchema,
+  USER_STATUSES,
   UserSchema,
   VehicleSchema,
   z,
@@ -52,10 +57,13 @@ const badRequest = errorResponse("Body failed zod validation");
 
 const Vehicle = registry.register("Vehicle", VehicleSchema);
 const CreateVehicle = registry.register("CreateVehicle", CreateVehicleSchema);
+const UpdateVehicle = registry.register("UpdateVehicle", UpdateVehicleSchema);
 const User = registry.register("User", UserSchema);
 const CreateUser = registry.register("CreateUser", CreateUserSchema);
+const ReviewUser = registry.register("ReviewUser", ReviewUserSchema);
 const Route = registry.register("Route", RouteSchema);
 const CreateRoute = registry.register("CreateRoute", CreateRouteSchema);
+const UpdateRoute = registry.register("UpdateRoute", UpdateRouteSchema);
 const FinishRoute = registry.register("FinishRoute", FinishRouteSchema);
 const Stop = registry.register("Stop", StopSchema);
 const CreateStop = registry.register("CreateStop", CreateStopSchema.omit({ routeId: true }));
@@ -64,6 +72,12 @@ const IdParam = z.object({ id: z.uuid() });
 const RouteIdParam = z.object({ routeId: z.uuid() });
 const OnlyActiveQuery = z.object({
   all: z.enum(["true", "false"]).optional().describe("Set to 'true' to include inactive rows"),
+});
+const UserStatusQuery = z.object({
+  status: z
+    .enum([...USER_STATUSES, "all"])
+    .optional()
+    .describe("Filter by status; defaults to 'active'. 'all' lifts the filter."),
 });
 
 const authed = { security: [{ bearerAuth: [] }] };
@@ -105,6 +119,24 @@ path({
   },
 });
 path({
+  method: "patch",
+  path: "/vehicles/{id}",
+  tags: ["Vehicles"],
+  summary: "Edit a vehicle (also used to reactivate it via active: true)",
+  request: {
+    params: IdParam,
+    body: { content: { "application/json": { schema: UpdateVehicle } } },
+  },
+  responses: {
+    200: jsonResponse("Vehicle updated", Vehicle),
+    400: badRequest,
+    401: unauthorized,
+    403: forbidden,
+    404: notFound,
+    409: errorResponse("A vehicle with that plate already exists"),
+  },
+});
+path({
   method: "delete",
   path: "/vehicles/{id}",
   tags: ["Vehicles"],
@@ -124,7 +156,7 @@ path({
   path: "/users",
   tags: ["Users"],
   summary: "List users",
-  request: { query: OnlyActiveQuery },
+  request: { query: UserStatusQuery },
   responses: { 200: jsonResponse("Users", z.array(User)), 401: unauthorized, 403: forbidden },
 });
 path({
@@ -161,6 +193,24 @@ path({
     404: notFound,
   },
 });
+path({
+  method: "patch",
+  path: "/users/{id}/review",
+  tags: ["Users"],
+  summary: "Approve or reject a pending driver registration",
+  request: {
+    params: IdParam,
+    body: { content: { "application/json": { schema: ReviewUser } } },
+  },
+  responses: {
+    200: jsonResponse("User reviewed", User),
+    400: badRequest,
+    401: unauthorized,
+    403: forbidden,
+    404: notFound,
+    409: { description: "User is not pending review" },
+  },
+});
 
 // --- routes ---
 path({
@@ -195,6 +245,24 @@ path({
     400: badRequest,
     401: unauthorized,
     403: forbidden,
+  },
+});
+path({
+  method: "patch",
+  path: "/routes/{id}",
+  tags: ["Routes"],
+  summary: "Edit a pending route (reassign driver/vehicle, change code/date/plannedKm)",
+  request: {
+    params: IdParam,
+    body: { content: { "application/json": { schema: UpdateRoute } } },
+  },
+  responses: {
+    200: jsonResponse("Route updated", Route),
+    400: badRequest,
+    401: unauthorized,
+    403: forbidden,
+    404: notFound,
+    409: errorResponse("Route is not pending"),
   },
 });
 path({
@@ -287,6 +355,20 @@ path({
     403: forbidden,
     404: notFound,
     409: errorResponse("Stop not in a delayable state"),
+  },
+});
+
+// --- dashboard ---
+const DashboardSummary = registry.register("DashboardSummary", DashboardSummarySchema);
+path({
+  method: "get",
+  path: "/dashboard/summary",
+  tags: ["Dashboard"],
+  summary: "Fleet-wide counts for the dashboard home screen",
+  responses: {
+    200: jsonResponse("Summary", DashboardSummary),
+    401: unauthorized,
+    403: forbidden,
   },
 });
 

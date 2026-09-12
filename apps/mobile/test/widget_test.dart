@@ -1,30 +1,86 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:mobile/main.dart';
+import 'package:mobile/core/theme/app_theme.dart';
+import 'package:mobile/features/auth/data/auth_repository.dart';
+import 'package:mobile/features/auth/presentation/login_screen.dart';
+
+class _FakeAuthRepository implements AuthRepository {
+  _FakeAuthRepository({this.shouldFail = false});
+
+  final bool shouldFail;
+  bool signInCalled = false;
+
+  @override
+  Future<void> signIn({required String email, required String password}) async {
+    signInCalled = true;
+    await Future.delayed(const Duration(milliseconds: 50));
+    if (shouldFail) {
+      throw Exception('invalid credentials');
+    }
+  }
+
+  @override
+  Future<void> signOut() async {}
+
+  @override
+  Future<String?> register({
+    required String email,
+    required String password,
+    required String name,
+    required String signupCode,
+  }) async => null;
+}
+
+Widget _wrap(AuthRepository repository) {
+  return MaterialApp(
+    theme: AppTheme.light,
+    home: LoginScreen(authRepository: repository),
+  );
+}
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('renders email and password fields plus the submit button', (tester) async {
+    await tester.pumpWidget(_wrap(_FakeAuthRepository()));
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(find.widgetWithText(TextFormField, 'Correo'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, 'Contraseña'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Ingresar'), findsOneWidget);
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+  testWidgets('shows a loading indicator while signing in', (tester) async {
+    await tester.pumpWidget(_wrap(_FakeAuthRepository()));
+
+    await tester.enterText(find.widgetWithText(TextFormField, 'Correo'), 'driver@torpreca.com');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Contraseña'), 'password123');
+    await tester.tap(find.widgetWithText(FilledButton, 'Ingresar'));
     await tester.pump();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('shows an error message when sign in fails', (tester) async {
+    final repository = _FakeAuthRepository(shouldFail: true);
+    await tester.pumpWidget(_wrap(repository));
+
+    await tester.enterText(find.widgetWithText(TextFormField, 'Correo'), 'driver@torpreca.com');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Contraseña'), 'wrong');
+    await tester.tap(find.widgetWithText(FilledButton, 'Ingresar'));
+    await tester.pumpAndSettle();
+
+    expect(repository.signInCalled, isTrue);
+    expect(find.text('No se pudo iniciar sesión. Intenta de nuevo.'), findsOneWidget);
+  });
+
+  testWidgets('tapping "Regístrate" navigates to RegisterScreen', (tester) async {
+    await tester.pumpWidget(_wrap(_FakeAuthRepository()));
+
+    await tester.tap(find.text('¿No tienes cuenta? Regístrate'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Crear cuenta'), findsWidgets);
+    expect(find.widgetWithText(TextFormField, 'Código de invitación'), findsOneWidget);
   });
 }

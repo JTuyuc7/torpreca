@@ -1,4 +1,4 @@
-import { CreateVehicleSchema } from "@torpreca/shared";
+import { CreateVehicleSchema, UpdateVehicleSchema } from "@torpreca/shared";
 import type { Routable } from "../../core/http/router";
 import { auth } from "../../core/middleware/auth";
 import { rateLimitGeneral } from "../../core/middleware/rate-limit";
@@ -28,6 +28,18 @@ export function registerVehiclesRoutes(router: Routable) {
     async (ctx) => {
       const vehicle = await service.create(ctx.body as never);
       return Response.json(vehicle, { status: 201 });
+    },
+  );
+
+  router.patch(
+    "/vehicles/:id",
+    auth,
+    requireRole("admin", "super_admin"),
+    rateLimitGeneral,
+    validateBody(UpdateVehicleSchema),
+    async (ctx) => {
+      const vehicle = await service.update(ctx.params.id!, ctx.body as never);
+      return Response.json(vehicle);
     },
   );
 

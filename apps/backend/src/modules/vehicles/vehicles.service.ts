@@ -1,4 +1,4 @@
-import type { CreateVehicleInput, Vehicle } from "@torpreca/shared";
+import type { CreateVehicleInput, UpdateVehicleInput, Vehicle } from "@torpreca/shared";
 import { AppError, NotFoundError } from "../../core/errors/app-error";
 import type { VehiclesRepository } from "./vehicles.repository";
 
@@ -20,6 +20,21 @@ export function createVehiclesService(repo: VehiclesRepository) {
       const existing = await repo.getByPlate(input.plate);
       if (existing) throw new AppError(409, "A vehicle with that plate already exists");
       return repo.create(input);
+    },
+
+    async update(id: string, patch: UpdateVehicleInput): Promise<Vehicle> {
+      await this.getById(id);
+
+      if (patch.plate !== undefined) {
+        const existing = await repo.getByPlate(patch.plate);
+        if (existing && existing.id !== id) {
+          throw new AppError(409, "A vehicle with that plate already exists");
+        }
+      }
+
+      const updated = await repo.update(id, patch);
+      if (!updated) throw new NotFoundError("Vehicle not found");
+      return updated;
     },
 
     async deactivate(id: string): Promise<void> {

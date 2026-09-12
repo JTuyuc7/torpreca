@@ -1,4 +1,4 @@
-import { CreateUserSchema } from "@torpreca/shared";
+import { CreateUserSchema, ReviewUserSchema, type Role, USER_STATUSES } from "@torpreca/shared";
 import { logEvent } from "../../core/audit/log-event";
 import { clientIp } from "../../core/http/client-ip";
 import type { Routable } from "../../core/http/router";
@@ -18,8 +18,18 @@ export function registerUsersRoutes(router: Routable) {
     requireRole("admin", "supervisor", "super_admin"),
     rateLimitGeneral,
     async (ctx) => {
-      const onlyActive = !ctx.req.url.includes("all=true");
-      return Response.json(await service.list(onlyActive));
+      // ?status=pending powers the dashboard's approval queue; ?status=all
+      // (or the legacy ?all=true) lifts the default active-only filter.
+      const url = new URL(ctx.req.url);
+      const statusParam = url.searchParams.get("status");
+      const status =
+        statusParam && (USER_STATUSES as readonly string[]).includes(statusParam)
+          ? (statusParam as (typeof USER_STATUSES)[number])
+          : statusParam === "all" || url.searchParams.get("all") === "true"
+            ? "all"
+            : undefined;
+
+      return Response.json(await service.list(status));
     },
   );
 
@@ -36,7 +46,14 @@ export function registerUsersRoutes(router: Routable) {
   router.post(
     "/users",
     auth,
-    requireRole("admin", "super_admin"),
+    // super_admin only: this is how admin/supervisor accounts get created
+    // (linking an already-existing Supabase Auth user to a `users` profile)
+    // — an "admin" granting another admin/supervisor account would be
+    // self-service privilege escalation without oversight. Backlogged
+    // (session 08 sep 2026): a real invite flow via the Supabase Admin API
+    // would remove the need for a super_admin to manually copy-paste an
+    // authUserId here at all.
+    requireRole("super_admin"),
     rateLimitGeneral,
     validateBody(CreateUserSchema),
     async (ctx) => {
@@ -53,6 +70,30 @@ export function registerUsersRoutes(router: Routable) {
       });
 
       return Response.json(user, { status: 201 });
+    },
+  );
+
+  router.patch(
+    "/users/:id/review",
+    auth,
+    requireRole("admin", "supervisor", "super_admin"),
+    rateLimitGeneral,
+    validateBody(ReviewUserSchema),
+    async (ctx) => {
+      const { decision, role } = ctx.body as { decision: "approve" | "reject"; role?: Role };
+      const user = await service.review(ctx.params.id!, decision, ctx.user!.id, role);
+
+      await logEvent({
+        userId: ctx.user!.id,
+        role: ctx.user!.role,
+        action: decision === "approve" ? "user.approved" : "user.rejected",
+        entity: "users",
+        entityId: user.id,
+        ip: clientIp(ctx),
+        metadata: null,
+      });
+
+      return Response.json(user);
     },
   );
 

@@ -55,6 +55,18 @@ describe("routesRepository", () => {
     expect((await routesRepository.list({ date: "2026-08-23" })).map((r) => r.id)).toEqual(["r2"]);
   });
 
+  it("update() only succeeds while pending", async () => {
+    const { routesRepository } = await import("./routes.repository");
+    fake.reset({ routes: [BASE_ROW] });
+
+    const updated = await routesRepository.update("r1", { plannedKm: 99 });
+    expect(updated).toMatchObject({ plannedKm: 99 });
+
+    fake.reset({ routes: [{ ...BASE_ROW, status: "in_progress" }] });
+    const rejected = await routesRepository.update("r1", { plannedKm: 99 });
+    expect(rejected).toBeNull();
+  });
+
   it("start() only succeeds for the owning driver while pending", async () => {
     const { routesRepository } = await import("./routes.repository");
     fake.reset({ routes: [BASE_ROW] });

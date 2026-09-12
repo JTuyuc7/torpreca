@@ -138,6 +138,9 @@ class FakeQueryBuilder implements PromiseLike<PostgrestResult> {
 
 export interface FakeAuthUser {
   id: string;
+  email?: string;
+  email_confirmed_at?: string | null;
+  user_metadata?: Record<string, unknown>;
 }
 
 export interface FakeSupabaseClient {
@@ -147,6 +150,12 @@ export interface FakeSupabaseClient {
     getUser(
       token: string,
     ): Promise<{ data: { user: FakeAuthUser | null }; error: { message: string } | null }>;
+    admin: {
+      createUser(
+        attrs: Record<string, unknown>,
+      ): Promise<{ data: { user: FakeAuthUser | null }; error: { message: string } | null }>;
+    };
+    resend(attrs: Record<string, unknown>): Promise<{ error: { message: string } | null }>;
   };
 }
 
@@ -155,6 +164,13 @@ export interface FakeSupabase {
   tables: Record<string, Row[]>;
   reset(seed?: Record<string, Row[]>): void;
   setAuthUser(user: FakeAuthUser | null, error?: { message: string } | null): void;
+  // POST /mobile/auth/register's admin.createUser()/resend() calls — tests
+  // assert against these instead of a real Supabase Auth project.
+  authAdmin: {
+    createdUsers: FakeAuthUser[];
+    createUserError: { message: string } | null;
+    resendCalls: Record<string, unknown>[];
+  };
 }
 
 export function createFakeSupabase(
@@ -165,6 +181,11 @@ export function createFakeSupabase(
   const insertDefaults = options.insertDefaults ?? {};
   let authUser: FakeAuthUser | null = null;
   let authError: { message: string } | null = null;
+  const authAdmin: FakeSupabase["authAdmin"] = {
+    createdUsers: [],
+    createUserError: null,
+    resendCalls: [],
+  };
 
   const client: FakeSupabaseClient = {
     from(table) {
@@ -181,17 +202,40 @@ export function createFakeSupabase(
         if (authError) return { data: { user: null }, error: authError };
         return { data: { user: authUser }, error: null };
       },
+      admin: {
+        async createUser(attrs) {
+          if (authAdmin.createUserError) {
+            return { data: { user: null }, error: authAdmin.createUserError };
+          }
+          const user: FakeAuthUser = {
+            id: crypto.randomUUID(),
+            email: attrs.email as string,
+            email_confirmed_at: null,
+            user_metadata: (attrs.user_metadata as Record<string, unknown>) ?? {},
+          };
+          authAdmin.createdUsers.push(user);
+          return { data: { user }, error: null };
+        },
+      },
+      async resend(attrs) {
+        authAdmin.resendCalls.push(attrs);
+        return { error: null };
+      },
     },
   };
 
   return {
     client,
     tables,
+    authAdmin,
     reset(seed = {}) {
       for (const key of Object.keys(tables)) delete tables[key];
       for (const [key, rows] of Object.entries(seed)) {
         tables[key] = rows.map((row) => ({ ...row }));
       }
+      authAdmin.createdUsers = [];
+      authAdmin.createUserError = null;
+      authAdmin.resendCalls = [];
     },
     setAuthUser(user, error = null) {
       authUser = user;

@@ -17,3 +17,13 @@ export type StopStatus = (typeof STOP_STATUSES)[number];
 export const NOTIFICATION_TYPES = ["info", "alert", "urgent"] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
+
+// Literal values match the Postgres enum `user_status` — do not rename without a DB migration.
+export const USER_STATUSES = ["pending", "active", "rejected", "deactivated"] as const;
+
+export type UserStatus = (typeof USER_STATUSES)[number];
+
+// Literal values match the Postgres enum `vehicle_category` — do not rename without a DB migration.
+export const VEHICLE_CATEGORIES = ["motorcycle", "light_vehicle", "truck"] as const;
+
+export type VehicleCategory = (typeof VEHICLE_CATEGORIES)[number];

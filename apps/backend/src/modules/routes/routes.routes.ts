@@ -1,4 +1,4 @@
-import { CreateRouteSchema, FinishRouteSchema } from "@torpreca/shared";
+import { CreateRouteSchema, FinishRouteSchema, UpdateRouteSchema } from "@torpreca/shared";
 import { logEvent } from "../../core/audit/log-event";
 import { clientIp } from "../../core/http/client-ip";
 import type { Routable } from "../../core/http/router";
@@ -41,6 +41,29 @@ export function registerRoutesRoutes(router: Routable) {
       });
 
       return Response.json(route, { status: 201 });
+    },
+  );
+
+  router.patch(
+    "/routes/:id",
+    auth,
+    requireRole("admin", "supervisor", "super_admin"),
+    rateLimitGeneral,
+    validateBody(UpdateRouteSchema),
+    async (ctx) => {
+      const route = await service.update(ctx.params.id!, ctx.body as never);
+
+      await logEvent({
+        userId: ctx.user!.id,
+        role: ctx.user!.role,
+        action: "route.updated",
+        entity: "routes",
+        entityId: route.id,
+        ip: clientIp(ctx),
+        metadata: null,
+      });
+
+      return Response.json(route);
     },
   );
 

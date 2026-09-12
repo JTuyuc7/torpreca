@@ -16,6 +16,12 @@
   --outline: #79747e;
   --error: #b3261e;
   --decorative: #7e5b34;
+  /* Tells the browser which native widget skin to use for form controls it
+     renders itself (date/time picker popup, select dropdown, scrollbars) —
+     without this they default to the OS's light skin regardless of our own
+     dark tokens above, which is why the date picker's calendar icon looked
+     like a bright rectangle over the dark surface. */
+  color-scheme: light;
 }
 
 @theme inline {
@@ -42,6 +48,7 @@
     --text: #e6e1e5;
     --outline: #8bafc8;
     --error: #f2b8b5;
+    color-scheme: dark;
   }
 }
 
@@ -49,4 +56,31 @@ body {
   background: var(--background);
   color: var(--text);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Number inputs (e.g. plannedKm) keep their up/down spinner off — it added
+   visual noise without being how anyone actually enters a distance. */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  appearance: textfield;
+}
+
+/* Fades new content in once a loading skeleton is swapped out for it, so the
+   layout settles instead of popping/jumping into place. */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-in {
+  animation: fade-in 220ms ease-out;
 }

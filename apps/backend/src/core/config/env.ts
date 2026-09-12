@@ -5,6 +5,10 @@ const EnvSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   SECRET_KEY: z.string().min(1),
   REQUEST_SIGNING_SECRET: z.string().min(1),
+  // Shared invitation code required by POST /mobile/auth/register — not
+  // per-user, just filters out registrations from people outside Torpreca
+  // (see the self-signup design doc).
+  SIGNUP_CODE: z.string().min(1),
   PORT: z.coerce.number().int().positive().default(3000),
   ALLOWED_ORIGINS: z
     .string()

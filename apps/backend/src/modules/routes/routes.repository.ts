@@ -1,4 +1,4 @@
-import type { CreateRouteInput, Route } from "@torpreca/shared";
+import type { CreateRouteInput, Route, UpdateRouteInput } from "@torpreca/shared";
 import { supabaseAdmin } from "../../core/db/supabase";
 
 function toRoute(row: Record<string, unknown>): Route {
@@ -28,6 +28,9 @@ export interface RoutesRepository {
   list(filter?: RouteFilter): Promise<Route[]>;
   getById(id: string): Promise<Route | null>;
   create(input: CreateRouteInput, createdBy: string): Promise<Route>;
+  // Only succeeds while the route is still `pending` — same eq()-as-guard
+  // pattern as start/finish below.
+  update(id: string, patch: UpdateRouteInput): Promise<Route | null>;
   start(id: string, driverId: string): Promise<Route | null>;
   finish(id: string, driverId: string, drivenKm: number): Promise<Route | null>;
 }
@@ -68,6 +71,25 @@ export const routesRepository: RoutesRepository = {
       .single();
     if (error) throw error;
     return toRoute(data);
+  },
+
+  async update(id, patch) {
+    const row: Record<string, unknown> = {};
+    if (patch.code !== undefined) row.code = patch.code;
+    if (patch.driverId !== undefined) row.driver_id = patch.driverId;
+    if (patch.vehicleId !== undefined) row.vehicle_id = patch.vehicleId;
+    if (patch.date !== undefined) row.date = patch.date;
+    if (patch.plannedKm !== undefined) row.planned_km = patch.plannedKm;
+
+    const { data, error } = await supabaseAdmin
+      .from("routes")
+      .update(row)
+      .eq("id", id)
+      .eq("status", "pending")
+      .select("*")
+      .maybeSingle();
+    if (error) throw error;
+    return data ? toRoute(data) : null;
   },
 
   // Only succeeds if this driver owns the route and it's still `pending` — the

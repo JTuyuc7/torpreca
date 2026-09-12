@@ -37,3 +37,23 @@ export function registerSyncQueueRoutes(router: Routable) {
     },
   );
 }
+
+// Mirrors modules/auth/mobile-auth.routes.ts and
+// modules/ws-tickets/ws-tickets.routes.ts' registerMobileWsTicketsRoutes:
+// Flutter can't hold REQUEST_SIGNING_SECRET, so the driver app drains its
+// offline queue through this unsigned /mobile route instead of /sync,
+// protected by JWT + role + rate limit only. Same `service.drain()` as the
+// signed route — no parallel business logic.
+export function registerMobileSyncQueueRoutes(router: Routable) {
+  router.post(
+    "/mobile/sync",
+    auth,
+    requireRole("driver"),
+    rateLimitGeneral,
+    validateBody(SyncBatchSchema),
+    async (ctx) => {
+      const results = await service.drain(ctx.body as never, ctx.user!, clientIp(ctx));
+      return Response.json({ results });
+    },
+  );
+}

@@ -12,16 +12,24 @@ import {
 } from "./core/ws/tracking-handlers";
 import { resolveUpgradeData, type TrackingSocketData } from "./core/ws/upgrade";
 import { registerAuthRoutes } from "./modules/auth/auth.routes";
+import { registerMobileAuthRoutes } from "./modules/auth/mobile-auth.routes";
+import { registerDashboardRoutes } from "./modules/dashboard/dashboard.routes";
 import { locationsRepository } from "./modules/locations/locations.repository";
 import { registerLocationsRoutes } from "./modules/locations/locations.routes";
 import { createLocationsService } from "./modules/locations/locations.service";
 import { routesRepository } from "./modules/routes/routes.repository";
 import { registerRoutesRoutes } from "./modules/routes/routes.routes";
 import { registerStopsRoutes } from "./modules/stops/stops.routes";
-import { registerSyncQueueRoutes } from "./modules/sync-queue/sync-queue.routes";
+import {
+  registerMobileSyncQueueRoutes,
+  registerSyncQueueRoutes,
+} from "./modules/sync-queue/sync-queue.routes";
 import { registerUsersRoutes } from "./modules/users/users.routes";
 import { registerVehiclesRoutes } from "./modules/vehicles/vehicles.routes";
-import { registerWsTicketsRoutes } from "./modules/ws-tickets/ws-tickets.routes";
+import {
+  registerMobileWsTicketsRoutes,
+  registerWsTicketsRoutes,
+} from "./modules/ws-tickets/ws-tickets.routes";
 import { docsPageHtml } from "./openapi/docs-page";
 import { openApiDocument } from "./openapi/document";
 
@@ -31,13 +39,17 @@ const router = new Router();
 // and add `deprecated({ sunset, link })` as an extra middleware on this v1 group.
 const v1 = router.withPrefix("/api/v1");
 registerAuthRoutes(v1);
+registerMobileAuthRoutes(v1);
 registerVehiclesRoutes(v1);
 registerUsersRoutes(v1);
 registerRoutesRoutes(v1);
 registerStopsRoutes(v1);
 registerLocationsRoutes(v1);
+registerDashboardRoutes(v1);
 registerWsTicketsRoutes(v1);
+registerMobileWsTicketsRoutes(v1);
 registerSyncQueueRoutes(v1);
+registerMobileSyncQueueRoutes(v1);
 
 // Unversioned infra routes — not signed, not tied to an API version.
 router.get("/health", () => Response.json({ ok: true }));
