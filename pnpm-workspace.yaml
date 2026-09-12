@@ -18,3 +18,5 @@
 packages:
   - apps/dashboard
   - packages/shared
+overrides:
+  next@>=16.0.0 <16.3.3: '>=16.3.3'

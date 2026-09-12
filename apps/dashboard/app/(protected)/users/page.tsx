@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useAuthUser } from "@/app/(protected)/auth-context";
 import { ErrorBanner } from "@/components/ui/error-banner";
+import { Input } from "@/components/ui/input";
 import { Section } from "@/components/ui/section";
 import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -183,35 +184,21 @@ export default function UsersPage() {
                   <label htmlFor="authUserId" className="text-xs text-outline">
                     Auth User ID (Supabase)
                   </label>
-                  <input
-                    id="authUserId"
-                    {...register("authUserId")}
-                    className="h-9 rounded-md border border-outline/30 bg-background px-2 text-sm text-text"
-                    placeholder="uuid"
-                  />
+                  <Input id="authUserId" {...register("authUserId")} placeholder="uuid" />
                   {errors.authUserId && <FieldError>ID inválido (debe ser un UUID).</FieldError>}
                 </div>
                 <div className="flex flex-col gap-1">
                   <label htmlFor="name" className="text-xs text-outline">
                     Nombre
                   </label>
-                  <input
-                    id="name"
-                    {...register("name")}
-                    className="h-9 rounded-md border border-outline/30 bg-background px-2 text-sm text-text"
-                  />
+                  <Input id="name" {...register("name")} />
                   {errors.name && <FieldError>Requerido.</FieldError>}
                 </div>
                 <div className="flex flex-col gap-1">
                   <label htmlFor="email" className="text-xs text-outline">
                     Email
                   </label>
-                  <input
-                    id="email"
-                    type="email"
-                    {...register("email")}
-                    className="h-9 rounded-md border border-outline/30 bg-background px-2 text-sm text-text"
-                  />
+                  <Input id="email" type="email" {...register("email")} />
                   {errors.email && <FieldError>Correo inválido.</FieldError>}
                 </div>
                 <div className="flex flex-col gap-1">
@@ -252,10 +239,10 @@ export default function UsersPage() {
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-outline/30 text-xs text-outline">
-                    <th className="py-2">Usuario</th>
-                    <th className="py-2">Rol</th>
-                    <th className="py-2">Estado</th>
-                    <th className="py-2">Creado</th>
+                    <th className="py-2 pr-4">Usuario</th>
+                    <th className="py-2 pr-4">Rol</th>
+                    <th className="py-2 pr-4">Estado</th>
+                    <th className="py-2 pr-4">Creado</th>
                     <th className="py-2">Acciones</th>
                   </tr>
                 </thead>
@@ -265,13 +252,13 @@ export default function UsersPage() {
                       deactivateUser.isPending && deactivateUser.variables === user.id;
                     return (
                       <tr key={user.id} className="border-b border-outline/10 text-text">
-                        <td className="py-2.5">
+                        <td className="py-2.5 pr-4">
                           <p className="font-medium">{user.name}</p>
                           <p className="text-xs text-outline">{user.email}</p>
                         </td>
-                        <td className="py-2.5">{user.role}</td>
-                        <td className="py-2.5">{STATUS_LABELS[user.status]}</td>
-                        <td className="py-2.5">{new Date(user.createdAt).toLocaleDateString()}</td>
+                        <td className="py-2.5 pr-4">{user.role}</td>
+                        <td className="py-2.5 pr-4">{STATUS_LABELS[user.status]}</td>
+                        <td className="py-2.5 pr-4">{new Date(user.createdAt).toLocaleDateString()}</td>
                         <td className="py-2.5">
                           {user.status !== "deactivated" && (
                             <button
