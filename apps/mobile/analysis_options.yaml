@@ -18,6 +18,9 @@ analyzer:
     - windows/**
     - macos/**
     - linux/**
+    # Vendored third-party source (TOR-132, see third_party/README.md) — not
+    # our code to lint; analyzing it just buries real findings in noise.
+    - third_party/**
 
 linter:
   # The lint rules applied to this project can be customized in the

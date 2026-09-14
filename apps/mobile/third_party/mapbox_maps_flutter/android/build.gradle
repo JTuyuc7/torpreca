@@ -1,0 +1,72 @@
+group 'com.mapbox.maps.mapbox_maps'
+version '1.0.0'
+
+buildscript {
+    ext.kotlin_version = '1.8.22'
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath 'com.android.tools.build:gradle:7.3.0'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+rootProject.allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven {
+            url 'https://api.mapbox.com/downloads/v2/releases/maven'
+        }
+        maven {
+            url 'https://api.mapbox.com/downloads/v2/snapshots/maven'
+        }
+    }
+}
+
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+
+android {
+    // PATCHED (TOR-132, see apps/mobile/third_party/README.md): was
+    // `compileSdk 33` upstream — too low for this package's own transitive
+    // androidx deps (flutter_plugin_android_lifecycle, androidx.core, etc.,
+    // which require compiling against API 34+), so `flutter build apk
+    // --release` failed AGP's checkReleaseAarMetadata check. Debug builds
+    // were unaffected (that check only runs for release).
+    compileSdk 36
+
+    namespace 'com.mapbox.maps.mapbox_maps'
+    sourceSets {
+        main.java.srcDirs += 'src/main/kotlin'
+    }
+    defaultConfig {
+        minSdkVersion 21
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
+}
+
+if (file("$rootDir/gradle/ktlint.gradle").exists() && file("$rootDir/gradle/lint.gradle").exists()) {
+    project.apply {
+        from("$rootDir/gradle/ktlint.gradle")
+        from("$rootDir/gradle/lint.gradle")
+    }
+}
+
+dependencies {
+    implementation "com.mapbox.maps:android:11.13.0"
+
+    implementation "androidx.annotation:annotation:1.5.0"
+    implementation "androidx.lifecycle:lifecycle-runtime-ktx:2.6.2"
+}

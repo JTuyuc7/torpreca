@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/api/mobile_auth_client.dart';
@@ -8,13 +9,14 @@ import 'core/env.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/data/auth_repository.dart';
 import 'features/auth/presentation/login_screen.dart';
-import 'features/home/presentation/home_placeholder.dart';
+import 'features/map/presentation/map_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: '.env');
   await Hive.initFlutter();
   await Supabase.initialize(url: Env.supabaseUrl, publishableKey: Env.supabaseAnonKey);
+  MapboxOptions.setAccessToken(Env.mapboxToken);
   runApp(const MyApp());
 }
 
@@ -40,7 +42,7 @@ class MyApp extends StatelessWidget {
 /// Whenever a session appears (a fresh login *or* one already persisted from
 /// a previous app launch), it's handed to [_SessionGate] to confirm the
 /// backend's own account status (`POST /mobile/auth/session`) before ever
-/// showing [HomePlaceholder] — a driver approved yesterday and rejected
+/// showing [MapScreen] — a driver approved yesterday and rejected
 /// today shouldn't get in just because their phone still has Supabase's
 /// session cached. This check deliberately lives here, not inside
 /// `AuthRepository.signIn()`: that would race this same stream (it fires the
@@ -82,7 +84,7 @@ class _AuthGateState extends State<AuthGate> {
           accessToken: session.accessToken,
           mobileAuthClient: _mobileAuthClient,
           onBlocked: (message) => setState(() => _blockedMessage = message),
-          child: HomePlaceholder(authRepository: _authRepository),
+          child: MapScreen(authRepository: _authRepository),
         );
       },
     );

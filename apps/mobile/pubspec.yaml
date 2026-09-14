@@ -46,6 +46,13 @@ dependencies:
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   uuid: ^4.6.0
+  # Mapa principal del conductor (TOR-22) — CLAUDE.md: "Mapas | mapbox_maps_flutter en mobile"
+  # Vendored, not pub.dev — see third_party/README.md (TOR-132): upstream
+  # 2.9.0 is the only version that builds cleanly against this project's
+  # AGP 9/Kotlin 2.4 toolchain, but its release build needs one line patched
+  # (compileSdk 33 -> 36) that no Gradle-side override can apply.
+  mapbox_maps_flutter:
+    path: third_party/mapbox_maps_flutter
 
 dev_dependencies:
   flutter_test:
