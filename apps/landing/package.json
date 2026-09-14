@@ -23,10 +23,5 @@
     "tailwindcss": "^4",
     "typescript": "^5"
   },
-  "packageManager": "pnpm@10.34.5",
-  "pnpm": {
-    "overrides": {
-      "js-yaml@>=4.0.0 <4.3.2": ">=4.3.2"
-    }
-  }
+  "packageManager": "pnpm@10.34.5"
 }
