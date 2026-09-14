@@ -14,6 +14,19 @@ import '../../../core/offline/sync_queue_item.dart';
 
 enum TrackingStatus { idle, connecting, tracking, error }
 
+/// Thrown by [TrackingService._ensureLocationPermission] instead of a bare
+/// [StateError] — a `StateError.toString()` prefixes "Bad state:", which
+/// leaked into the UI as raw, undescriptive text. This carries just enough
+/// to build a proper user-facing message in [TrackingService._fail].
+class LocationPermissionDeniedException implements Exception {
+  const LocationPermissionDeniedException({required this.permanently});
+
+  /// True for [LocationPermission.deniedForever] — the OS won't show its
+  /// own permission dialog again, so the only way out is the app's own
+  /// Settings screen (not the device-wide location settings).
+  final bool permanently;
+}
+
 /// Sends periodic GPS pings over `/ws` (apps/backend/src/core/ws/*) while
 /// the app is in the foreground. No route assignment exists yet, so
 /// `routeId` is always sent as `null` — matches `CreateLocationSchema` in
@@ -86,10 +99,19 @@ class TrackingService extends ChangeNotifier {
       _setStatus(TrackingStatus.tracking);
       unawaited(_sendPing());
       unawaited(_drainOfflineQueue(accessToken));
-    } on LocationServiceDisabledException catch (error) {
-      _fail(error.toString(), locationServicesDisabled: true);
+    } on LocationServiceDisabledException catch (_) {
+      _fail(
+        'El GPS del dispositivo está desactivado. Actívalo para iniciar el rastreo.',
+        locationServicesDisabled: true,
+      );
+    } on LocationPermissionDeniedException catch (error) {
+      _fail(
+        error.permanently
+            ? 'El permiso de ubicación fue denegado permanentemente. Actívalo manualmente en Ajustes de la app.'
+            : 'Se necesita el permiso de ubicación para iniciar el rastreo.',
+      );
     } catch (error) {
-      _fail(error.toString());
+      _fail('No se pudo iniciar el rastreo: $error');
     }
   }
 
@@ -136,14 +158,17 @@ class TrackingService extends ChangeNotifier {
       position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
       );
-    } on LocationServiceDisabledException catch (error) {
+    } on LocationServiceDisabledException catch (_) {
       // A GPS read failure is fatal (permission revoked, services turned
       // off mid-session) — unlike a dropped socket, there's nothing to
       // queue, so this does stop tracking.
-      _fail(error.toString(), locationServicesDisabled: true);
+      _fail(
+        'El GPS del dispositivo se desactivó durante el rastreo. Actívalo para continuar.',
+        locationServicesDisabled: true,
+      );
       return;
     } catch (error) {
-      _fail(error.toString());
+      _fail('Se perdió la señal de ubicación: $error');
       return;
     }
 
@@ -225,7 +250,9 @@ class TrackingService extends ChangeNotifier {
     }
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
-      throw StateError('Location permission denied');
+      throw LocationPermissionDeniedException(
+        permanently: permission == LocationPermission.deniedForever,
+      );
     }
 
     if (!await Geolocator.isLocationServiceEnabled()) {
