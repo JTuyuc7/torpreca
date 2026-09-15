@@ -4,11 +4,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/api/routes_client.dart';
 import '../../../core/api/stops_client.dart';
 import '../data/stop.dart';
+import 'stop_detail_screen.dart';
+import 'stop_status_ui.dart';
 
 /// "Lista de paradas" (TOR-35) — the driver's stops for today's route, via
 /// `GET /mobile/routes` + `GET /mobile/routes/:routeId/stops`. Tapping a stop
-/// to see its detail or mark it complete is "Detalle de parada" (TOR-20), a
-/// separate ticket.
+/// opens `StopDetailScreen` (TOR-20) to see its full detail and mark it
+/// completed/delayed.
 class StopsScreen extends StatefulWidget {
   const StopsScreen({super.key});
 
@@ -45,19 +47,15 @@ class _StopsScreenState extends State<StopsScreen> {
     await future;
   }
 
-  String _statusLabel(StopStatus status) => switch (status) {
-    StopStatus.pending => 'Pendiente',
-    StopStatus.next => 'Siguiente',
-    StopStatus.completed => 'Completada',
-    StopStatus.delayed => 'Retrasada',
-  };
-
-  IconData _statusIcon(StopStatus status) => switch (status) {
-    StopStatus.pending => Icons.radio_button_unchecked,
-    StopStatus.next => Icons.navigation,
-    StopStatus.completed => Icons.check_circle,
-    StopStatus.delayed => Icons.error_outline,
-  };
+  Future<void> _openDetail(Stop stop) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => StopDetailScreen(stop: stop)),
+    );
+    // Simpler and more robust than threading the possibly-updated stop back
+    // through every way of leaving StopDetailScreen (system back gesture,
+    // AppBar button, etc.) — this list is cheap to refetch.
+    if (mounted) _refresh();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -72,21 +70,34 @@ class _StopsScreenState extends State<StopsScreen> {
               return const Center(child: CircularProgressIndicator());
             }
             if (snapshot.hasError) {
-              return _messageList('No se pudieron cargar las paradas.');
+              return _StateMessage(
+                icon: Icons.wifi_off,
+                title: 'No se pudieron cargar las paradas.',
+                description: 'Revisa tu conexión e intenta de nuevo.',
+                actionLabel: 'Reintentar',
+                onAction: _refresh,
+              );
             }
             final stops = snapshot.data ?? const [];
             if (stops.isEmpty) {
-              return _messageList('No tienes paradas asignadas hoy.');
+              return _StateMessage(
+                icon: Icons.event_available_outlined,
+                title: 'No tienes paradas asignadas hoy.',
+                description: 'Cuando un administrador te asigne una ruta, sus paradas van a aparecer acá.',
+                actionLabel: 'Actualizar',
+                onAction: _refresh,
+              );
             }
             return ListView.builder(
               itemCount: stops.length,
               itemBuilder: (context, index) {
                 final stop = stops[index];
                 return ListTile(
-                  leading: Icon(_statusIcon(stop.status)),
+                  leading: Icon(stopStatusIcon(stop.status)),
                   title: Text(stop.customerName),
                   subtitle: Text(stop.address),
-                  trailing: Text(_statusLabel(stop.status)),
+                  trailing: Text(stopStatusLabel(stop.status)),
+                  onTap: () => _openDetail(stop),
                 );
               },
             );
@@ -95,12 +106,51 @@ class _StopsScreenState extends State<StopsScreen> {
       ),
     );
   }
+}
 
-  // A ListView (not a Center) so pull-to-refresh still works when the list
-  // has nothing to show yet.
-  Widget _messageList(String message) {
+// A ListView (not a Center) so pull-to-refresh still works over it, plus an
+// explicit action button — the pull gesture alone isn't discoverable enough
+// on its own for "nothing to see yet" vs. "something went wrong".
+class _StateMessage extends StatelessWidget {
+  const _StateMessage({
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.actionLabel,
+    required this.onAction,
+  });
+
+  final IconData icon;
+  final String title;
+  final String description;
+  final String actionLabel;
+  final VoidCallback onAction;
+
+  @override
+  Widget build(BuildContext context) {
     return ListView(
-      children: [Padding(padding: const EdgeInsets.all(24), child: Center(child: Text(message)))],
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 48),
+          child: Column(
+            children: [
+              Icon(icon, size: 40, color: Theme.of(context).colorScheme.outline),
+              const SizedBox(height: 12),
+              Text(title, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 4),
+              Text(
+                description,
+                textAlign: TextAlign.center,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge?.copyWith(color: Theme.of(context).colorScheme.outline),
+              ),
+              const SizedBox(height: 16),
+              OutlinedButton(onPressed: onAction, child: Text(actionLabel)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

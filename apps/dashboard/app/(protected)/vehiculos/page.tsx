@@ -2,10 +2,11 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CreateVehicleSchema, VEHICLE_CATEGORIES, type Vehicle, type VehicleCategory, z } from "@torpreca/shared";
-import { Plus } from "lucide-react";
+import { Plus, Truck } from "lucide-react";
 import { useState } from "react";
 import { type Resolver, useForm } from "react-hook-form";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { FieldHint } from "@/components/ui/field-hint";
 import { Input } from "@/components/ui/input";
@@ -398,7 +399,12 @@ export default function VehiculosPage() {
       {vehicles !== undefined && (
         <div className="flex flex-col gap-6 animate-fade-in">
           {vehicles.length === 0 && (
-            <p className="text-sm text-outline">No hay vehículos registrados.</p>
+            <EmptyState
+              icon={Truck}
+              title="No hay vehículos registrados."
+              description="Agregá la primera unidad de la flota para poder asignarla a una ruta."
+              action={{ label: "Agregar el primer vehículo", onClick: () => setCreateOpen(true) }}
+            />
           )}
 
           {vehicles.length > 0 && (

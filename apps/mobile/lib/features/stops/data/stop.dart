@@ -1,6 +1,5 @@
-/// Mirrors `StopSchema` (packages/shared/src/schemas/stop.schema.ts) — only
-/// the fields "Lista de paradas" (TOR-35) displays. Detail fields (lat/lng/
-/// instructions/times) belong to "Detalle de parada" (TOR-20).
+/// Mirrors `StopSchema` (packages/shared/src/schemas/stop.schema.ts) — every
+/// field "Lista de paradas" (TOR-35) and "Detalle de parada" (TOR-20) need.
 enum StopStatus { pending, next, completed, delayed }
 
 StopStatus _statusFromJson(String value) => switch (value) {
@@ -16,6 +15,9 @@ class Stop {
     required this.order,
     required this.customerName,
     required this.address,
+    required this.lat,
+    required this.lng,
+    required this.instructions,
     required this.status,
   });
 
@@ -24,6 +26,9 @@ class Stop {
     order: json['order'] as int,
     customerName: json['customerName'] as String,
     address: json['address'] as String,
+    lat: (json['lat'] as num).toDouble(),
+    lng: (json['lng'] as num).toDouble(),
+    instructions: json['instructions'] as String?,
     status: _statusFromJson(json['status'] as String),
   );
 
@@ -31,5 +36,19 @@ class Stop {
   final int order;
   final String customerName;
   final String address;
+  final double lat;
+  final double lng;
+  final String? instructions;
   final StopStatus status;
+
+  Stop copyWith({StopStatus? status}) => Stop(
+    id: id,
+    order: order,
+    customerName: customerName,
+    address: address,
+    lat: lat,
+    lng: lng,
+    instructions: instructions,
+    status: status ?? this.status,
+  );
 }
