@@ -73,9 +73,9 @@ export function registerStopsRoutes(router: Routable) {
 }
 
 // Mirrors modules/auth/mobile-auth.routes.ts: Flutter can't hold
-// REQUEST_SIGNING_SECRET, so the driver app lists a route's stops through
-// this unsigned /mobile route instead of /routes/:routeId/stops, protected
-// by JWT + role + rate limit only.
+// REQUEST_SIGNING_SECRET, so the driver app lists/updates a route's stops
+// through these unsigned /mobile routes instead of /routes/:routeId/stops +
+// /stops/:id/complete|delay, protected by JWT + role + rate limit only.
 export function registerMobileStopsRoutes(router: Routable) {
   router.get(
     "/mobile/routes/:routeId/stops",
@@ -84,6 +84,50 @@ export function registerMobileStopsRoutes(router: Routable) {
     rateLimitGeneral,
     async (ctx) => {
       return Response.json(await service.listByRoute(ctx.params.routeId!, ctx.user!));
+    },
+  );
+
+  router.patch(
+    "/mobile/stops/:id/complete",
+    auth,
+    requireRole("driver"),
+    rateLimitGeneral,
+    async (ctx) => {
+      const stop = await service.complete(ctx.params.id!, ctx.user!);
+
+      await logEvent({
+        userId: ctx.user!.id,
+        role: ctx.user!.role,
+        action: "stop.completed",
+        entity: "stops",
+        entityId: stop.id,
+        ip: clientIp(ctx),
+        metadata: null,
+      });
+
+      return Response.json(stop);
+    },
+  );
+
+  router.patch(
+    "/mobile/stops/:id/delay",
+    auth,
+    requireRole("driver"),
+    rateLimitGeneral,
+    async (ctx) => {
+      const stop = await service.delay(ctx.params.id!, ctx.user!);
+
+      await logEvent({
+        userId: ctx.user!.id,
+        role: ctx.user!.role,
+        action: "stop.delayed",
+        entity: "stops",
+        entityId: stop.id,
+        ip: clientIp(ctx),
+        metadata: null,
+      });
+
+      return Response.json(stop);
     },
   );
 }

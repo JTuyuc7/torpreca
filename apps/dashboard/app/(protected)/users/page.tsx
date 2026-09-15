@@ -2,9 +2,11 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CreateUserSchema, PROMOTABLE_ROLES, type Role, type User, z } from "@torpreca/shared";
+import { Users as UsersIcon } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useAuthUser } from "@/app/(protected)/auth-context";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { Input } from "@/components/ui/input";
 import { Section } from "@/components/ui/section";
@@ -231,7 +233,15 @@ export default function UsersPage() {
           )}
 
           {otherUsers.length === 0 && pendingUsers.length === 0 && (
-            <p className="text-sm text-outline">No hay usuarios registrados.</p>
+            <EmptyState
+              icon={UsersIcon}
+              title="No hay usuarios registrados."
+              description={
+                isSuperAdmin
+                  ? "Los conductores aparecen aquí cuando se registran desde la app móvil. Como super_admin también podés vincular una cuenta de supervisor o administrador con el formulario de arriba."
+                  : "Los conductores aparecen aquí cuando se registran desde la app móvil, y un super_admin puede vincular cuentas de supervisor o administrador."
+              }
+            />
           )}
 
           {otherUsers.length > 0 && (

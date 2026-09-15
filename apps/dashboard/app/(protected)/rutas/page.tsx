@@ -2,8 +2,10 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CreateRouteSchema, type Route, type User, type Vehicle, z } from "@torpreca/shared";
+import { Route as RouteIcon } from "lucide-react";
 import { useState } from "react";
 import { type Resolver, useForm } from "react-hook-form";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { Input } from "@/components/ui/input";
 import { Section } from "@/components/ui/section";
@@ -350,7 +352,13 @@ export default function RutasPage() {
             createRoute={createRoute}
           />
 
-          {routes.length === 0 && <p className="text-sm text-outline">No hay rutas registradas.</p>}
+          {routes.length === 0 && (
+            <EmptyState
+              icon={RouteIcon}
+              title="No hay rutas registradas."
+              description="Usa el formulario de arriba para crear la primera ruta del día: elegí un conductor y, si aplica, un vehículo."
+            />
+          )}
 
           {routes.length > 0 && (
             <Section title="Todas las rutas">

@@ -3,9 +3,10 @@
 import "mapbox-gl/dist/mapbox-gl.css";
 
 import type { Route } from "@torpreca/shared";
-import { Circle } from "lucide-react";
+import { Circle, Route as RouteIcon } from "lucide-react";
 import { useRef, useState } from "react";
 import { Map as MapboxMap, type MapRef, Marker } from "react-map-gl/mapbox";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { Section } from "@/components/ui/section";
 import { Select } from "@/components/ui/select";
@@ -58,7 +59,15 @@ function ActiveRoutesList({
   onSelect: (driverId: string) => void;
 }) {
   if (routes.length === 0) {
-    return <p className="text-sm text-outline">No hay rutas en curso ahora mismo.</p>;
+    return (
+      <EmptyState
+        icon={RouteIcon}
+        title="No hay rutas en curso ahora mismo."
+        description="Creá una ruta y asignale un conductor para verla aparecer acá en vivo."
+        action={{ label: "Ir a Gestión de rutas", href: "/rutas" }}
+        compact
+      />
+    );
   }
 
   return (

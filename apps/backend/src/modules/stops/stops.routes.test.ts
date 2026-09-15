@@ -269,4 +269,66 @@ describe("stops HTTP routes", () => {
 
     expect(res.status).toBe(403);
   });
+
+  it("PATCH /mobile/stops/:id/complete as the owning driver logs stop.completed", async () => {
+    fake.setAuthUser({ id: DRIVER_AUTH_ID });
+    const router = await buildRouter();
+
+    const res = await router.handle(
+      new Request("http://x/mobile/stops/s1/complete", {
+        method: "PATCH",
+        headers: { authorization: "Bearer t" },
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { status: string };
+    expect(body.status).toBe("completed");
+    expect(fake.tables.audit_logs?.[0]).toMatchObject({ action: "stop.completed" });
+  });
+
+  it("PATCH /mobile/stops/:id/complete for another driver's route returns 403", async () => {
+    fake.setAuthUser({ id: OTHER_DRIVER_AUTH_ID });
+    const router = await buildRouter();
+
+    const res = await router.handle(
+      new Request("http://x/mobile/stops/s1/complete", {
+        method: "PATCH",
+        headers: { authorization: "Bearer t" },
+      }),
+    );
+
+    expect(res.status).toBe(403);
+  });
+
+  it("PATCH /mobile/stops/:id/delay as the owning driver logs stop.delayed", async () => {
+    fake.setAuthUser({ id: DRIVER_AUTH_ID });
+    const router = await buildRouter();
+
+    const res = await router.handle(
+      new Request("http://x/mobile/stops/s1/delay", {
+        method: "PATCH",
+        headers: { authorization: "Bearer t" },
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { status: string };
+    expect(body.status).toBe("delayed");
+    expect(fake.tables.audit_logs?.[0]).toMatchObject({ action: "stop.delayed" });
+  });
+
+  it("PATCH /mobile/stops/:id/complete as admin returns 403 (driver-only)", async () => {
+    fake.setAuthUser({ id: ADMIN_AUTH_ID });
+    const router = await buildRouter();
+
+    const res = await router.handle(
+      new Request("http://x/mobile/stops/s1/complete", {
+        method: "PATCH",
+        headers: { authorization: "Bearer t" },
+      }),
+    );
+
+    expect(res.status).toBe(403);
+  });
 });
