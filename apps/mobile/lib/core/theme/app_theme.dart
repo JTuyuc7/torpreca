@@ -47,6 +47,28 @@ class AppTheme {
           textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
         ),
       ),
+      // Design System V2 (Notion -> Sistema de Diseño): "Secondary/CTA ...
+      // tab activo" — the selected NavigationBar destination uses `secondary`
+      // (orange), not M3's seed-derived secondaryContainer default.
+      navigationBarTheme: NavigationBarThemeData(
+        indicatorColor: colorScheme.secondary,
+        iconTheme: WidgetStateProperty.resolveWith(
+          (states) => IconThemeData(
+            color: states.contains(WidgetState.selected)
+                ? colorScheme.onSecondary
+                : colorScheme.outline,
+          ),
+        ),
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (states) => TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: states.contains(WidgetState.selected)
+                ? colorScheme.secondary
+                : colorScheme.outline,
+          ),
+        ),
+      ),
     );
   }
 

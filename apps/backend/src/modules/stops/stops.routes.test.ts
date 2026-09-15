@@ -124,9 +124,10 @@ function seedRouteAndStop() {
 }
 
 async function buildRouter() {
-  const { registerStopsRoutes } = await import("./stops.routes");
+  const { registerStopsRoutes, registerMobileStopsRoutes } = await import("./stops.routes");
   const router = new Router();
   registerStopsRoutes(router);
+  registerMobileStopsRoutes(router);
   return router;
 }
 
@@ -232,5 +233,40 @@ describe("stops HTTP routes", () => {
     );
 
     expect(second.status).toBe(409);
+  });
+
+  it("GET /mobile/routes/:routeId/stops for the owning driver returns 200", async () => {
+    fake.setAuthUser({ id: DRIVER_AUTH_ID });
+    const router = await buildRouter();
+
+    const res = await router.handle(
+      new Request("http://x/mobile/routes/r1/stops", { headers: { authorization: "Bearer t" } }),
+    );
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as unknown[];
+    expect(body).toHaveLength(1);
+  });
+
+  it("GET /mobile/routes/:routeId/stops for another driver's route returns 403", async () => {
+    fake.setAuthUser({ id: OTHER_DRIVER_AUTH_ID });
+    const router = await buildRouter();
+
+    const res = await router.handle(
+      new Request("http://x/mobile/routes/r1/stops", { headers: { authorization: "Bearer t" } }),
+    );
+
+    expect(res.status).toBe(403);
+  });
+
+  it("GET /mobile/routes/:routeId/stops as admin returns 403 (driver-only)", async () => {
+    fake.setAuthUser({ id: ADMIN_AUTH_ID });
+    const router = await buildRouter();
+
+    const res = await router.handle(
+      new Request("http://x/mobile/routes/r1/stops", { headers: { authorization: "Bearer t" } }),
+    );
+
+    expect(res.status).toBe(403);
   });
 });

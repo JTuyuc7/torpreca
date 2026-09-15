@@ -18,8 +18,8 @@ import { locationsRepository } from "./modules/locations/locations.repository";
 import { registerLocationsRoutes } from "./modules/locations/locations.routes";
 import { createLocationsService } from "./modules/locations/locations.service";
 import { routesRepository } from "./modules/routes/routes.repository";
-import { registerRoutesRoutes } from "./modules/routes/routes.routes";
-import { registerStopsRoutes } from "./modules/stops/stops.routes";
+import { registerMobileRoutesRoutes, registerRoutesRoutes } from "./modules/routes/routes.routes";
+import { registerMobileStopsRoutes, registerStopsRoutes } from "./modules/stops/stops.routes";
 import {
   registerMobileSyncQueueRoutes,
   registerSyncQueueRoutes,
@@ -43,7 +43,9 @@ registerMobileAuthRoutes(v1);
 registerVehiclesRoutes(v1);
 registerUsersRoutes(v1);
 registerRoutesRoutes(v1);
+registerMobileRoutesRoutes(v1);
 registerStopsRoutes(v1);
+registerMobileStopsRoutes(v1);
 registerLocationsRoutes(v1);
 registerDashboardRoutes(v1);
 registerWsTicketsRoutes(v1);

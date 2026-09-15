@@ -107,3 +107,19 @@ export function registerRoutesRoutes(router: Routable) {
     },
   );
 }
+
+// Mirrors modules/auth/mobile-auth.routes.ts: Flutter can't hold
+// REQUEST_SIGNING_SECRET, so the driver app reads its own routes through
+// these unsigned /mobile routes instead of /routes, protected by JWT + role +
+// rate limit only. Read-only — creating/editing a route stays dashboard-only
+// and signed.
+export function registerMobileRoutesRoutes(router: Routable) {
+  router.get("/mobile/routes", auth, requireRole("driver"), rateLimitGeneral, async (ctx) => {
+    const date = new URL(ctx.req.url).searchParams.get("date") ?? undefined;
+    return Response.json(await service.list(ctx.user!, date));
+  });
+
+  router.get("/mobile/routes/:id", auth, requireRole("driver"), rateLimitGeneral, async (ctx) => {
+    return Response.json(await service.getById(ctx.params.id!, ctx.user!));
+  });
+}

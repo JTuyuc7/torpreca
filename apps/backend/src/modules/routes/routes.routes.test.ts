@@ -40,9 +40,10 @@ function asAdmin() {
 }
 
 async function buildRouter() {
-  const { registerRoutesRoutes } = await import("./routes.routes");
+  const { registerRoutesRoutes, registerMobileRoutesRoutes } = await import("./routes.routes");
   const router = new Router();
   registerRoutesRoutes(router);
+  registerMobileRoutesRoutes(router);
   return router;
 }
 
@@ -276,5 +277,90 @@ describe("routes HTTP routes", () => {
       "route.started",
       "route.finished",
     ]);
+  });
+
+  it("GET /mobile/routes as driver returns only that driver's routes", async () => {
+    fake.tables.routes = [
+      {
+        id: "r1",
+        code: "R-1",
+        driver_id: "driver-1",
+        vehicle_id: null,
+        created_by: "admin-1",
+        date: "2026-08-22",
+        status: "pending",
+        planned_km: 10,
+        driven_km: 0,
+        start_time: null,
+        end_time: null,
+        created_at: "t",
+        updated_at: "t",
+      },
+      {
+        id: "r2",
+        code: "R-2",
+        driver_id: "someone-else",
+        vehicle_id: null,
+        created_by: "admin-1",
+        date: "2026-08-22",
+        status: "pending",
+        planned_km: 5,
+        driven_km: 0,
+        start_time: null,
+        end_time: null,
+        created_at: "t",
+        updated_at: "t",
+      },
+    ];
+    asDriver();
+    const router = await buildRouter();
+
+    const res = await router.handle(
+      new Request("http://x/mobile/routes", { headers: { authorization: "Bearer t" } }),
+    );
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { id: string }[];
+    expect(body).toHaveLength(1);
+    expect(body[0]?.id).toBe("r1");
+  });
+
+  it("GET /mobile/routes as admin returns 403 (driver-only)", async () => {
+    asAdmin();
+    const router = await buildRouter();
+
+    const res = await router.handle(
+      new Request("http://x/mobile/routes", { headers: { authorization: "Bearer t" } }),
+    );
+
+    expect(res.status).toBe(403);
+  });
+
+  it("GET /mobile/routes/:id for another driver's route returns 403", async () => {
+    fake.tables.routes = [
+      {
+        id: "r1",
+        code: "R-1",
+        driver_id: "someone-else",
+        vehicle_id: null,
+        created_by: "admin-1",
+        date: "2026-08-22",
+        status: "pending",
+        planned_km: 10,
+        driven_km: 0,
+        start_time: null,
+        end_time: null,
+        created_at: "t",
+        updated_at: "t",
+      },
+    ];
+    asDriver();
+    const router = await buildRouter();
+
+    const res = await router.handle(
+      new Request("http://x/mobile/routes/r1", { headers: { authorization: "Bearer t" } }),
+    );
+
+    expect(res.status).toBe(403);
   });
 });
