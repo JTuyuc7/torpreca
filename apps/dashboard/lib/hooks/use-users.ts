@@ -70,6 +70,11 @@ export function useUsers() {
   return {
     users: usersQuery.data,
     isLoading: usersQuery.isLoading,
+    // Distinct from isLoading (true only for the very first, cache-less
+    // fetch) — this covers a manual "Actualizar" refetch of data that's
+    // already on screen, so the button can show its own spinner instead of
+    // the page falling back to the full skeleton state.
+    isRefetching: usersQuery.isFetching && !usersQuery.isLoading,
     error: usersQuery.error?.message ?? null,
     refetch: usersQuery.refetch,
     createUser: createUserMutation,

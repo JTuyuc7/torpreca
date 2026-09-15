@@ -9,6 +9,21 @@ vi.mock("../../../lib/supabase/client", () => ({
   supabase: { auth: { getSession: () => getSession() } },
 }));
 
+// Mocked at the hook level (not via fetchMock below) — these two only exist
+// on this screen for TOR-31's "online now" / "today's route" columns, and
+// most tests here don't care about either. Keeping them out of fetchMock's
+// call sequence avoids breaking the exact-call assertions the pre-existing
+// useUsers-only tests already make.
+const useLiveLocations = vi.fn();
+vi.mock("@/lib/hooks/use-live-locations", () => ({
+  useLiveLocations: () => useLiveLocations(),
+}));
+
+const useRoutes = vi.fn();
+vi.mock("@/lib/hooks/use-routes", () => ({
+  useRoutes: () => useRoutes(),
+}));
+
 import UsersPage from "./page";
 
 // Defaults to super_admin — most tests exercise behavior that doesn't depend
@@ -56,11 +71,37 @@ const pendingUser = {
   updatedAt: "2026-09-01T00:00:00.000Z",
 };
 
+const driverUser = {
+  id: "driver-1",
+  authUserId: "auth-driver-1",
+  name: "Conductor Uno",
+  email: "conductor1@torpreca.gt",
+  role: "driver",
+  status: "active",
+  deactivatedAt: null,
+  deactivatedBy: null,
+  reviewedAt: null,
+  reviewedBy: null,
+  createdAt: "2026-09-01T00:00:00.000Z",
+  updatedAt: "2026-09-01T00:00:00.000Z",
+};
+
 beforeEach(() => {
   fetchMock.mockReset();
   vi.stubGlobal("fetch", fetchMock);
   getSession.mockReset();
   getSession.mockResolvedValue({ data: { session: { access_token: "tok" } } });
+  useLiveLocations.mockReset();
+  useLiveLocations.mockReturnValue({ locations: [], status: "connected" });
+  useRoutes.mockReset();
+  useRoutes.mockReturnValue({
+    routes: [],
+    isLoading: false,
+    error: null,
+    refetch: vi.fn(),
+    createRoute: { isPending: false, isError: false },
+    updateRoute: { isPending: false, isError: false },
+  });
 });
 
 describe("UsersPage", () => {
@@ -219,6 +260,72 @@ describe("UsersPage", () => {
           body: JSON.stringify({ decision: "approve", role: "supervisor" }),
         }),
       ),
+    );
+  });
+
+  it("shows a driver as online with today's route code when both are present", async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify([driverUser]), { status: 200 }));
+    useLiveLocations.mockReturnValue({
+      locations: [{ driverId: "driver-1", lat: 14.6, lng: -90.5 }],
+      status: "connected",
+    });
+    useRoutes.mockReturnValue({
+      routes: [
+        {
+          id: "r1",
+          code: "R-1",
+          driverId: "driver-1",
+          date: new Date().toISOString().slice(0, 10),
+          status: "in_progress",
+        },
+      ],
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+      createRoute: { isPending: false, isError: false },
+      updateRoute: { isPending: false, isError: false },
+    });
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText("Conductor Uno")).toBeInTheDocument());
+    expect(screen.getByText("En línea")).toBeInTheDocument();
+    expect(screen.getByText("R-1")).toBeInTheDocument();
+  });
+
+  it("shows a driver as offline with no route when there's no live location or route today", async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify([driverUser]), { status: 200 }));
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText("Conductor Uno")).toBeInTheDocument());
+    expect(screen.getByText("Fuera de línea")).toBeInTheDocument();
+  });
+
+  it("shows '—' for online/route columns on a non-driver row", async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify([activeUser]), { status: 200 }));
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText("Admin Torpreca")).toBeInTheDocument());
+    expect(screen.queryByText("En línea")).not.toBeInTheDocument();
+    expect(screen.queryByText("Fuera de línea")).not.toBeInTheDocument();
+  });
+
+  it("the 'Actualizar' button on Todos los usuarios re-fetches the list", async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify([activeUser]), { status: 200 }));
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText("Admin Torpreca")).toBeInTheDocument());
+    const callsBeforeRefresh = fetchMock.mock.calls.length;
+
+    fireEvent.click(screen.getByRole("button", { name: "Actualizar" }));
+
+    await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(callsBeforeRefresh));
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "/api/users?status=all",
+      expect.objectContaining({ headers: { authorization: "Bearer tok" } }),
     );
   });
 });
