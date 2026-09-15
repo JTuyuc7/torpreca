@@ -33,15 +33,21 @@ class LocationPermissionDeniedException implements Exception {
 /// packages/shared, which still requires the key.
 ///
 /// Offline-first (PG1 requirement): if the socket isn't connected when a
-/// ping is due (never connected, or dropped mid-session), the ping is
-/// queued locally via [OfflineQueueStore] with `synced: false` instead of
-/// being dropped. `status` stays `tracking` through a connection loss —
-/// only a fatal error (GPS permission/services, or the initial connect)
-/// moves it to `error`. Every time the socket connects (including the
-/// first time), the queue is drained via `POST /mobile/sync` — there's no
-/// background/periodic retry beyond that, so a queue built up during a long
-/// offline stretch clears out the next time the user restarts tracking
-/// with a connection available.
+/// ping is due (never connected, dropped mid-session, or still
+/// reconnecting), the ping is queued locally via [OfflineQueueStore] with
+/// `synced: false` instead of being dropped. `status` stays `tracking`
+/// through a connection loss — only a fatal error (GPS permission/services,
+/// or the initial connect) moves it to `error`.
+///
+/// A dropped socket triggers [_scheduleReconnect] automatically — retried
+/// with exponential backoff ([_reconnectBaseDelay] up to [_reconnectMaxDelay])
+/// for as long as `status` stays `tracking`, no user action needed. Found
+/// necessary once the dashboard's driver table (TOR-31) started treating a
+/// stale-for-30s ping as "offline": without an automatic reconnect, a
+/// connection drop that used to just mean "queue quietly, catch up whenever
+/// the driver next restarts tracking" instead made that driver look
+/// permanently offline on the dashboard, even mid-session. Every successful
+/// (re)connect drains the offline queue via `POST /mobile/sync`.
 ///
 /// Background tracking (app minimized/closed) is a separate ticket — this
 /// only tracks while a screen holding this service stays mounted.
@@ -57,6 +63,8 @@ class TrackingService extends ChangeNotifier {
        _uuid = uuid ?? const Uuid();
 
   static const _pingInterval = Duration(seconds: 8);
+  static const _reconnectBaseDelay = Duration(seconds: 3);
+  static const _reconnectMaxDelay = Duration(seconds: 30);
 
   final WsTicketClient _ticketClient;
   final SyncClient _syncClient;
@@ -68,6 +76,12 @@ class TrackingService extends ChangeNotifier {
   WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _channelSub;
   Timer? _pingTimer;
+
+  // Kept for _attemptReconnect — start()'s own accessToken argument is long
+  // gone by the time a drop happens minutes into a session.
+  String? _accessToken;
+  Timer? _reconnectTimer;
+  int _reconnectAttempt = 0;
 
   TrackingStatus _status = TrackingStatus.idle;
   TrackingStatus get status => _status;
@@ -88,6 +102,8 @@ class TrackingService extends ChangeNotifier {
     if (_status == TrackingStatus.connecting || _status == TrackingStatus.tracking) {
       return;
     }
+    _accessToken = accessToken;
+    _reconnectAttempt = 0;
     _setStatus(TrackingStatus.connecting);
 
     try {
@@ -131,18 +147,55 @@ class TrackingService extends ChangeNotifier {
 
   /// The socket dropped mid-session (network loss, backend restart, etc).
   /// Deliberately does *not* call [_fail] — tracking stays "active" and
-  /// subsequent pings fall back to the offline queue in [_sendPing] until
-  /// the user restarts tracking. No auto-reconnect here (out of scope for
-  /// this ticket — see the class doc comment).
+  /// subsequent pings fall back to the offline queue in [_sendPing] while a
+  /// reconnect is pending. See the class doc comment for why an automatic
+  /// reconnect (not just falling back to the offline queue forever) matters.
   void _handleConnectionLost() {
     if (_channel == null) return;
     _channelSub?.cancel();
     _channelSub = null;
     _channel = null;
     notifyListeners();
+    _scheduleReconnect();
+  }
+
+  // Guarded by `_reconnectTimer != null` so a burst of onError+onDone from
+  // the same drop (or an overlapping manual retry path) never schedules more
+  // than one pending attempt at a time.
+  void _scheduleReconnect() {
+    if (_status != TrackingStatus.tracking || _reconnectTimer != null) return;
+    final delaySeconds = (_reconnectBaseDelay.inSeconds * (1 << _reconnectAttempt)).clamp(
+      _reconnectBaseDelay.inSeconds,
+      _reconnectMaxDelay.inSeconds,
+    );
+    _reconnectTimer = Timer(Duration(seconds: delaySeconds), _attemptReconnect);
+  }
+
+  Future<void> _attemptReconnect() async {
+    _reconnectTimer = null;
+    // Stopped, or already reconnected some other way, while this attempt
+    // was queued — nothing to do.
+    if (_status != TrackingStatus.tracking || _channel != null) return;
+
+    final accessToken = _accessToken;
+    if (accessToken == null) return;
+
+    try {
+      await _connectSocket(accessToken);
+      _reconnectAttempt = 0;
+      notifyListeners();
+      unawaited(_drainOfflineQueue(accessToken));
+    } catch (_) {
+      _reconnectAttempt++;
+      _scheduleReconnect();
+    }
   }
 
   Future<void> stop() async {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _reconnectAttempt = 0;
+    _accessToken = null;
     _pingTimer?.cancel();
     _pingTimer = null;
     await _channelSub?.cancel();
@@ -264,6 +317,9 @@ class TrackingService extends ChangeNotifier {
   }
 
   void _fail(String message, {bool locationServicesDisabled = false}) {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _accessToken = null;
     _pingTimer?.cancel();
     _pingTimer = null;
     _channelSub?.cancel();

@@ -31,6 +31,9 @@ class MockWebSocket {
   }
 }
 
+// `recordedAt` has to be "now" at test-run time, not a fixed past date — the
+// hook filters out anything older than STALE_AFTER_MS (see its doc comment),
+// and every other test here relies on location1 counting as fresh.
 const location1 = {
   id: "l1",
   driverId: "d1",
@@ -38,7 +41,7 @@ const location1 = {
   lat: 14.6,
   lng: -90.5,
   speed: null,
-  recordedAt: "2026-09-12T00:00:00.000Z",
+  recordedAt: new Date().toISOString(),
   synced: true,
   createdAt: "t",
   updatedAt: "t",
@@ -106,5 +109,28 @@ describe("useLiveLocations", () => {
 
     await waitFor(() => expect(result.current.status).toBe("error"));
     expect(MockWebSocket.instances).toHaveLength(0);
+  });
+
+  it("excludes a driver's last known location once it's older than 30s (stopped tracking)", async () => {
+    const stale = { ...location1, recordedAt: new Date(Date.now() - 25_000).toISOString() };
+    getLatestLocations.mockResolvedValue({ ok: true, locations: [stale] });
+    mintWsTicket.mockResolvedValue({ ok: true, ticket: "tick-1" });
+
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const { result } = renderHook(() => useLiveLocations());
+
+      // Still within the 30s window (25s old) — counts as online.
+      await waitFor(() => expect(result.current.locations).toEqual([stale]));
+
+      // The 5s tick pushes elapsed time past 30s with no new ping arriving —
+      // this is exactly the case listLatestPerDriver() alone can't catch.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(6_000);
+      });
+      expect(result.current.locations).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

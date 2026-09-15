@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CreateUserSchema, PROMOTABLE_ROLES, type Role, type User, z } from "@torpreca/shared";
-import { Users as UsersIcon } from "lucide-react";
+import { Circle, RefreshCw, Users as UsersIcon } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useAuthUser } from "@/app/(protected)/auth-context";
@@ -13,7 +13,9 @@ import { Section } from "@/components/ui/section";
 import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { useLiveLocations } from "@/lib/hooks/use-live-locations";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
+import { useRoutes } from "@/lib/hooks/use-routes";
 import { useUsers } from "@/lib/hooks/use-users";
 
 // Roles assignable from the manual creation form — "driver" is excluded:
@@ -44,12 +46,27 @@ function FieldError({ children }: { children: React.ReactNode }) {
 
 export default function UsersPage() {
   usePageTitle("Gestión de usuarios");
-  const { users, isLoading, error, refetch, createUser, deactivateUser, reviewUser } = useUsers();
+  const { users, isLoading, isRefetching, error, refetch, createUser, deactivateUser, reviewUser } =
+    useUsers();
   // POST /users (link an existing Supabase Auth user to a new profile) is
   // super_admin-only on the backend — granting another admin/supervisor
   // account is privilege escalation, so it shouldn't be self-service for a
   // regular admin. Hiding the form for anyone else avoids a dead-end 403.
   const isSuperAdmin = useAuthUser()?.role === "super_admin";
+
+  // TOR-31 ("Lista de conductores"): instead of a separate screen — this
+  // table already covers drivers (see the "Conductores" nav item comment in
+  // ../layout.tsx) — drivers get two more columns here: whether they're
+  // currently online (same live-tracking WebSocket the map on "/" uses) and
+  // the route assigned to them today, if any. Supervisors/admins don't have
+  // either concept, so their rows just show "—".
+  const { locations } = useLiveLocations();
+  const { routes } = useRoutes();
+  const onlineDriverIds = new Set(locations.map((l) => l.driverId));
+  const today = new Date().toISOString().slice(0, 10);
+  const todaysRouteCodeByDriver = new Map(
+    (routes ?? []).filter((r) => r.date === today).map((r) => [r.driverId, r.code]),
+  );
 
   // Role each pending row will be approved as — defaults to "driver" (what
   // self-registration always sets), but lets an admin promote to
@@ -245,48 +262,83 @@ export default function UsersPage() {
           )}
 
           {otherUsers.length > 0 && (
-            <Section title="Todos los usuarios">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-outline/30 text-xs text-outline">
-                    <th className="py-2 pr-4">Usuario</th>
-                    <th className="py-2 pr-4">Rol</th>
-                    <th className="py-2 pr-4">Estado</th>
-                    <th className="py-2 pr-4">Creado</th>
-                    <th className="py-2">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {otherUsers.map((user) => {
-                    const isDeactivating =
-                      deactivateUser.isPending && deactivateUser.variables === user.id;
-                    return (
-                      <tr key={user.id} className="border-b border-outline/10 text-text">
-                        <td className="py-2.5 pr-4">
-                          <p className="font-medium">{user.name}</p>
-                          <p className="text-xs text-outline">{user.email}</p>
-                        </td>
-                        <td className="py-2.5 pr-4">{user.role}</td>
-                        <td className="py-2.5 pr-4">{STATUS_LABELS[user.status]}</td>
-                        <td className="py-2.5 pr-4">{new Date(user.createdAt).toLocaleDateString()}</td>
-                        <td className="py-2.5">
-                          {user.status !== "deactivated" && (
-                            <button
-                              type="button"
-                              disabled={isDeactivating}
-                              onClick={() => deactivateUser.mutate(user.id)}
-                              className="flex h-9 items-center gap-1.5 rounded-md border border-error px-3 text-sm font-medium text-error transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
-                            >
-                              {isDeactivating && <Spinner className="h-3.5 w-3.5" />}
-                              Desactivar
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <Section
+              title="Todos los usuarios"
+              action={
+                <button
+                  type="button"
+                  disabled={isRefetching}
+                  onClick={() => refetch()}
+                  title="Actualizar"
+                  aria-label="Actualizar"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-outline/30 text-outline transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
+                >
+                  <RefreshCw size={14} className={isRefetching ? "animate-spin" : undefined} />
+                </button>
+              }
+            >
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-outline/30 text-xs text-outline">
+                      <th className="py-2 pr-4">Usuario</th>
+                      <th className="py-2 pr-4">Rol</th>
+                      <th className="py-2 pr-4">Estado operativo</th>
+                      <th className="py-2 pr-4">Ruta de hoy</th>
+                      <th className="py-2 pr-4">Estado</th>
+                      <th className="py-2 pr-4">Creado</th>
+                      <th className="py-2">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {otherUsers.map((user) => {
+                      const isDeactivating =
+                        deactivateUser.isPending && deactivateUser.variables === user.id;
+                      const isOnline = onlineDriverIds.has(user.id);
+                      return (
+                        <tr key={user.id} className="border-b border-outline/10 text-text">
+                          <td className="py-2.5 pr-4">
+                            <p className="font-medium">{user.name}</p>
+                            <p className="text-xs text-outline">{user.email}</p>
+                          </td>
+                          <td className="py-2.5 pr-4">{user.role}</td>
+                          <td className="py-2.5 pr-4">
+                            {user.role === "driver" ? (
+                              <span className="inline-flex items-center gap-1.5">
+                                <Circle
+                                  size={8}
+                                  className={isOnline ? "fill-primary text-primary" : "fill-outline text-outline"}
+                                />
+                                {isOnline ? "En línea" : "Fuera de línea"}
+                              </span>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                          <td className="py-2.5 pr-4">
+                            {user.role === "driver" ? (todaysRouteCodeByDriver.get(user.id) ?? "—") : "—"}
+                          </td>
+                          <td className="py-2.5 pr-4">{STATUS_LABELS[user.status]}</td>
+                          <td className="py-2.5 pr-4">{new Date(user.createdAt).toLocaleDateString()}</td>
+                          <td className="py-2.5">
+                            {user.status !== "deactivated" && (
+                              <button
+                                type="button"
+                                disabled={isDeactivating}
+                                onClick={() => deactivateUser.mutate(user.id)}
+                                className="flex h-9 items-center gap-1.5 rounded-md border border-error px-3 text-sm font-medium text-error transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
+                              >
+                                {isDeactivating && <Spinner className="h-3.5 w-3.5" />}
+                                Desactivar
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </Section>
           )}
         </div>
