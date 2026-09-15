@@ -71,3 +71,19 @@ export function registerStopsRoutes(router: Routable) {
     return Response.json(stop);
   });
 }
+
+// Mirrors modules/auth/mobile-auth.routes.ts: Flutter can't hold
+// REQUEST_SIGNING_SECRET, so the driver app lists a route's stops through
+// this unsigned /mobile route instead of /routes/:routeId/stops, protected
+// by JWT + role + rate limit only.
+export function registerMobileStopsRoutes(router: Routable) {
+  router.get(
+    "/mobile/routes/:routeId/stops",
+    auth,
+    requireRole("driver"),
+    rateLimitGeneral,
+    async (ctx) => {
+      return Response.json(await service.listByRoute(ctx.params.routeId!, ctx.user!));
+    },
+  );
+}

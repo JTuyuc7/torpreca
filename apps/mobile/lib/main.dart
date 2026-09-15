@@ -9,7 +9,7 @@ import 'core/env.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/data/auth_repository.dart';
 import 'features/auth/presentation/login_screen.dart';
-import 'features/map/presentation/map_screen.dart';
+import 'features/home/presentation/home_shell.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,19 +35,19 @@ class MyApp extends StatelessWidget {
   }
 }
 
-/// Reactively swaps between LoginScreen and HomePlaceholder based on
+/// Reactively swaps between LoginScreen and HomeShell based on
 /// Supabase's own session stream — no manual Navigator.push on
 /// login/logout, matching the pattern supabase_flutter recommends.
 ///
 /// Whenever a session appears (a fresh login *or* one already persisted from
 /// a previous app launch), it's handed to [_SessionGate] to confirm the
 /// backend's own account status (`POST /mobile/auth/session`) before ever
-/// showing [MapScreen] — a driver approved yesterday and rejected
+/// showing [HomeShell] — a driver approved yesterday and rejected
 /// today shouldn't get in just because their phone still has Supabase's
 /// session cached. This check deliberately lives here, not inside
 /// `AuthRepository.signIn()`: that would race this same stream (it fires the
 /// instant `signInWithPassword` resolves, before signIn() could even await
-/// the check), showing HomePlaceholder first and only bouncing back to a
+/// the check), showing HomeShell first and only bouncing back to a
 /// *brand-new* LoginScreen instance afterwards — losing whatever error
 /// message the old, already-disposed instance tried to set.
 class AuthGate extends StatefulWidget {
@@ -84,7 +84,7 @@ class _AuthGateState extends State<AuthGate> {
           accessToken: session.accessToken,
           mobileAuthClient: _mobileAuthClient,
           onBlocked: (message) => setState(() => _blockedMessage = message),
-          child: MapScreen(authRepository: _authRepository),
+          child: HomeShell(authRepository: _authRepository),
         );
       },
     );
