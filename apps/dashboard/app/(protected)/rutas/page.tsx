@@ -8,6 +8,7 @@ import { type Resolver, useForm } from "react-hook-form";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { Input } from "@/components/ui/input";
+import { RouteStatusBadge } from "@/components/ui/route-status-badge";
 import { Section } from "@/components/ui/section";
 import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,35 +17,6 @@ import { usePageTitle } from "@/lib/hooks/use-page-title";
 import { useRoutes } from "@/lib/hooks/use-routes";
 import { useUsers } from "@/lib/hooks/use-users";
 import { useVehicles } from "@/lib/hooks/use-vehicles";
-
-const STATUS_LABELS: Record<Route["status"], string> = {
-  pending: "Pendiente",
-  in_progress: "En curso",
-  completed: "Completada",
-  delayed: "Retrasada",
-  cancelled: "Cancelada",
-};
-
-// Only the tokens the design system actually defines (outline/primary/error)
-// — no new colors invented for this: neutral for pending, primary for the
-// two "moving forward" states, error for the two "went wrong" states.
-const STATUS_BADGE_CLASSES: Record<Route["status"], string> = {
-  pending: "bg-outline/15 text-outline",
-  in_progress: "bg-primary/15 text-primary",
-  completed: "bg-primary text-white",
-  delayed: "bg-error/15 text-error",
-  cancelled: "bg-error text-white",
-};
-
-function StatusBadge({ status }: { status: Route["status"] }) {
-  return (
-    <span
-      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE_CLASSES[status]}`}
-    >
-      {STATUS_LABELS[status]}
-    </span>
-  );
-}
 
 function FieldError({ children }: { children: React.ReactNode }) {
   return <p className="text-xs text-error">{children}</p>;
@@ -273,7 +245,7 @@ function RouteEditRow({
         {errors.date && <FieldError>Requerida</FieldError>}
       </td>
       <td className="py-3 pr-4">
-        <StatusBadge status={route.status} />
+        <RouteStatusBadge status={route.status} />
       </td>
       <td className="py-3 pr-4">
         <Input
@@ -399,7 +371,7 @@ export default function RutasPage() {
                         <td className="py-3 pr-4">{vehiclePlate(route.vehicleId)}</td>
                         <td className="py-3 pr-4">{route.date}</td>
                         <td className="py-3 pr-4">
-                          <StatusBadge status={route.status} />
+                          <RouteStatusBadge status={route.status} />
                         </td>
                         <td className="py-3 pr-4 tabular-nums">
                           {route.plannedKm ?? "—"} / {route.drivenKm}
