@@ -1,7 +1,7 @@
 "use client";
 
 import type { AuthUser, Role } from "@torpreca/shared";
-import { FileText, LayoutDashboard, LogOut, Menu, Route, Truck, Users } from "lucide-react";
+import { FileText, LayoutDashboard, LogOut, Menu, Route, ScrollText, Truck, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -20,12 +20,22 @@ import { AuthUserProvider } from "./auth-context";
 // (TOR-12) got its screen at "/". "Vehículos" (TOR-44) isn't in that mockup
 // at all — added because the screen needs to be reachable from somewhere;
 // slotted next to Rutas since both feed the same route-assignment workflow.
-const NAV_ITEMS: { label: string; href: string; enabled: boolean; icon: typeof Users }[] = [
+// `superAdminOnly` items are filtered out of the render entirely for anyone
+// else (CLAUDE.md: "Pantalla de logs solo renderiza si rol === 'super_admin'")
+// — not just disabled-looking, not in the DOM at all.
+const NAV_ITEMS: {
+  label: string;
+  href: string;
+  enabled: boolean;
+  icon: typeof Users;
+  superAdminOnly?: boolean;
+}[] = [
   { label: "Panel Principal", href: "/", enabled: true, icon: LayoutDashboard },
   { label: "Conductores", href: "/users", enabled: true, icon: Users },
   { label: "Rutas", href: "/rutas", enabled: true, icon: Route },
   { label: "Vehículos", href: "/vehiculos", enabled: true, icon: Truck },
   { label: "Reportes", href: "/reportes", enabled: false, icon: FileText },
+  { label: "Logs del sistema", href: "/logs", enabled: true, icon: ScrollText, superAdminOnly: true },
 ];
 
 const ROLE_LABELS: Record<Role, string> = {
@@ -79,7 +89,9 @@ function Sidebar({
           </button>
         </div>
         <nav className="flex flex-col gap-1 px-3">
-          {NAV_ITEMS.map((item) => {
+          {NAV_ITEMS.filter(
+            (item) => !item.superAdminOnly || authUser.role === "super_admin",
+          ).map((item) => {
             const active = item.enabled && pathname === item.href;
             const Icon = item.icon;
             if (!item.enabled) {

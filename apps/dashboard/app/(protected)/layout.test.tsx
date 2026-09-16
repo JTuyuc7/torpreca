@@ -171,6 +171,40 @@ describe("ProtectedLayout", () => {
     );
   });
 
+  it("hides 'Logs del sistema' from the nav for a non-super_admin role", async () => {
+    getSession.mockResolvedValue({ data: { session: { access_token: "tok" } } });
+    window.sessionStorage.setItem(
+      "torpreca:auth-user",
+      JSON.stringify({ id: "u1", role: "admin", status: "active" }),
+    );
+
+    render(
+      <ProtectedLayout>
+        <p>secret</p>
+      </ProtectedLayout>,
+    );
+    await waitFor(() => expect(screen.getByText("secret")).toBeInTheDocument());
+
+    expect(screen.queryByText("Logs del sistema")).not.toBeInTheDocument();
+  });
+
+  it("shows 'Logs del sistema' in the nav for super_admin", async () => {
+    getSession.mockResolvedValue({ data: { session: { access_token: "tok" } } });
+    window.sessionStorage.setItem(
+      "torpreca:auth-user",
+      JSON.stringify({ id: "u1", role: "super_admin", status: "active" }),
+    );
+
+    render(
+      <ProtectedLayout>
+        <p>secret</p>
+      </ProtectedLayout>,
+    );
+    await waitFor(() => expect(screen.getByText("secret")).toBeInTheDocument());
+
+    expect(screen.getByRole("link", { name: "Logs del sistema" })).toBeInTheDocument();
+  });
+
   it("clicking 'Cerrar sesión' redirects without the cross-tab message", async () => {
     getSession.mockResolvedValue({ data: { session: { access_token: "tok" } } });
     window.sessionStorage.setItem(

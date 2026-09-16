@@ -11,6 +11,7 @@ import {
   type TrackingWs,
 } from "./core/ws/tracking-handlers";
 import { resolveUpgradeData, type TrackingSocketData } from "./core/ws/upgrade";
+import { registerAuditLogsRoutes } from "./modules/audit-logs/audit-logs.routes";
 import { registerAuthRoutes } from "./modules/auth/auth.routes";
 import { registerMobileAuthRoutes } from "./modules/auth/mobile-auth.routes";
 import { registerMobileDailyReportsRoutes } from "./modules/daily-reports/daily-reports.routes";
@@ -54,6 +55,7 @@ registerMobileWsTicketsRoutes(v1);
 registerSyncQueueRoutes(v1);
 registerMobileSyncQueueRoutes(v1);
 registerMobileDailyReportsRoutes(v1);
+registerAuditLogsRoutes(v1);
 
 // Unversioned infra routes — not signed, not tied to an API version.
 router.get("/health", () => Response.json({ ok: true }));
