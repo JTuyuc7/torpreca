@@ -5,6 +5,7 @@ import {
   type RouteConfig,
 } from "@asteasolutions/zod-to-openapi";
 import {
+  AuditLogSchema,
   CreateRouteSchema,
   CreateStopSchema,
   CreateUserSchema,
@@ -367,6 +368,20 @@ path({
   summary: "Fleet-wide counts for the dashboard home screen",
   responses: {
     200: jsonResponse("Summary", DashboardSummary),
+    401: unauthorized,
+    403: forbidden,
+  },
+});
+
+// --- audit-logs ---
+const AuditLog = registry.register("AuditLog", AuditLogSchema);
+path({
+  method: "get",
+  path: "/audit-logs",
+  tags: ["Audit Logs"],
+  summary: "Every audit_logs row, newest first — super_admin only",
+  responses: {
+    200: jsonResponse("AuditLogs", z.array(AuditLog)),
     401: unauthorized,
     403: forbidden,
   },
