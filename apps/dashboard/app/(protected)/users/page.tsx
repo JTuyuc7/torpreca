@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CreateUserSchema, PROMOTABLE_ROLES, type Role, type User, z } from "@torpreca/shared";
 import { Circle, RefreshCw, Users as UsersIcon } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useAuthUser } from "@/app/(protected)/auth-context";
@@ -298,7 +299,16 @@ export default function UsersPage() {
                       return (
                         <tr key={user.id} className="border-b border-outline/10 text-text">
                           <td className="py-2.5 pr-4">
-                            <p className="font-medium">{user.name}</p>
+                            {user.role === "driver" ? (
+                              <Link
+                                href={`/users/${user.id}`}
+                                className="font-medium text-primary hover:underline"
+                              >
+                                {user.name}
+                              </Link>
+                            ) : (
+                              <p className="font-medium">{user.name}</p>
+                            )}
                             <p className="text-xs text-outline">{user.email}</p>
                           </td>
                           <td className="py-2.5 pr-4">{user.role}</td>
