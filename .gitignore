@@ -10,6 +10,8 @@
 # Cualquier .<algo>.env por ambiente (ej. .staging.env, .production.env)
 .*.env
 !template.env
+# apps/mobile build flavors (TOR-111): .env.staging, .env.production
+**/.env.*
 
 # Dependencias
 node_modules/
