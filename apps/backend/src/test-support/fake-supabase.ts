@@ -6,9 +6,9 @@
 
 export type Row = Record<string, unknown>;
 
-type Filter = { op: "eq" | "neq"; col: string; val: unknown };
+type Filter = { op: "eq" | "neq" | "gte" | "lt"; col: string; val: unknown };
 
-type PostgrestResult = { data: unknown; error: { message: string } | null };
+type PostgrestResult = { data: unknown; error: { message: string } | null; count?: number };
 
 export type RpcHandler = (tables: Record<string, Row[]>, args: Record<string, unknown>) => Row[];
 
@@ -20,13 +20,17 @@ class FakeQueryBuilder implements PromiseLike<PostgrestResult> {
   private orderCol: string | null = null;
   private orderAsc = true;
   private terminal: "single" | "maybeSingle" | null = null;
+  private wantCount = false;
+  private rangeFrom: number | null = null;
+  private rangeTo: number | null = null;
 
   constructor(
     private readonly source: Row[],
     private readonly insertDefaults: Row = {},
   ) {}
 
-  select(_columns?: string) {
+  select(_columns?: string, opts?: { count?: "exact" | "planned" | "estimated" }) {
+    if (opts?.count) this.wantCount = true;
     return this;
   }
 
@@ -52,6 +56,23 @@ class FakeQueryBuilder implements PromiseLike<PostgrestResult> {
     return this;
   }
 
+  gte(col: string, val: unknown) {
+    this.filters.push({ op: "gte", col, val });
+    return this;
+  }
+
+  lt(col: string, val: unknown) {
+    this.filters.push({ op: "lt", col, val });
+    return this;
+  }
+
+  // Inclusive on both ends, same as supabase-js's .range(from, to).
+  range(from: number, to: number) {
+    this.rangeFrom = from;
+    this.rangeTo = to;
+    return this;
+  }
+
   order(col: string, opts?: { ascending?: boolean }) {
     this.orderCol = col;
     this.orderAsc = opts?.ascending ?? true;
@@ -69,7 +90,22 @@ class FakeQueryBuilder implements PromiseLike<PostgrestResult> {
   }
 
   private matches(row: Row): boolean {
-    return this.filters.every((f) => (f.op === "eq" ? row[f.col] === f.val : row[f.col] !== f.val));
+    return this.filters.every((f) => {
+      const rowVal = row[f.col] as string | number;
+      const filterVal = f.val as string | number;
+      switch (f.op) {
+        case "eq":
+          return rowVal === filterVal;
+        case "neq":
+          return rowVal !== filterVal;
+        case "gte":
+          return rowVal >= filterVal;
+        case "lt":
+          return rowVal < filterVal;
+        default:
+          return false;
+      }
+    });
   }
 
   private applyOrder(rows: Row[]): Row[] {
@@ -107,11 +143,16 @@ class FakeQueryBuilder implements PromiseLike<PostgrestResult> {
       return this.wrap(matched);
     }
 
-    const matched = this.applyOrder(this.source.filter((row) => this.matches(row)));
-    return this.wrap(matched);
+    const filtered = this.applyOrder(this.source.filter((row) => this.matches(row)));
+    const total = filtered.length;
+    const paged =
+      this.rangeFrom != null
+        ? filtered.slice(this.rangeFrom, (this.rangeTo ?? filtered.length - 1) + 1)
+        : filtered;
+    return this.wrap(paged, this.wantCount ? total : undefined);
   }
 
-  private wrap(rows: Row[]): PostgrestResult {
+  private wrap(rows: Row[], count?: number): PostgrestResult {
     if (this.terminal === "single") {
       if (rows.length !== 1) {
         return { data: null, error: { message: "fake-supabase: expected exactly one row" } };
@@ -124,7 +165,7 @@ class FakeQueryBuilder implements PromiseLike<PostgrestResult> {
       }
       return { data: rows[0] ?? null, error: null };
     }
-    return { data: rows, error: null };
+    return { data: rows, error: null, ...(count !== undefined ? { count } : {}) };
   }
 
   // biome-ignore lint/suspicious/noThenProperty: mirrors supabase-js's PostgrestBuilder (itself thenable) — repositories `await` a query directly without a terminal .single()/.maybeSingle() call.
