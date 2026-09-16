@@ -5,7 +5,8 @@ import {
   type RouteConfig,
 } from "@asteasolutions/zod-to-openapi";
 import {
-  AuditLogSchema,
+  AUDIT_EVENTS,
+  AuditLogsPageSchema,
   CreateRouteSchema,
   CreateStopSchema,
   CreateUserSchema,
@@ -374,14 +375,28 @@ path({
 });
 
 // --- audit-logs ---
-const AuditLog = registry.register("AuditLog", AuditLogSchema);
+const AuditLogsPage = registry.register("AuditLogsPage", AuditLogsPageSchema);
+const AuditLogsQuery = z.object({
+  action: z.enum(AUDIT_EVENTS).optional().describe("Filter by event type"),
+  userId: z.uuid().optional().describe("Filter by the user the event is attributed to"),
+  date: z.iso.date().optional().describe("Filter to events created on this calendar day (UTC)"),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .optional()
+    .describe("Page size, default 20, max 100"),
+  offset: z.coerce.number().int().min(0).optional().describe("Rows to skip, default 0"),
+});
 path({
   method: "get",
   path: "/audit-logs",
   tags: ["Audit Logs"],
-  summary: "Every audit_logs row, newest first — super_admin only",
+  summary: "Paginated audit_logs rows, newest first — super_admin only",
+  request: { query: AuditLogsQuery },
   responses: {
-    200: jsonResponse("AuditLogs", z.array(AuditLog)),
+    200: jsonResponse("AuditLogsPage", AuditLogsPage),
     401: unauthorized,
     403: forbidden,
   },

@@ -1,18 +1,36 @@
-import type { AuditLog } from "@torpreca/shared";
+import type { AuditEvent, AuditLogsPage } from "@torpreca/shared";
 
 // Browser-side call to this app's own /api/audit-logs BFF route handler —
 // same centralization pattern as lib/api/users-client.ts.
 
-export type AuditLogsResult = { ok: true; logs: AuditLog[] } | { ok: false; status: number };
+export type AuditLogsFilter = {
+  action?: AuditEvent;
+  userId?: string;
+  date?: string;
+  limit: number;
+  offset: number;
+};
 
-export async function listAuditLogs(accessToken: string): Promise<AuditLogsResult> {
+export type AuditLogsResult = { ok: true; page: AuditLogsPage } | { ok: false; status: number };
+
+export async function listAuditLogs(
+  accessToken: string,
+  filter: AuditLogsFilter,
+): Promise<AuditLogsResult> {
   try {
-    const res = await fetch("/api/audit-logs", {
+    const params = new URLSearchParams();
+    if (filter.action) params.set("action", filter.action);
+    if (filter.userId) params.set("userId", filter.userId);
+    if (filter.date) params.set("date", filter.date);
+    params.set("limit", String(filter.limit));
+    params.set("offset", String(filter.offset));
+
+    const res = await fetch(`/api/audit-logs?${params.toString()}`, {
       headers: { authorization: `Bearer ${accessToken}` },
     });
     if (!res.ok) return { ok: false, status: res.status };
-    const logs = (await res.json()) as AuditLog[];
-    return { ok: true, logs };
+    const page = (await res.json()) as AuditLogsPage;
+    return { ok: true, page };
   } catch {
     return { ok: false, status: 0 };
   }

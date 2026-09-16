@@ -7,6 +7,8 @@
   },
   "scripts": {
     "dev": "next dev",
+    "staging": "bun --env-file=.env.staging run dev",
+    "production": "bun --env-file=.env.production run dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
