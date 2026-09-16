@@ -6,10 +6,22 @@ import { auth } from "../../core/middleware/auth";
 import { rateLimitGeneral } from "../../core/middleware/rate-limit";
 import { requireRole } from "../../core/middleware/role";
 import { validateBody } from "../../core/middleware/validate-zod";
+import { dailyReportsRepository } from "../daily-reports/daily-reports.repository";
+import { createDailyReportsService } from "../daily-reports/daily-reports.service";
+import { stopsRepository } from "../stops/stops.repository";
 import { routesRepository } from "./routes.repository";
 import { createRoutesService } from "./routes.service";
 
 const service = createRoutesService(routesRepository);
+// routesService deliberately doesn't know about daily-reports (same reason
+// it doesn't call logEvent itself) — each place a route can finish
+// (this handler, sync-queue.service.ts's route.finished case) triggers its
+// own regeneration after the fact.
+const dailyReportsService = createDailyReportsService(
+  dailyReportsRepository,
+  routesRepository,
+  stopsRepository,
+);
 
 export function registerRoutesRoutes(router: Routable) {
   router.get("/routes", auth, rateLimitGeneral, async (ctx) => {
@@ -102,6 +114,8 @@ export function registerRoutesRoutes(router: Routable) {
         ip: clientIp(ctx),
         metadata: null,
       });
+
+      await dailyReportsService.generateForDriverDate(route.driverId, route.date);
 
       return Response.json(route);
     },

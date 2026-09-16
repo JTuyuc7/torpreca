@@ -1,6 +1,8 @@
 import { describe, expect, it, mock } from "bun:test";
-import type { AuthUser, Location, Route, Stop, SyncQueueItem } from "@torpreca/shared";
+import type { AuthUser, DailyReport, Location, Route, Stop, SyncQueueItem } from "@torpreca/shared";
 import { createFakeSupabase } from "../../test-support/fake-supabase";
+import type { DailyReportsRepository } from "../daily-reports/daily-reports.repository";
+import { createDailyReportsService } from "../daily-reports/daily-reports.service";
 import type { LocationsRepository } from "../locations/locations.repository";
 import { createLocationsService } from "../locations/locations.service";
 import type { RoutesRepository } from "../routes/routes.repository";
@@ -111,6 +113,33 @@ function createFakeLocationsRepo(): LocationsRepository {
   };
 }
 
+function createFakeDailyReportsRepo(): DailyReportsRepository & { rows: DailyReport[] } {
+  const rows: DailyReport[] = [];
+  return {
+    rows,
+    async getByDriverAndDate(driverId, date) {
+      return rows.find((r) => r.driverId === driverId && r.date === date) ?? null;
+    },
+    async upsert(input) {
+      const existing = rows.find((r) => r.driverId === input.driverId && r.date === input.date);
+      const now = new Date().toISOString();
+      if (existing) {
+        Object.assign(existing, input, { generatedAt: now, updatedAt: now });
+        return existing;
+      }
+      const created: DailyReport = {
+        id: crypto.randomUUID(),
+        ...input,
+        generatedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      };
+      rows.push(created);
+      return created;
+    },
+  };
+}
+
 function createFakeSyncQueueRepo(): SyncQueueRepository & { records: SyncQueueItem[] } {
   const records: SyncQueueItem[] = [];
   return {
@@ -170,12 +199,21 @@ const baseStop: Stop = {
 
 function buildService(routesSeed: Route[], stopsSeed: Stop[]) {
   const routesRepo = createFakeRoutesRepo(routesSeed);
+  const stopsRepo = createFakeStopsRepo(stopsSeed);
   const routesService = createRoutesService(routesRepo);
-  const stopsService = createStopsService(createFakeStopsRepo(stopsSeed), routesRepo);
+  const stopsService = createStopsService(stopsRepo, routesRepo);
   const locationsService = createLocationsService(createFakeLocationsRepo(), routesRepo);
+  const dailyReportsRepo = createFakeDailyReportsRepo();
+  const dailyReportsService = createDailyReportsService(dailyReportsRepo, routesRepo, stopsRepo);
   const syncRepo = createFakeSyncQueueRepo();
-  const service = createSyncQueueService(syncRepo, locationsService, stopsService, routesService);
-  return { service, syncRepo, routesService };
+  const service = createSyncQueueService(
+    syncRepo,
+    locationsService,
+    stopsService,
+    routesService,
+    dailyReportsService,
+  );
+  return { service, syncRepo, routesService, dailyReportsRepo };
 }
 
 describe("sync-queue.service", () => {
@@ -228,15 +266,16 @@ describe("sync-queue.service", () => {
     expect(syncRepo.records.every((r) => r.synced)).toBe(true);
   });
 
-  it("applies route.started then route.finished", async () => {
-    const { service } = buildService([{ ...baseRoute }], []);
+  it("applies route.started then route.finished, and generates the day's report", async () => {
+    const { service, dailyReportsRepo } = buildService([{ ...baseRoute }], [{ ...baseStop }]);
 
     const results = await service.drain(
       [
         { eventType: "route.started", recordedAt: "t1", payload: { routeId: baseRoute.id } },
+        { eventType: "stop.completed", recordedAt: "t2", payload: { stopId: baseStop.id } },
         {
           eventType: "route.finished",
-          recordedAt: "t2",
+          recordedAt: "t3",
           payload: { routeId: baseRoute.id, drivenKm: 12 },
         },
       ],
@@ -244,7 +283,16 @@ describe("sync-queue.service", () => {
       null,
     );
 
-    expect(results.map((r) => r.status)).toEqual(["applied", "applied"]);
+    expect(results.map((r) => r.status)).toEqual(["applied", "applied", "applied"]);
+    expect(dailyReportsRepo.rows).toEqual([
+      expect.objectContaining({
+        driverId: driver.id,
+        date: baseRoute.date,
+        drivenKm: 12,
+        completedStops: 1,
+        routesServed: 1,
+      }),
+    ]);
   });
 
   it("processes a mixed batch independently — one error doesn't block the rest", async () => {

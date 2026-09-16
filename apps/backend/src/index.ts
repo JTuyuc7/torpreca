@@ -13,6 +13,7 @@ import {
 import { resolveUpgradeData, type TrackingSocketData } from "./core/ws/upgrade";
 import { registerAuthRoutes } from "./modules/auth/auth.routes";
 import { registerMobileAuthRoutes } from "./modules/auth/mobile-auth.routes";
+import { registerMobileDailyReportsRoutes } from "./modules/daily-reports/daily-reports.routes";
 import { registerDashboardRoutes } from "./modules/dashboard/dashboard.routes";
 import { locationsRepository } from "./modules/locations/locations.repository";
 import { registerLocationsRoutes } from "./modules/locations/locations.routes";
@@ -52,6 +53,7 @@ registerWsTicketsRoutes(v1);
 registerMobileWsTicketsRoutes(v1);
 registerSyncQueueRoutes(v1);
 registerMobileSyncQueueRoutes(v1);
+registerMobileDailyReportsRoutes(v1);
 
 // Unversioned infra routes — not signed, not tied to an API version.
 router.get("/health", () => Response.json({ ok: true }));
