@@ -11,9 +11,19 @@ import 'features/auth/data/auth_repository.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/home/presentation/home_shell.dart';
 
-Future<void> main() async {
+// Default entry point (`flutter run`/`flutter test` with no explicit -t) —
+// boots straight into staging, the safer default for ad-hoc local runs. Real
+// builds go through main_staging.dart/main_production.dart + `--flavor`
+// (TOR-111) so the Android applicationId/app name/env file all agree with
+// each other instead of drifting independently.
+Future<void> main() => bootstrap('.env.staging');
+
+/// Shared app bootstrap — each flavor's entry point (`main_staging.dart`,
+/// `main_production.dart`) just picks which `.env.*` asset to load here.
+/// [envFileName] must match one of the assets declared in `pubspec.yaml`.
+Future<void> bootstrap(String envFileName) async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: '.env');
+  await dotenv.load(fileName: envFileName);
   await Hive.initFlutter();
   await Supabase.initialize(url: Env.supabaseUrl, publishableKey: Env.supabaseAnonKey);
   MapboxOptions.setAccessToken(Env.mapboxToken);
