@@ -1,9 +1,17 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { Router } from "../../core/http/router";
+import type { RpcHandler } from "../../test-support/fake-supabase";
 import { createFakeSupabase } from "../../test-support/fake-supabase";
+
+// Finishing a route now also generates that day's daily report (TOR-78),
+// which reads the route's stops via stops.repository.ts's
+// get_stops_readable RPC — needed here even though this file never creates
+// a stop through its own routes.
+const getStopsReadable: RpcHandler = (tables) => tables.stops ?? [];
 
 const fake = createFakeSupabase({
   insertDefaults: { routes: { status: "pending", driven_km: 0 } },
+  rpcHandlers: { get_stops_readable: getStopsReadable },
 });
 mock.module("../../core/db/supabase", () => ({ supabaseAdmin: fake.client }));
 
@@ -48,7 +56,7 @@ async function buildRouter() {
 }
 
 beforeEach(() => {
-  fake.reset({ routes: [], audit_logs: [] });
+  fake.reset({ routes: [], stops: [], daily_reports: [], audit_logs: [] });
   seedUsers();
 });
 
@@ -276,6 +284,15 @@ describe("routes HTTP routes", () => {
     expect(fake.tables.audit_logs?.map((l) => l.action)).toEqual([
       "route.started",
       "route.finished",
+    ]);
+
+    expect(fake.tables.daily_reports).toEqual([
+      expect.objectContaining({
+        driver_id: "driver-1",
+        date: "2026-08-22",
+        driven_km: 12.5,
+        routes_served: 1,
+      }),
     ]);
   });
 

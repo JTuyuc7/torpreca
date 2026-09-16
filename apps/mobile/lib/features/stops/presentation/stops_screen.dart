@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/api/routes_client.dart';
 import '../../../core/api/stops_client.dart';
+import '../../../core/widgets/state_message.dart';
 import '../data/stop.dart';
 import 'stop_detail_screen.dart';
 import 'stop_status_ui.dart';
@@ -43,7 +44,11 @@ class _StopsScreenState extends State<StopsScreen> {
 
   Future<void> _refresh() async {
     final future = _loadStops();
-    setState(() => _stopsFuture = future);
+    // A block body, not `setState(() => _stopsFuture = future)` — see the
+    // identical note on DailyReportScreen._refresh().
+    setState(() {
+      _stopsFuture = future;
+    });
     await future;
   }
 
@@ -70,17 +75,15 @@ class _StopsScreenState extends State<StopsScreen> {
               return const Center(child: CircularProgressIndicator());
             }
             if (snapshot.hasError) {
-              return _StateMessage(
-                icon: Icons.wifi_off,
+              return StateMessage.forError(
+                snapshot.error!,
                 title: 'No se pudieron cargar las paradas.',
-                description: 'Revisa tu conexión e intenta de nuevo.',
-                actionLabel: 'Reintentar',
                 onAction: _refresh,
               );
             }
             final stops = snapshot.data ?? const [];
             if (stops.isEmpty) {
-              return _StateMessage(
+              return StateMessage(
                 icon: Icons.event_available_outlined,
                 title: 'No tienes paradas asignadas hoy.',
                 description: 'Cuando un administrador te asigne una ruta, sus paradas van a aparecer acá.',
@@ -104,53 +107,6 @@ class _StopsScreenState extends State<StopsScreen> {
           },
         ),
       ),
-    );
-  }
-}
-
-// A ListView (not a Center) so pull-to-refresh still works over it, plus an
-// explicit action button — the pull gesture alone isn't discoverable enough
-// on its own for "nothing to see yet" vs. "something went wrong".
-class _StateMessage extends StatelessWidget {
-  const _StateMessage({
-    required this.icon,
-    required this.title,
-    required this.description,
-    required this.actionLabel,
-    required this.onAction,
-  });
-
-  final IconData icon;
-  final String title;
-  final String description;
-  final String actionLabel;
-  final VoidCallback onAction;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 48),
-          child: Column(
-            children: [
-              Icon(icon, size: 40, color: Theme.of(context).colorScheme.outline),
-              const SizedBox(height: 12),
-              Text(title, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 4),
-              Text(
-                description,
-                textAlign: TextAlign.center,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyLarge?.copyWith(color: Theme.of(context).colorScheme.outline),
-              ),
-              const SizedBox(height: 16),
-              OutlinedButton(onPressed: onAction, child: Text(actionLabel)),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

@@ -1,6 +1,7 @@
 import type { AuthUser, SyncEvent } from "@torpreca/shared";
 import { logEvent } from "../../core/audit/log-event";
 import { AppError } from "../../core/errors/app-error";
+import type { DailyReportsService } from "../daily-reports/daily-reports.service";
 import type { LocationsService } from "../locations/locations.service";
 import type { RoutesService } from "../routes/routes.service";
 import type { StopsService } from "../stops/stops.service";
@@ -30,6 +31,7 @@ export function createSyncQueueService(
   locationsService: LocationsService,
   stopsService: StopsService,
   routesService: RoutesService,
+  dailyReportsService: DailyReportsService,
 ) {
   async function applyOne(
     event: SyncEvent,
@@ -104,6 +106,7 @@ export function createSyncQueueService(
             ip,
             metadata: null,
           });
+          await dailyReportsService.generateForDriverDate(route.driverId, route.date);
           break;
         }
       }
