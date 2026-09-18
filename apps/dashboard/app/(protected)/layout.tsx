@@ -6,10 +6,16 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { logout as logoutRequest, verifySession } from "@/lib/api/auth-client";
+import { encodeReturnTo } from "@/lib/auth/return-to";
 import { clearCachedAuthUser, readCachedAuthUser, writeCachedAuthUser } from "@/lib/auth/session-cache";
+import { useInactivityTimeout } from "@/lib/hooks/use-inactivity-timeout";
 import { readStoredSidebarCollapsed, writeStoredSidebarCollapsed } from "@/lib/preferences/sidebar";
 import { supabase } from "@/lib/supabase/client";
 import { AuthUserProvider } from "./auth-context";
+import { SessionExpiredDialog } from "./session-expired-dialog";
+
+// TOR-123 card: 15-30 min suggested — picked the middle of that range.
+const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000;
 
 // Mirrors the sidebar nav in context/dashboard/assets/TorprecaDesignV2.pdf.
 // "Conductores" is the mockup's label for people-management, which today
@@ -172,6 +178,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [checking, setChecking] = useState(true);
+  const [sessionExpired, setSessionExpired] = useState(false);
   // Lazy initializer (not a plain `useState(false)` + effect): this layout
   // never renders real content on its first pass anyway (see `if (checking
   // || !authUser) return null` below) — checking/authUser are only ever
@@ -195,6 +202,17 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   // back on /login.
   const loggingOutHereRef = useRef(false);
 
+  // Set right before the inactivity-timeout signOut() call below, so the
+  // listener knows the resulting SIGNED_OUT event is expected and shouldn't
+  // navigate on its own — the SessionExpiredDialog owns that transition
+  // (via its button), not the cross-tab "signed out elsewhere" path.
+  const inactivityTimeoutRef = useRef(false);
+
+  // Where the user was when the inactivity timeout fired — read straight
+  // from window.location instead of usePathname()/useSearchParams() since
+  // it's only ever needed inside an event handler, not during render.
+  const returnToRef = useRef<string | null>(null);
+
   // Supabase persists its session in localStorage (not cookies) and already
   // fires a `storage` event to every open tab on sign-out — this listener is
   // what actually reacts to it. Without it, a tab stays on a protected page
@@ -205,6 +223,10 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
       if (event !== "SIGNED_OUT") return;
+      if (inactivityTimeoutRef.current) {
+        inactivityTimeoutRef.current = false;
+        return;
+      }
       clearCachedAuthUser();
       if (loggingOutHereRef.current) {
         loggingOutHereRef.current = false;
@@ -215,6 +237,23 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     });
     return () => subscription.unsubscribe();
   }, [router]);
+
+  // TOR-123: Supabase's refresh token doesn't expire on its own by
+  // inactivity (lasts weeks) — without this a tab left open stays "logged
+  // in" indefinitely. Ends the session immediately (not just on the modal's
+  // button click) so a session left idle is actually dead, not just hidden
+  // behind a dialog someone could dismiss by refreshing.
+  useInactivityTimeout(
+    INACTIVITY_TIMEOUT_MS,
+    () => {
+      inactivityTimeoutRef.current = true;
+      returnToRef.current = window.location.pathname + window.location.search;
+      clearCachedAuthUser();
+      setSessionExpired(true);
+      void supabase.auth.signOut();
+    },
+    !!authUser,
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -282,6 +321,19 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     // onAuthStateChange listener above, triggered by this signOut() call —
     // single place for that logic, shared with the cross-tab case.
     await supabase.auth.signOut();
+  }
+
+  if (sessionExpired) {
+    return (
+      <SessionExpiredDialog
+        onLoginAgain={() => {
+          const returnTo = returnToRef.current;
+          const returnToParam =
+            returnTo && returnTo !== "/" ? `&returnTo=${encodeReturnTo(returnTo)}` : "";
+          router.replace(`/login?reason=inactivity${returnToParam}`);
+        }}
+      />
+    );
   }
 
   if (checking || !authUser) return null;

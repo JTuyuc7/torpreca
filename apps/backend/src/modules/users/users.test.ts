@@ -1,5 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import type { Role, User, UserStatus } from "@torpreca/shared";
+import type { AuthUser, Role, User, UserStatus } from "@torpreca/shared";
+import { registerConnection } from "../../core/ws/connection-registry";
+import { createRateLimitBucket } from "../../core/ws/rate-limit";
+import type { TrackingWs } from "../../core/ws/tracking-handlers";
 import type { UsersRepository } from "./users.repository";
 import { createUsersService } from "./users.service";
 
@@ -127,6 +130,40 @@ describe("users.service", () => {
     const [user] = await repo.list("all");
     expect(user?.status).toBe("deactivated");
     expect(user?.deactivatedBy).toBe("admin-id");
+  });
+
+  it("deactivate closes that user's open WebSocket connections", async () => {
+    const authUser: AuthUser = { id: "1", role: "driver", status: "active" };
+    const repo = createFakeRepo([
+      {
+        id: "1",
+        authUserId: crypto.randomUUID(),
+        name: "Juan Pérez",
+        email: "juan@torpreca.gt",
+        role: "driver",
+        status: "active",
+        deactivatedAt: null,
+        deactivatedBy: null,
+        reviewedAt: null,
+        reviewedBy: null,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+      },
+    ]);
+    const service = createUsersService(repo);
+    const closed: unknown[] = [];
+    const ws: TrackingWs = {
+      data: { user: authUser, pingBucket: createRateLimitBucket(10, 10_000) },
+      send: () => {},
+      subscribe: () => {},
+      unsubscribe: () => {},
+      close: (code, reason) => closed.push([code, reason]),
+    };
+    registerConnection(ws);
+
+    await service.deactivate("1", "admin-id");
+
+    expect(closed).toEqual([[4001, "Account deactivated"]]);
   });
 
   describe("review", () => {
