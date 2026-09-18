@@ -1,5 +1,5 @@
 // Minimal in-memory stand-in for the slice of supabase-js this backend uses
-// (`.from().select/insert/update().eq/neq().order().single/maybeSingle()`,
+// (`.from().select/insert/update/delete().eq/neq().order().single/maybeSingle()`,
 // `.rpc()`, `.auth.getUser()`). Swapped in for `supabaseAdmin` via
 // `mock.module("../../core/db/supabase", ...)` so repository and HTTP tests
 // run without a real Supabase project. See TOR-75 plan.
@@ -13,7 +13,7 @@ type PostgrestResult = { data: unknown; error: { message: string } | null; count
 export type RpcHandler = (tables: Record<string, Row[]>, args: Record<string, unknown>) => Row[];
 
 class FakeQueryBuilder implements PromiseLike<PostgrestResult> {
-  private op: "select" | "insert" | "update" = "select";
+  private op: "select" | "insert" | "update" | "delete" = "select";
   private insertPayload: Row | null = null;
   private updatePayload: Row | null = null;
   private filters: Filter[] = [];
@@ -43,6 +43,11 @@ class FakeQueryBuilder implements PromiseLike<PostgrestResult> {
   update(payload: Row) {
     this.op = "update";
     this.updatePayload = payload;
+    return this;
+  }
+
+  delete() {
+    this.op = "delete";
     return this;
   }
 
@@ -139,6 +144,18 @@ class FakeQueryBuilder implements PromiseLike<PostgrestResult> {
       const matched = this.source.filter((row) => this.matches(row));
       for (const row of matched) {
         Object.assign(row, this.updatePayload, { updated_at: now });
+      }
+      return this.wrap(matched);
+    }
+
+    if (this.op === "delete") {
+      const matched = this.source.filter((row) => this.matches(row));
+      // Mutate `source` in place (splice), not reassign — it's the same
+      // array reference held in `tables[table]`, so a fresh array here
+      // wouldn't be visible outside this call.
+      for (const row of matched) {
+        const idx = this.source.indexOf(row);
+        if (idx !== -1) this.source.splice(idx, 1);
       }
       return this.wrap(matched);
     }

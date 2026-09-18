@@ -16,6 +16,8 @@ import { useLiveLocations } from "@/lib/hooks/use-live-locations";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
 import { useRoutes } from "@/lib/hooks/use-routes";
 import { useUsers } from "@/lib/hooks/use-users";
+import { MAP_STYLES } from "@/lib/map/styles";
+import { readStoredMapStyle, writeStoredMapStyle } from "@/lib/preferences/map-style";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN as string;
 
@@ -23,12 +25,6 @@ const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN as string;
 // an empty map; it re-centers on nothing in particular until a route in the
 // side list is clicked (see focusOnDriver below).
 const INITIAL_VIEW = { longitude: -90.5069, latitude: 14.6349, zoom: 11 };
-
-const MAP_STYLES = [
-  { label: "Calles", value: "mapbox://styles/mapbox/streets-v12" },
-  { label: "Satélite", value: "mapbox://styles/mapbox/satellite-streets-v12" },
-  { label: "Oscuro", value: "mapbox://styles/mapbox/dark-v11" },
-] as const;
 
 const STATUS_LABEL: Record<ReturnType<typeof useLiveLocations>["status"], string> = {
   connecting: "Conectando...",
@@ -112,8 +108,9 @@ export default function HomePage() {
   const { routes } = useRoutes();
   const { users } = useUsers();
 
-  const [mapStyle, setMapStyle] = useState<(typeof MAP_STYLES)[number]["value"]>(
-    MAP_STYLES[0].value,
+  // Lazy initializer: reads localStorage once on mount, not on every render.
+  const [mapStyle, setMapStyle] = useState<(typeof MAP_STYLES)[number]["value"]>(() =>
+    readStoredMapStyle(),
   );
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
   const mapRef = useRef<MapRef>(null);
@@ -177,7 +174,11 @@ export default function HomePage() {
             aria-label="Tipo de mapa"
             className="w-36"
             value={mapStyle}
-            onChange={(e) => setMapStyle(e.target.value as (typeof MAP_STYLES)[number]["value"])}
+            onChange={(e) => {
+              const next = e.target.value as (typeof MAP_STYLES)[number]["value"];
+              setMapStyle(next);
+              writeStoredMapStyle(next);
+            }}
           >
             {MAP_STYLES.map((s) => (
               <option key={s.value} value={s.value}>
