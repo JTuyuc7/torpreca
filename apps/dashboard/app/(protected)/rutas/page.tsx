@@ -17,6 +17,7 @@ import { usePageTitle } from "@/lib/hooks/use-page-title";
 import { useRoutes } from "@/lib/hooks/use-routes";
 import { useUsers } from "@/lib/hooks/use-users";
 import { useVehicles } from "@/lib/hooks/use-vehicles";
+import { RouteKmCalculatorDialog } from "./route-km-calculator-dialog";
 
 function FieldError({ children }: { children: React.ReactNode }) {
   return <p className="text-xs text-error">{children}</p>;
@@ -81,6 +82,7 @@ function CreateRouteForm({
     handleSubmit,
     watch,
     reset,
+    setValue,
     formState: { errors, isValid },
   } = useForm<RouteFormValues>({
     resolver: routeResolver,
@@ -158,13 +160,18 @@ function CreateRouteForm({
           <label htmlFor="plannedKm" className="text-xs text-outline">
             Km planeados
           </label>
-          <Input
-            id="plannedKm"
-            type="number"
-            min={0}
-            {...register("plannedKm", { valueAsNumber: true })}
-            className="w-28"
-          />
+          <div className="flex items-center gap-2">
+            <Input
+              id="plannedKm"
+              type="number"
+              min={0}
+              {...register("plannedKm", { valueAsNumber: true })}
+              className="w-28"
+            />
+            <RouteKmCalculatorDialog
+              onApply={(km) => setValue("plannedKm", km, { shouldValidate: true })}
+            />
+          </div>
           {errors.plannedKm && <FieldError>Debe ser 0 o mayor.</FieldError>}
         </div>
         <button
@@ -197,6 +204,7 @@ function RouteEditRow({
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors, isValid },
   } = useForm<RouteFormValues>({
     resolver: routeResolver,
@@ -248,12 +256,17 @@ function RouteEditRow({
         <RouteStatusBadge status={route.status} />
       </td>
       <td className="py-3 pr-4">
-        <Input
-          type="number"
-          min={0}
-          {...register("plannedKm", { valueAsNumber: true })}
-          className="w-24"
-        />
+        <div className="flex items-center gap-2">
+          <Input
+            type="number"
+            min={0}
+            {...register("plannedKm", { valueAsNumber: true })}
+            className="w-24"
+          />
+          <RouteKmCalculatorDialog
+            onApply={(km) => setValue("plannedKm", km, { shouldValidate: true })}
+          />
+        </div>
         {errors.plannedKm && <FieldError>≥ 0</FieldError>}
       </td>
       <td className="py-3">
