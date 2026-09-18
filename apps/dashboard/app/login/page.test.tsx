@@ -101,4 +101,49 @@ describe("LoginPage", () => {
 
     expect(screen.queryByText(/tu sesión se cerró/i)).not.toBeInTheDocument();
   });
+
+  it("shows the inactivity notice when redirected here with that reason", () => {
+    searchParams = new URLSearchParams("reason=inactivity");
+
+    render(<LoginPage />);
+
+    expect(screen.getByText(/tu sesión expiró por inactividad/i)).toBeInTheDocument();
+  });
+
+  it("redirects back to the encoded returnTo path after a successful login", async () => {
+    const returnTo = btoa(encodeURIComponent("/users/42?tab=history"));
+    window.history.pushState({}, "", `/login?reason=inactivity&returnTo=${returnTo}`);
+    signInWithPassword.mockResolvedValue({
+      data: { session: { access_token: "tok" } },
+      error: null,
+    });
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ id: "u1", role: "admin", status: "active" }), { status: 200 }),
+    );
+
+    render(<LoginPage />);
+    fillAndSubmit("admin@example.com", "correct");
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/users/42?tab=history"));
+
+    window.history.pushState({}, "", "/");
+  });
+
+  it("falls back to / when returnTo is missing or unsafe", async () => {
+    window.history.pushState({}, "", "/login?returnTo=not-valid-base64!!");
+    signInWithPassword.mockResolvedValue({
+      data: { session: { access_token: "tok" } },
+      error: null,
+    });
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ id: "u1", role: "admin", status: "active" }), { status: 200 }),
+    );
+
+    render(<LoginPage />);
+    fillAndSubmit("admin@example.com", "correct");
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/"));
+
+    window.history.pushState({}, "", "/");
+  });
 });

@@ -4,22 +4,31 @@ import { Eye, EyeOff, Info, Mail } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, Suspense, useState } from "react";
 import { reportLoginFailed, verifySession } from "@/lib/api/auth-client";
+import { decodeReturnTo } from "@/lib/auth/return-to";
 import { writeCachedAuthUser } from "@/lib/auth/session-cache";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
 import { supabase } from "@/lib/supabase/client";
+
+// One notice per `?reason=` value redirects to /login carry — TOR-123 added
+// "inactivity" alongside the pre-existing cross-tab sign-out case.
+const REASON_MESSAGES: Record<string, string> = {
+  "signed-out-elsewhere": "Tu sesión se cerró (aquí o en otra pestaña). Inicia sesión de nuevo.",
+  inactivity: "Tu sesión expiró por inactividad. Inicia sesión de nuevo.",
+};
 
 // useSearchParams() opts the component reading it into fully dynamic
 // rendering unless isolated behind a Suspense boundary — kept as its own
 // leaf component so the rest of the (otherwise static) login page isn't
 // affected by that.
-function SignedOutElsewhereNotice() {
+function SessionNotice() {
   const params = useSearchParams();
-  if (params.get("reason") !== "signed-out-elsewhere") return null;
+  const message = REASON_MESSAGES[params.get("reason") ?? ""];
+  if (!message) return null;
 
   return (
     <div className="mt-4 flex items-center gap-2 rounded-md border border-outline/30 bg-surface px-3 py-2 text-sm text-text">
       <Info size={16} className="shrink-0 text-outline" />
-      <span>Tu sesión se cerró (aquí o en otra pestaña). Inicia sesión de nuevo.</span>
+      <span>{message}</span>
     </div>
   );
 }
@@ -73,7 +82,11 @@ export default function LoginPage() {
     }
 
     writeCachedAuthUser(result.user);
-    router.push("/");
+    // Read straight from window.location (not useSearchParams()) so this
+    // component itself doesn't opt into fully dynamic rendering — see the
+    // comment on SessionNotice above for why that's isolated behind Suspense.
+    const returnTo = decodeReturnTo(new URLSearchParams(window.location.search).get("returnTo"));
+    router.push(returnTo ?? "/");
   }
 
   return (
@@ -95,7 +108,7 @@ export default function LoginPage() {
           <p className="mt-1 text-sm text-outline">Accede al panel de administración</p>
 
           <Suspense fallback={null}>
-            <SignedOutElsewhereNotice />
+            <SessionNotice />
           </Suspense>
 
           <div className="mt-8">

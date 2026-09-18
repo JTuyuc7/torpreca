@@ -1,5 +1,6 @@
 import type { CreateUserInput, Role, User, UserStatus } from "@torpreca/shared";
 import { AppError, NotFoundError } from "../../core/errors/app-error";
+import { closeConnectionsForUser } from "../../core/ws/connection-registry";
 import type { UsersRepository } from "./users.repository";
 
 // Takes the repository as a dependency instead of importing the real one:
@@ -28,6 +29,7 @@ export function createUsersService(repo: UsersRepository) {
     async deactivate(id: string, deactivatedBy: string): Promise<void> {
       await this.getById(id);
       await repo.deactivate(id, deactivatedBy);
+      closeConnectionsForUser(id);
     },
 
     async review(
