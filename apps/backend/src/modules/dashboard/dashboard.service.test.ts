@@ -44,7 +44,9 @@ function fakeUsersRepo(seed: User[]): UsersRepository {
     getById: notUsed,
     getByAuthUserId: notUsed,
     create: notUsed,
+    invite: notUsed,
     deactivate: notUsed,
+    updateRole: notUsed,
     review: notUsed,
   };
 }

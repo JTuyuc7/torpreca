@@ -1,4 +1,4 @@
-import type { CreateUserInput, Role, User, UserStatus } from "@torpreca/shared";
+import type { CreateUserInput, InviteUserInput, Role, User, UserStatus } from "@torpreca/shared";
 import { AppError, NotFoundError } from "../../core/errors/app-error";
 import { closeConnectionsForUser } from "../../core/ws/connection-registry";
 import type { UsersRepository } from "./users.repository";
@@ -26,10 +26,28 @@ export function createUsersService(repo: UsersRepository) {
       return repo.create(input, "active");
     },
 
+    // TOR-125: self-service creation — the repository handles both the
+    // Supabase Auth invite and the profile row; no duplicate pre-check here
+    // since inviteUserByEmail() is itself the source of truth for whether
+    // that email already has an account.
+    async invite(input: InviteUserInput): Promise<User> {
+      return repo.invite(input);
+    },
+
     async deactivate(id: string, deactivatedBy: string): Promise<void> {
       await this.getById(id);
       await repo.deactivate(id, deactivatedBy);
       closeConnectionsForUser(id);
+    },
+
+    // TOR-126: changes the role of a user past the pending-review step (the
+    // "Todos los usuarios" table, not the approval queue — see review() below
+    // for that one). `role` is already narrowed to PROMOTABLE_ROLES by
+    // UpdateUserRoleSchema, so super_admin can't reach here from the UI.
+    async updateRole(id: string, role: Role): Promise<User> {
+      await this.getById(id);
+      await repo.updateRole(id, role);
+      return this.getById(id);
     },
 
     async review(

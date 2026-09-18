@@ -212,6 +212,10 @@ export interface FakeSupabaseClient {
       createUser(
         attrs: Record<string, unknown>,
       ): Promise<{ data: { user: FakeAuthUser | null }; error: { message: string } | null }>;
+      inviteUserByEmail(
+        email: string,
+        options?: Record<string, unknown>,
+      ): Promise<{ data: { user: FakeAuthUser | null }; error: { message: string } | null }>;
     };
     resend(attrs: Record<string, unknown>): Promise<{ error: { message: string } | null }>;
   };
@@ -228,6 +232,8 @@ export interface FakeSupabase {
     createdUsers: FakeAuthUser[];
     createUserError: { message: string } | null;
     resendCalls: Record<string, unknown>[];
+    invitedUsers: FakeAuthUser[];
+    inviteUserError: { message: string } | null;
   };
 }
 
@@ -243,6 +249,8 @@ export function createFakeSupabase(
     createdUsers: [],
     createUserError: null,
     resendCalls: [],
+    invitedUsers: [],
+    inviteUserError: null,
   };
 
   const client: FakeSupabaseClient = {
@@ -274,6 +282,19 @@ export function createFakeSupabase(
           authAdmin.createdUsers.push(user);
           return { data: { user }, error: null };
         },
+        async inviteUserByEmail(email, options = {}) {
+          if (authAdmin.inviteUserError) {
+            return { data: { user: null }, error: authAdmin.inviteUserError };
+          }
+          const user: FakeAuthUser = {
+            id: crypto.randomUUID(),
+            email,
+            email_confirmed_at: null,
+            user_metadata: (options.data as Record<string, unknown>) ?? {},
+          };
+          authAdmin.invitedUsers.push(user);
+          return { data: { user }, error: null };
+        },
       },
       async resend(attrs) {
         authAdmin.resendCalls.push(attrs);
@@ -294,6 +315,8 @@ export function createFakeSupabase(
       authAdmin.createdUsers = [];
       authAdmin.createUserError = null;
       authAdmin.resendCalls = [];
+      authAdmin.invitedUsers = [];
+      authAdmin.inviteUserError = null;
     },
     setAuthUser(user, error = null) {
       authUser = user;

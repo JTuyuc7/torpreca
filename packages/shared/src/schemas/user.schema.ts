@@ -68,3 +68,29 @@ export const ReviewUserSchema = z.object({
 });
 
 export type ReviewUserInput = z.infer<typeof ReviewUserSchema>;
+
+// Body for PATCH /users/:id/role (TOR-126) — changes the role of a user
+// that's already past the pending-review step, from "Gestión de usuarios".
+// Same PROMOTABLE_ROLES as above (super_admin excluded — CLAUDE.md: only
+// assignable from the DB).
+export const UpdateUserRoleSchema = z.object({
+  role: z.enum(PROMOTABLE_ROLES),
+});
+
+export type UpdateUserRoleInput = z.infer<typeof UpdateUserRoleSchema>;
+
+// Roles the self-service invite flow (TOR-125) can create — "driver" is
+// excluded (drivers only ever arrive via mobile self-registration) and
+// super_admin is excluded (CLAUDE.md: only assignable from the DB).
+export const INVITABLE_ROLES = ["supervisor", "admin"] as const;
+
+// Body for POST /users/invite (TOR-125) — a super_admin inviting a new
+// admin/supervisor without leaving the dashboard or touching Supabase Auth
+// directly (unlike CreateUserSchema, which links an *existing* Supabase Auth
+// user by authUserId — that manual-linking flow still works, this one
+// replaces it as the default path for a brand-new person).
+export const InviteUserSchema = UserSchema.pick({ name: true, email: true }).extend({
+  role: z.enum(INVITABLE_ROLES),
+});
+
+export type InviteUserInput = z.infer<typeof InviteUserSchema>;

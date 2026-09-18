@@ -1,6 +1,13 @@
-import type { CreateUserInput, Role, User } from "@torpreca/shared";
+import type { CreateUserInput, InviteUserInput, Role, User } from "@torpreca/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createUser, deactivateUser, listAllUsers, reviewUser } from "@/lib/api/users-client";
+import {
+  createUser,
+  deactivateUser,
+  inviteUser,
+  listAllUsers,
+  reviewUser,
+  updateUserRole,
+} from "@/lib/api/users-client";
 import { getAccessToken } from "@/lib/supabase/access-token";
 
 const usersQueryKey = ["users"] as const;
@@ -39,6 +46,24 @@ export function useUsers() {
     },
   });
 
+  const inviteUserMutation = useMutation({
+    mutationFn: async (input: InviteUserInput) => {
+      const token = await getAccessToken();
+      const result = await inviteUser(token, input);
+      if (!result.ok) {
+        throw new Error(
+          result.status === 409
+            ? "Ya existe un usuario con ese correo."
+            : "No se pudo enviar la invitación. Intenta de nuevo.",
+        );
+      }
+      return result.user;
+    },
+    onSuccess: (user) => {
+      queryClient.setQueryData<User[]>(usersQueryKey, (prev) => (prev ? [user, ...prev] : [user]));
+    },
+  });
+
   const deactivateUserMutation = useMutation({
     mutationFn: async (id: string) => {
       const token = await getAccessToken();
@@ -49,6 +74,20 @@ export function useUsers() {
     onSuccess: (id) => {
       queryClient.setQueryData<User[]>(usersQueryKey, (prev) =>
         prev?.map((u) => (u.id === id ? { ...u, status: "deactivated" as const } : u)),
+      );
+    },
+  });
+
+  const updateUserRoleMutation = useMutation({
+    mutationFn: async (vars: { id: string; role: Role }) => {
+      const token = await getAccessToken();
+      const result = await updateUserRole(token, vars.id, vars.role);
+      if (!result.ok) throw new Error("No se pudo actualizar el rol. Intenta de nuevo.");
+      return result.user;
+    },
+    onSuccess: (user) => {
+      queryClient.setQueryData<User[]>(usersQueryKey, (prev) =>
+        prev?.map((u) => (u.id === user.id ? user : u)),
       );
     },
   });
@@ -78,7 +117,9 @@ export function useUsers() {
     error: usersQuery.error?.message ?? null,
     refetch: usersQuery.refetch,
     createUser: createUserMutation,
+    inviteUser: inviteUserMutation,
     deactivateUser: deactivateUserMutation,
+    updateUserRole: updateUserRoleMutation,
     reviewUser: reviewUserMutation,
   };
 }
