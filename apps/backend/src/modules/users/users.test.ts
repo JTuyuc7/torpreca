@@ -38,6 +38,24 @@ function createFakeRepo(seed: User[] = []): UsersRepository {
       users.push(created);
       return created;
     },
+    async invite(input) {
+      const created: User = {
+        id: crypto.randomUUID(),
+        authUserId: crypto.randomUUID(),
+        name: input.name,
+        email: input.email,
+        role: input.role,
+        status: "active",
+        deactivatedAt: null,
+        deactivatedBy: null,
+        reviewedAt: null,
+        reviewedBy: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      users.push(created);
+      return created;
+    },
     async deactivate(id, deactivatedBy) {
       const user = users.find((u) => u.id === id);
       if (user) {
@@ -45,6 +63,10 @@ function createFakeRepo(seed: User[] = []): UsersRepository {
         user.deactivatedAt = new Date().toISOString();
         user.deactivatedBy = deactivatedBy;
       }
+    },
+    async updateRole(id, role) {
+      const user = users.find((u) => u.id === id);
+      if (user) user.role = role;
     },
     async review(id, decision, reviewedBy, role?: Role) {
       const user = users.find((u) => u.id === id);
@@ -59,6 +81,22 @@ function createFakeRepo(seed: User[] = []): UsersRepository {
 }
 
 describe("users.service", () => {
+  it("invite delegates to the repository and lands active", async () => {
+    const service = createUsersService(createFakeRepo());
+    const user = await service.invite({
+      name: "Nueva Supervisora",
+      email: "supervisora@torpreca.gt",
+      role: "supervisor",
+    });
+
+    expect(user).toMatchObject({
+      name: "Nueva Supervisora",
+      email: "supervisora@torpreca.gt",
+      role: "supervisor",
+      status: "active",
+    });
+  });
+
   it("creates a new user, active by default", async () => {
     const service = createUsersService(createFakeRepo());
     const user = await service.create({
@@ -164,6 +202,34 @@ describe("users.service", () => {
     await service.deactivate("1", "admin-id");
 
     expect(closed).toEqual([[4001, "Account deactivated"]]);
+  });
+
+  it("updateRole changes an already-active user's role", async () => {
+    const repo = createFakeRepo([
+      {
+        id: "1",
+        authUserId: crypto.randomUUID(),
+        name: "Juan Pérez",
+        email: "juan@torpreca.gt",
+        role: "driver",
+        status: "active",
+        deactivatedAt: null,
+        deactivatedBy: null,
+        reviewedAt: null,
+        reviewedBy: null,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+      },
+    ]);
+    const service = createUsersService(repo);
+
+    const user = await service.updateRole("1", "supervisor");
+    expect(user.role).toBe("supervisor");
+  });
+
+  it("updateRole throws NotFoundError for a missing id", async () => {
+    const service = createUsersService(createFakeRepo());
+    await expect(service.updateRole("no-existe", "supervisor")).rejects.toThrow("User not found");
   });
 
   describe("review", () => {

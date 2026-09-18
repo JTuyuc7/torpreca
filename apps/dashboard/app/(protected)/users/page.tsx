@@ -1,14 +1,29 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CreateUserSchema, PROMOTABLE_ROLES, type Role, type User, z } from "@torpreca/shared";
-import { Circle, RefreshCw, Users as UsersIcon } from "lucide-react";
+import {
+  type InviteUserInput,
+  InviteUserSchema,
+  INVITABLE_ROLES,
+  PROMOTABLE_ROLES,
+  type Role,
+  type User,
+} from "@torpreca/shared";
+import { Circle, MoreVertical, RefreshCw, Users as UsersIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useAuthUser } from "@/app/(protected)/auth-context";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorBanner } from "@/components/ui/error-banner";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Section } from "@/components/ui/section";
 import { Select } from "@/components/ui/select";
@@ -18,21 +33,6 @@ import { useLiveLocations } from "@/lib/hooks/use-live-locations";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
 import { useRoutes } from "@/lib/hooks/use-routes";
 import { useUsers } from "@/lib/hooks/use-users";
-
-// Roles assignable from the manual creation form — "driver" is excluded:
-// drivers only ever arrive via mobile self-registration (POST
-// /mobile/auth/register), landing "pending" and showing up in the queue
-// below instead. super_admin is also excluded (CLAUDE.md: "super_admin no se
-// puede crear desde la UI — solo desde la DB"). Existing rows of either role
-// still show up in the table. `as const` (not just `Role[]`) so it can feed
-// z.enum below — a plain array of the union type isn't narrow enough for it.
-const ASSIGNABLE_ROLES = ["supervisor", "admin"] as const;
-
-// Narrows CreateUserSchema's `role` (the full ROLES enum) down to just the
-// two roles this form is allowed to submit — reuses the backend's exact
-// field validation (uuid/email/min-length) instead of re-declaring it.
-const CreateUserFormSchema = CreateUserSchema.extend({ role: z.enum(ASSIGNABLE_ROLES) });
-type CreateUserFormValues = z.infer<typeof CreateUserFormSchema>;
 
 const STATUS_LABELS: Record<User["status"], string> = {
   pending: "Pendiente",
@@ -47,13 +47,26 @@ function FieldError({ children }: { children: React.ReactNode }) {
 
 export default function UsersPage() {
   usePageTitle("Gestión de usuarios");
-  const { users, isLoading, isRefetching, error, refetch, createUser, deactivateUser, reviewUser } =
-    useUsers();
-  // POST /users (link an existing Supabase Auth user to a new profile) is
-  // super_admin-only on the backend — granting another admin/supervisor
-  // account is privilege escalation, so it shouldn't be self-service for a
-  // regular admin. Hiding the form for anyone else avoids a dead-end 403.
+  const {
+    users,
+    isLoading,
+    isRefetching,
+    error,
+    refetch,
+    inviteUser,
+    deactivateUser,
+    updateUserRole,
+    reviewUser,
+  } = useUsers();
+  // POST /users/invite is super_admin-only on the backend — granting another
+  // admin/supervisor account is privilege escalation, so it shouldn't be
+  // self-service for a regular admin. Hiding the form for anyone else avoids
+  // a dead-end 403.
   const isSuperAdmin = useAuthUser()?.role === "super_admin";
+  // Shown once after a successful invite — there's no new row to point at
+  // the way createUser's old flow had (the person hasn't set a password
+  // yet), so this is the confirmation that something happened.
+  const [invitedEmail, setInvitedEmail] = useState<string | null>(null);
 
   // TOR-31 ("Lista de conductores"): instead of a separate screen — this
   // table already covers drivers (see the "Conductores" nav item comment in
@@ -79,16 +92,19 @@ export default function UsersPage() {
     handleSubmit,
     reset,
     formState: { errors, isValid },
-  } = useForm<CreateUserFormValues>({
-    resolver: zodResolver(CreateUserFormSchema),
+  } = useForm<InviteUserInput>({
+    resolver: zodResolver(InviteUserSchema),
     mode: "onChange",
-    defaultValues: { authUserId: "", name: "", email: "", role: ASSIGNABLE_ROLES[0] },
+    defaultValues: { name: "", email: "", role: INVITABLE_ROLES[0] },
   });
 
-  function onCreate(values: CreateUserFormValues) {
-    createUser.mutate(values, {
-      onSuccess: () =>
-        reset({ authUserId: "", name: "", email: "", role: ASSIGNABLE_ROLES[0] }),
+  function onInvite(values: InviteUserInput) {
+    setInvitedEmail(null);
+    inviteUser.mutate(values, {
+      onSuccess: (user) => {
+        reset({ name: "", email: "", role: INVITABLE_ROLES[0] });
+        setInvitedEmail(user.email);
+      },
     });
   }
 
@@ -105,6 +121,8 @@ export default function UsersPage() {
       {error && <ErrorBanner message={error} onRetry={() => refetch()} />}
       {reviewUser.isError && <ErrorBanner message={reviewUser.error.message} />}
       {deactivateUser.isError && <ErrorBanner message={deactivateUser.error.message} />}
+      {updateUserRole.isError && <ErrorBanner message={updateUserRole.error.message} />}
+      {inviteUser.isError && <ErrorBanner message={inviteUser.error.message} />}
 
       {isLoading && (
         <div className="flex flex-col gap-6" aria-busy="true" aria-label="Cargando usuarios">
@@ -192,21 +210,14 @@ export default function UsersPage() {
 
           {isSuperAdmin && (
             <Section
-              title="Agregar usuario"
-              description="Supervisores y administradores — vincula un Auth User ID ya creado en Supabase."
+              title="Invitar usuario"
+              description="Supervisores y administradores — Supabase le envía un correo de invitación para que defina su propia contraseña."
             >
               <form
-                onSubmit={handleSubmit(onCreate)}
+                onSubmit={handleSubmit(onInvite)}
                 noValidate
                 className="flex flex-wrap items-end gap-3"
               >
-                <div className="flex flex-col gap-1">
-                  <label htmlFor="authUserId" className="text-xs text-outline">
-                    Auth User ID (Supabase)
-                  </label>
-                  <Input id="authUserId" {...register("authUserId")} placeholder="uuid" />
-                  {errors.authUserId && <FieldError>ID inválido (debe ser un UUID).</FieldError>}
-                </div>
                 <div className="flex flex-col gap-1">
                   <label htmlFor="name" className="text-xs text-outline">
                     Nombre
@@ -226,7 +237,7 @@ export default function UsersPage() {
                     Rol
                   </label>
                   <Select id="role" {...register("role")}>
-                    {ASSIGNABLE_ROLES.map((r) => (
+                    {INVITABLE_ROLES.map((r) => (
                       <option key={r} value={r}>
                         {r}
                       </option>
@@ -235,15 +246,15 @@ export default function UsersPage() {
                 </div>
                 <button
                   type="submit"
-                  disabled={!isValid || createUser.isPending}
+                  disabled={!isValid || inviteUser.isPending}
                   className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
                 >
-                  {createUser.isPending && <Spinner className="h-3.5 w-3.5" />}
-                  {createUser.isPending ? "Creando..." : "Crear usuario"}
+                  {inviteUser.isPending && <Spinner className="h-3.5 w-3.5" />}
+                  {inviteUser.isPending ? "Enviando..." : "Enviar invitación"}
                 </button>
-                {createUser.isError && (
-                  <p role="alert" className="w-full text-sm text-error">
-                    {createUser.error.message}
+                {invitedEmail && (
+                  <p className="w-full text-sm text-primary">
+                    Invitación enviada a {invitedEmail}.
                   </p>
                 )}
               </form>
@@ -256,8 +267,8 @@ export default function UsersPage() {
               title="No hay usuarios registrados."
               description={
                 isSuperAdmin
-                  ? "Los conductores aparecen aquí cuando se registran desde la app móvil. Como super_admin también podés vincular una cuenta de supervisor o administrador con el formulario de arriba."
-                  : "Los conductores aparecen aquí cuando se registran desde la app móvil, y un super_admin puede vincular cuentas de supervisor o administrador."
+                  ? "Los conductores aparecen aquí cuando se registran desde la app móvil. Como super_admin también podés invitar a un supervisor o administrador con el formulario de arriba."
+                  : "Los conductores aparecen aquí cuando se registran desde la app móvil, y un super_admin puede invitar cuentas de supervisor o administrador."
               }
             />
           )}
@@ -296,6 +307,14 @@ export default function UsersPage() {
                       const isDeactivating =
                         deactivateUser.isPending && deactivateUser.variables === user.id;
                       const isOnline = onlineDriverIds.has(user.id);
+                      // TOR-126: can't promote/demote to or from super_admin
+                      // from the UI (CLAUDE.md — DB-only), and no point
+                      // offering it on an already-deactivated account.
+                      const canChangeRole =
+                        isSuperAdmin && user.role !== "super_admin" && user.status !== "deactivated";
+                      const canDeactivate = user.status !== "deactivated";
+                      const isUpdatingRole =
+                        updateUserRole.isPending && updateUserRole.variables?.id === user.id;
                       return (
                         <tr key={user.id} className="border-b border-outline/10 text-text">
                           <td className="py-2.5 pr-4">
@@ -331,16 +350,47 @@ export default function UsersPage() {
                           <td className="py-2.5 pr-4">{STATUS_LABELS[user.status]}</td>
                           <td className="py-2.5 pr-4">{new Date(user.createdAt).toLocaleDateString()}</td>
                           <td className="py-2.5">
-                            {user.status !== "deactivated" && (
-                              <button
-                                type="button"
-                                disabled={isDeactivating}
-                                onClick={() => deactivateUser.mutate(user.id)}
-                                className="flex h-9 items-center gap-1.5 rounded-md border border-error px-3 text-sm font-medium text-error transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
-                              >
-                                {isDeactivating && <Spinner className="h-3.5 w-3.5" />}
-                                Desactivar
-                              </button>
+                            {(canChangeRole || canDeactivate) && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button
+                                    type="button"
+                                    disabled={isUpdatingRole || isDeactivating}
+                                    aria-label={`Acciones para ${user.name}`}
+                                    className="flex h-9 w-9 items-center justify-center rounded-md border border-outline/30 text-outline transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
+                                  >
+                                    {isUpdatingRole || isDeactivating ? (
+                                      <Spinner className="h-3.5 w-3.5" />
+                                    ) : (
+                                      <MoreVertical size={16} />
+                                    )}
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent>
+                                  {canChangeRole && (
+                                    <>
+                                      <DropdownMenuLabel>Cambiar rol</DropdownMenuLabel>
+                                      {PROMOTABLE_ROLES.filter((r) => r !== user.role).map((r) => (
+                                        <DropdownMenuItem
+                                          key={r}
+                                          onSelect={() => updateUserRole.mutate({ id: user.id, role: r })}
+                                        >
+                                          {r}
+                                        </DropdownMenuItem>
+                                      ))}
+                                    </>
+                                  )}
+                                  {canChangeRole && canDeactivate && <DropdownMenuSeparator />}
+                                  {canDeactivate && (
+                                    <DropdownMenuItem
+                                      destructive
+                                      onSelect={() => deactivateUser.mutate(user.id)}
+                                    >
+                                      Desactivar
+                                    </DropdownMenuItem>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             )}
                           </td>
                         </tr>

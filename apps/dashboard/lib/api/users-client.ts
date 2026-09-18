@@ -1,4 +1,4 @@
-import type { CreateUserInput, Role, User } from "@torpreca/shared";
+import type { CreateUserInput, InviteUserInput, Role, User } from "@torpreca/shared";
 
 // Browser-side calls to this app's own /api/users* BFF route handlers (see
 // lib/backend/signed-fetch.ts) — same centralization pattern as
@@ -71,6 +71,53 @@ export async function deactivateUser(
     });
     if (!res.ok) return { ok: false, status: res.status };
     return { ok: true };
+  } catch {
+    return { ok: false, status: 0 };
+  }
+}
+
+export type InviteUserResult = { ok: true; user: User } | { ok: false; status: number };
+
+// TOR-125: self-service — Supabase creates the Auth account and emails the
+// person an invite link to set their own password; no password ever passes
+// through this client or the backend.
+export async function inviteUser(
+  accessToken: string,
+  input: InviteUserInput,
+): Promise<InviteUserResult> {
+  try {
+    const res = await fetch("/api/users/invite", {
+      method: "POST",
+      headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) return { ok: false, status: res.status };
+    const user = (await res.json()) as User;
+    return { ok: true, user };
+  } catch {
+    return { ok: false, status: 0 };
+  }
+}
+
+export type UpdateUserRoleResult = { ok: true; user: User } | { ok: false; status: number };
+
+// TOR-126: promotes/demotes a user past the pending-review step — the
+// "Todos los usuarios" table's per-row role selector, not the approval queue
+// (that's reviewUser below).
+export async function updateUserRole(
+  accessToken: string,
+  id: string,
+  role: Role,
+): Promise<UpdateUserRoleResult> {
+  try {
+    const res = await fetch(`/api/users/${id}/role`, {
+      method: "PATCH",
+      headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ role }),
+    });
+    if (!res.ok) return { ok: false, status: res.status };
+    const user = (await res.json()) as User;
+    return { ok: true, user };
   } catch {
     return { ok: false, status: 0 };
   }
