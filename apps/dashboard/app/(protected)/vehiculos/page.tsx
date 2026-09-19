@@ -65,7 +65,7 @@ function ActiveBadge({ active }: { active: boolean }) {
   return (
     <span
       className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-        active ? "bg-primary text-white" : "bg-outline/15 text-outline"
+        active ? "bg-primary text-on-primary" : "bg-outline/15 text-outline"
       }`}
     >
       {active ? "Activo" : "Inactivo"}
@@ -203,7 +203,7 @@ function CreateVehicleDialog({
             <button
               type="submit"
               disabled={!isValid || createVehicle.isPending}
-              className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
+              className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-on-primary transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
             >
               {createVehicle.isPending && <Spinner className="h-3.5 w-3.5" />}
               {createVehicle.isPending ? "Guardando..." : "Guardar vehículo"}
@@ -302,7 +302,7 @@ function VehicleEditDialog({
                 <button
                   type="submit"
                   disabled={!isValid || isSaving}
-                  className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
+                  className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-on-primary transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
                 >
                   {isSaving && <Spinner className="h-3.5 w-3.5" />}
                   Guardar
@@ -379,7 +379,7 @@ export default function VehiculosPage() {
         <button
           type="button"
           onClick={() => setCreateOpen(true)}
-          className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-white transition-opacity hover:opacity-90 cursor-pointer"
+          className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-on-primary transition-opacity hover:opacity-90 cursor-pointer"
         >
           <Plus size={15} />
           Agregar vehículo

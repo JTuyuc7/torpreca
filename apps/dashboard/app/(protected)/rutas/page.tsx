@@ -177,7 +177,7 @@ function CreateRouteForm({
         <button
           type="submit"
           disabled={!isValid || createRoute.isPending}
-          className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
+          className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-on-primary transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
         >
           {createRoute.isPending && <Spinner className="h-3.5 w-3.5" />}
           {createRoute.isPending ? "Creando..." : "Crear ruta"}
@@ -275,7 +275,7 @@ function RouteEditRow({
             type="button"
             disabled={!isValid || isSaving}
             onClick={handleSubmit(onSubmit)}
-            className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
+            className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-on-primary transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
           >
             {isSaving && <Spinner className="h-3.5 w-3.5" />}
             Guardar

@@ -16,6 +16,17 @@
   --outline: #79747e;
   --error: #b3261e;
   --decorative: #7e5b34;
+  /* Text color for content placed on top of --primary (solid buttons, active
+     badges). White in light mode, where --primary is a dark navy — but
+     --primary flips to a light blue in dark mode (#7dc0f5, to stay legible
+     as a ring/accent against the dark background), so white text on it drops
+     to ~1.96:1 contrast, well under WCAG AA. --on-primary tracks --primary's
+     brightness per theme instead of assuming white always works. */
+  --on-primary: #ffffff;
+  /* Same idea as --on-primary but for content on top of a solid --error fill
+     (the "cancelled" route badge). --error also flips to a light tone in
+     dark mode (#f2b8b5), so white text on it would drop to ~1.7:1. */
+  --on-error: #ffffff;
   /* Tells the browser which native widget skin to use for form controls it
      renders itself (date/time picker popup, select dropdown, scrollbars) —
      without this they default to the OS's light skin regardless of our own
@@ -35,6 +46,8 @@
   --color-outline: var(--outline);
   --color-error: var(--error);
   --color-decorative: var(--decorative);
+  --color-on-primary: var(--on-primary);
+  --color-on-error: var(--on-error);
   --font-sans: var(--font-roboto);
 }
 
@@ -48,6 +61,8 @@
     --text: #e6e1e5;
     --outline: #8bafc8;
     --error: #f2b8b5;
+    --on-primary: var(--background);
+    --on-error: var(--background);
     color-scheme: dark;
   }
 }
