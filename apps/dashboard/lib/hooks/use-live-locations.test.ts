@@ -1,8 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/supabase/access-token", () => ({ getAccessToken: vi.fn(async () => "tok") }));
-
 const getLatestLocations = vi.fn();
 const mintWsTicket = vi.fn();
 vi.mock("@/lib/api/dashboard-client", () => ({

@@ -5,7 +5,6 @@ import {
   deleteFavoriteRoute,
   listFavoriteRoutes,
 } from "@/lib/api/favorite-routes-client";
-import { getAccessToken } from "@/lib/supabase/access-token";
 
 const favoriteRoutesQueryKey = ["favorite-routes"] as const;
 
@@ -17,8 +16,7 @@ export function useFavoriteRoutes() {
   const favoriteRoutesQuery = useQuery({
     queryKey: favoriteRoutesQueryKey,
     queryFn: async () => {
-      const token = await getAccessToken();
-      const result = await listFavoriteRoutes(token);
+      const result = await listFavoriteRoutes();
       if (!result.ok) throw new Error("No se pudieron cargar las rutas favoritas.");
       return result.favoriteRoutes;
     },
@@ -26,8 +24,7 @@ export function useFavoriteRoutes() {
 
   const createFavoriteRouteMutation = useMutation({
     mutationFn: async (input: CreateFavoriteRouteInput) => {
-      const token = await getAccessToken();
-      const result = await createFavoriteRoute(token, input);
+      const result = await createFavoriteRoute(input);
       if (!result.ok) throw new Error("No se pudo guardar la ruta favorita.");
       return result.favoriteRoute;
     },
@@ -40,8 +37,7 @@ export function useFavoriteRoutes() {
 
   const deleteFavoriteRouteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const token = await getAccessToken();
-      const result = await deleteFavoriteRoute(token, id);
+      const result = await deleteFavoriteRoute(id);
       if (!result.ok) throw new Error("No se pudo borrar la ruta favorita.");
       return id;
     },

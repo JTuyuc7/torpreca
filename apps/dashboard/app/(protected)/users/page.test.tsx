@@ -5,11 +5,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { withQueryClient } from "@/lib/test-utils/query-client";
 import { AuthUserProvider } from "../auth-context";
 
-const getSession = vi.fn();
-vi.mock("../../../lib/supabase/client", () => ({
-  supabase: { auth: { getSession: () => getSession() } },
-}));
-
 // Mocked at the hook level (not via fetchMock below) — these two only exist
 // on this screen for TOR-31's "online now" / "today's route" columns, and
 // most tests here don't care about either. Keeping them out of fetchMock's
@@ -90,8 +85,6 @@ const driverUser = {
 beforeEach(() => {
   fetchMock.mockReset();
   vi.stubGlobal("fetch", fetchMock);
-  getSession.mockReset();
-  getSession.mockResolvedValue({ data: { session: { access_token: "tok" } } });
   useLiveLocations.mockReset();
   useLiveLocations.mockReturnValue({ locations: [], status: "connected" });
   useRoutes.mockReset();
@@ -112,10 +105,7 @@ describe("UsersPage", () => {
     renderPage();
 
     await waitFor(() => expect(screen.getByText("No hay usuarios registrados.")).toBeInTheDocument());
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/users?status=all",
-      expect.objectContaining({ headers: { authorization: "Bearer tok" } }),
-    );
+    expect(fetchMock).toHaveBeenCalledWith("/api/users?status=all");
   });
 
   it("lists users with a Desactivar action in the actions menu", async () => {
@@ -399,9 +389,6 @@ describe("UsersPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Actualizar" }));
 
     await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(callsBeforeRefresh));
-    expect(fetchMock).toHaveBeenLastCalledWith(
-      "/api/users?status=all",
-      expect.objectContaining({ headers: { authorization: "Bearer tok" } }),
-    );
+    expect(fetchMock).toHaveBeenLastCalledWith("/api/users?status=all");
   });
 });

@@ -1,7 +1,6 @@
 import type { CreateRouteInput, Route, UpdateRouteInput } from "@torpreca/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createRoute, listRoutes, updateRoute } from "@/lib/api/routes-client";
-import { getAccessToken } from "@/lib/supabase/access-token";
 
 const routesQueryKey = ["routes"] as const;
 
@@ -13,8 +12,7 @@ export function useRoutes() {
   const routesQuery = useQuery({
     queryKey: routesQueryKey,
     queryFn: async () => {
-      const token = await getAccessToken();
-      const result = await listRoutes(token);
+      const result = await listRoutes();
       if (!result.ok) throw new Error("No se pudieron cargar las rutas.");
       return result.routes;
     },
@@ -22,8 +20,7 @@ export function useRoutes() {
 
   const createRouteMutation = useMutation({
     mutationFn: async (input: CreateRouteInput) => {
-      const token = await getAccessToken();
-      const result = await createRoute(token, input);
+      const result = await createRoute(input);
       if (!result.ok) {
         throw new Error(
           result.status === 400
@@ -42,8 +39,7 @@ export function useRoutes() {
 
   const updateRouteMutation = useMutation({
     mutationFn: async (vars: { id: string; input: UpdateRouteInput }) => {
-      const token = await getAccessToken();
-      const result = await updateRoute(token, vars.id, vars.input);
+      const result = await updateRoute(vars.id, vars.input);
       if (!result.ok) {
         throw new Error(
           result.status === 409

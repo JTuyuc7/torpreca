@@ -1,9 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { withQueryClient } from "@/lib/test-utils/query-client";
-
-vi.mock("@/lib/supabase/access-token", () => ({ getAccessToken: vi.fn(async () => "tok") }));
-
 import RutasPage from "./page";
 
 const fetchMock = vi.fn();

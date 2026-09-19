@@ -2,8 +2,6 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { withQueryClient } from "@/lib/test-utils/query-client";
 
-vi.mock("@/lib/supabase/access-token", () => ({ getAccessToken: vi.fn(async () => "tok") }));
-
 const listAllUsers = vi.fn();
 const createUser = vi.fn();
 const inviteUser = vi.fn();
@@ -146,7 +144,7 @@ describe("useUsers", () => {
     result.current.updateUserRole.mutate({ id: activeUser.id, role: "supervisor" });
 
     await waitFor(() => expect(result.current.users).toEqual([promoted]));
-    expect(updateUserRole).toHaveBeenCalledWith("tok", activeUser.id, "supervisor");
+    expect(updateUserRole).toHaveBeenCalledWith(activeUser.id, "supervisor");
   });
 
   it("reviewUser replaces the reviewed user in the cached list", async () => {
@@ -161,6 +159,6 @@ describe("useUsers", () => {
     result.current.reviewUser.mutate({ id: pendingUser.id, decision: "approve", role: "supervisor" });
 
     await waitFor(() => expect(result.current.users).toEqual([approvedUser]));
-    expect(reviewUser).toHaveBeenCalledWith("tok", pendingUser.id, "approve", "supervisor");
+    expect(reviewUser).toHaveBeenCalledWith(pendingUser.id, "approve", "supervisor");
   });
 });

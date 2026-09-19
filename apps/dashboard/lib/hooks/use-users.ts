@@ -8,7 +8,6 @@ import {
   reviewUser,
   updateUserRole,
 } from "@/lib/api/users-client";
-import { getAccessToken } from "@/lib/supabase/access-token";
 
 const usersQueryKey = ["users"] as const;
 
@@ -21,8 +20,7 @@ export function useUsers() {
   const usersQuery = useQuery({
     queryKey: usersQueryKey,
     queryFn: async () => {
-      const token = await getAccessToken();
-      const result = await listAllUsers(token);
+      const result = await listAllUsers();
       if (!result.ok) throw new Error("No se pudieron cargar los usuarios.");
       return result.users;
     },
@@ -30,8 +28,7 @@ export function useUsers() {
 
   const createUserMutation = useMutation({
     mutationFn: async (input: CreateUserInput) => {
-      const token = await getAccessToken();
-      const result = await createUser(token, input);
+      const result = await createUser(input);
       if (!result.ok) {
         throw new Error(
           result.status === 409
@@ -48,8 +45,7 @@ export function useUsers() {
 
   const inviteUserMutation = useMutation({
     mutationFn: async (input: InviteUserInput) => {
-      const token = await getAccessToken();
-      const result = await inviteUser(token, input);
+      const result = await inviteUser(input);
       if (!result.ok) {
         throw new Error(
           result.status === 409
@@ -66,8 +62,7 @@ export function useUsers() {
 
   const deactivateUserMutation = useMutation({
     mutationFn: async (id: string) => {
-      const token = await getAccessToken();
-      const result = await deactivateUser(token, id);
+      const result = await deactivateUser(id);
       if (!result.ok) throw new Error("No se pudo desactivar el usuario.");
       return id;
     },
@@ -80,8 +75,7 @@ export function useUsers() {
 
   const updateUserRoleMutation = useMutation({
     mutationFn: async (vars: { id: string; role: Role }) => {
-      const token = await getAccessToken();
-      const result = await updateUserRole(token, vars.id, vars.role);
+      const result = await updateUserRole(vars.id, vars.role);
       if (!result.ok) throw new Error("No se pudo actualizar el rol. Intenta de nuevo.");
       return result.user;
     },
@@ -94,8 +88,7 @@ export function useUsers() {
 
   const reviewUserMutation = useMutation({
     mutationFn: async (vars: { id: string; decision: "approve" | "reject"; role?: Role }) => {
-      const token = await getAccessToken();
-      const result = await reviewUser(token, vars.id, vars.decision, vars.role);
+      const result = await reviewUser(vars.id, vars.decision, vars.role);
       if (!result.ok) throw new Error("No se pudo completar la revisión. Intenta de nuevo.");
       return result.user;
     },

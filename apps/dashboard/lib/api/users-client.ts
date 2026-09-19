@@ -2,17 +2,17 @@ import type { CreateUserInput, InviteUserInput, Role, User } from "@torpreca/sha
 
 // Browser-side calls to this app's own /api/users* BFF route handlers (see
 // lib/backend/signed-fetch.ts) — same centralization pattern as
-// lib/api/auth-client.ts.
+// lib/api/auth-client.ts. TOR-124: no access token is passed in anymore —
+// the session lives in an httpOnly cookie same-origin fetch() sends
+// automatically, and each route handler resolves it server-side.
 
 export type UsersResult = { ok: true; users: User[] } | { ok: false; status: number };
 
 export type PendingUsersResult = UsersResult;
 
-export async function listPendingUsers(accessToken: string): Promise<PendingUsersResult> {
+export async function listPendingUsers(): Promise<PendingUsersResult> {
   try {
-    const res = await fetch("/api/users?status=pending", {
-      headers: { authorization: `Bearer ${accessToken}` },
-    });
+    const res = await fetch("/api/users?status=pending");
     if (!res.ok) return { ok: false, status: res.status };
     const users = (await res.json()) as User[];
     return { ok: true, users };
@@ -23,11 +23,9 @@ export async function listPendingUsers(accessToken: string): Promise<PendingUser
 
 // Lists every user regardless of status — powers the "Gestión de usuarios"
 // screen (unlike listPendingUsers, which the driver approval queue uses).
-export async function listAllUsers(accessToken: string): Promise<UsersResult> {
+export async function listAllUsers(): Promise<UsersResult> {
   try {
-    const res = await fetch("/api/users?status=all", {
-      headers: { authorization: `Bearer ${accessToken}` },
-    });
+    const res = await fetch("/api/users?status=all");
     if (!res.ok) return { ok: false, status: res.status };
     const users = (await res.json()) as User[];
     return { ok: true, users };
@@ -40,14 +38,11 @@ export type CreateUserResult = { ok: true; user: User } | { ok: false; status: n
 
 // Links an existing Supabase Auth user (created outside the dashboard — see
 // the scope note on TOR-42) to a new `users` profile row.
-export async function createUser(
-  accessToken: string,
-  input: CreateUserInput,
-): Promise<CreateUserResult> {
+export async function createUser(input: CreateUserInput): Promise<CreateUserResult> {
   try {
     const res = await fetch("/api/users", {
       method: "POST",
-      headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify(input),
     });
     if (!res.ok) return { ok: false, status: res.status };
@@ -60,15 +55,9 @@ export async function createUser(
 
 export type DeactivateUserResult = { ok: true } | { ok: false; status: number };
 
-export async function deactivateUser(
-  accessToken: string,
-  id: string,
-): Promise<DeactivateUserResult> {
+export async function deactivateUser(id: string): Promise<DeactivateUserResult> {
   try {
-    const res = await fetch(`/api/users/${id}`, {
-      method: "DELETE",
-      headers: { authorization: `Bearer ${accessToken}` },
-    });
+    const res = await fetch(`/api/users/${id}`, { method: "DELETE" });
     if (!res.ok) return { ok: false, status: res.status };
     return { ok: true };
   } catch {
@@ -81,14 +70,11 @@ export type InviteUserResult = { ok: true; user: User } | { ok: false; status: n
 // TOR-125: self-service — Supabase creates the Auth account and emails the
 // person an invite link to set their own password; no password ever passes
 // through this client or the backend.
-export async function inviteUser(
-  accessToken: string,
-  input: InviteUserInput,
-): Promise<InviteUserResult> {
+export async function inviteUser(input: InviteUserInput): Promise<InviteUserResult> {
   try {
     const res = await fetch("/api/users/invite", {
       method: "POST",
-      headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify(input),
     });
     if (!res.ok) return { ok: false, status: res.status };
@@ -104,15 +90,11 @@ export type UpdateUserRoleResult = { ok: true; user: User } | { ok: false; statu
 // TOR-126: promotes/demotes a user past the pending-review step — the
 // "Todos los usuarios" table's per-row role selector, not the approval queue
 // (that's reviewUser below).
-export async function updateUserRole(
-  accessToken: string,
-  id: string,
-  role: Role,
-): Promise<UpdateUserRoleResult> {
+export async function updateUserRole(id: string, role: Role): Promise<UpdateUserRoleResult> {
   try {
     const res = await fetch(`/api/users/${id}/role`, {
       method: "PATCH",
-      headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({ role }),
     });
     if (!res.ok) return { ok: false, status: res.status };
@@ -126,7 +108,6 @@ export async function updateUserRole(
 export type ReviewUserResult = { ok: true; user: User } | { ok: false; status: number };
 
 export async function reviewUser(
-  accessToken: string,
   id: string,
   decision: "approve" | "reject",
   role?: Role,
@@ -134,7 +115,7 @@ export async function reviewUser(
   try {
     const res = await fetch(`/api/users/${id}/review`, {
       method: "PATCH",
-      headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify(role ? { decision, role } : { decision }),
     });
     if (!res.ok) return { ok: false, status: res.status };

@@ -3,38 +3,28 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const replace = vi.fn();
 // Real Next.js router (a real `useRouter()`) returns the same object across
-// renders — a fresh literal here made the layout's verify()/onAuthStateChange
-// effects (both dependent on `router`) re-run on every render, which stayed
-// harmless until TOR-123's setSessionExpired(true) triggered a real
-// re-render and exposed it as a genuine bug: verify() would refire, find
-// clearCachedAuthUser() had already run, and re-sign-out through a stale
-// "loggingOutHereRef" path.
+// renders — a fresh literal here made the layout's verify() effect (which
+// depends on `router`) re-run on every render, which stayed harmless until
+// TOR-123's setSessionExpired(true) triggered a real re-render and exposed
+// it as a genuine bug.
 const router = { push: vi.fn(), replace };
 vi.mock("next/navigation", () => ({
   useRouter: () => router,
   usePathname: () => "/",
 }));
 
-const getSession = vi.fn();
-// Real signOut() triggers Supabase's own onAuthStateChange listeners
-// (that's the whole cross-tab mechanism) — the mock does the same so
-// handleLogout's self-initiated-vs-external distinction is exercised
-// realistically instead of assumed.
-const signOut = vi.fn(() => {
-  authStateCallback?.("SIGNED_OUT");
-});
-let authStateCallback: ((event: string) => void) | null = null;
-const unsubscribe = vi.fn();
-vi.mock("../../lib/supabase/client", () => ({
-  supabase: {
-    auth: {
-      getSession: () => getSession(),
-      signOut: () => signOut(),
-      onAuthStateChange: (cb: (event: string) => void) => {
-        authStateCallback = cb;
-        return { data: { subscription: { unsubscribe } } };
-      },
-    },
+const announceSignedOut = vi.fn();
+let crossTabListener: (() => void) | null = null;
+// TOR-124: replaces the old Supabase onAuthStateChange mock — the session
+// moved to an httpOnly cookie, so cross-tab sign-out notification is now
+// this app's own BroadcastChannel wrapper instead of a Supabase SDK event.
+vi.mock("@/lib/auth/session-broadcast", () => ({
+  announceSignedOut: (...args: unknown[]) => announceSignedOut(...args),
+  onSignedOutElsewhere: (cb: () => void) => {
+    crossTabListener = cb;
+    return () => {
+      crossTabListener = null;
+    };
   },
 }));
 
@@ -51,18 +41,18 @@ const fetchMock = vi.fn();
 
 beforeEach(() => {
   replace.mockClear();
-  getSession.mockReset();
-  signOut.mockReset();
+  announceSignedOut.mockReset();
   fetchMock.mockReset();
   vi.stubGlobal("fetch", fetchMock);
   window.sessionStorage.clear();
   window.localStorage.clear();
   inactivityTimeoutCallback = null;
+  crossTabListener = null;
 });
 
 describe("ProtectedLayout", () => {
-  it("redirects to /login when there is no Supabase session", async () => {
-    getSession.mockResolvedValue({ data: { session: null } });
+  it("redirects to /login when there is no session", async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 401 }));
 
     render(
       <ProtectedLayout>
@@ -72,10 +62,12 @@ describe("ProtectedLayout", () => {
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
     expect(screen.queryByText("secret")).not.toBeInTheDocument();
+    // No session to sign out of — /api/auth/session (the check itself) is
+    // the only call, not /api/auth/logout too.
+    expect(fetchMock).not.toHaveBeenCalledWith("/api/auth/logout", expect.anything());
   });
 
   it("renders children using the cached AuthUser without calling the backend", async () => {
-    getSession.mockResolvedValue({ data: { session: { access_token: "tok" } } });
     window.sessionStorage.setItem(
       "torpreca:auth-user",
       JSON.stringify({ id: "u1", role: "admin", status: "active" }),
@@ -92,7 +84,6 @@ describe("ProtectedLayout", () => {
   });
 
   it("re-verifies with the backend and signs out when the role is rejected", async () => {
-    getSession.mockResolvedValue({ data: { session: { access_token: "tok" } } });
     fetchMock.mockResolvedValue(new Response(null, { status: 403 }));
 
     render(
@@ -102,12 +93,15 @@ describe("ProtectedLayout", () => {
     );
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
-    expect(signOut).toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledWith("/api/auth/session");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/auth/logout",
+      expect.objectContaining({ method: "POST" }),
+    );
     expect(screen.queryByText("secret")).not.toBeInTheDocument();
   });
 
   it("collapses the sidebar to icon-only when the toggle is clicked", async () => {
-    getSession.mockResolvedValue({ data: { session: { access_token: "tok" } } });
     window.sessionStorage.setItem(
       "torpreca:auth-user",
       JSON.stringify({ id: "u1", role: "admin", status: "active" }),
@@ -134,7 +128,6 @@ describe("ProtectedLayout", () => {
   });
 
   it("persists the collapsed state across remounts (e.g. a reload)", async () => {
-    getSession.mockResolvedValue({ data: { session: { access_token: "tok" } } });
     window.sessionStorage.setItem(
       "torpreca:auth-user",
       JSON.stringify({ id: "u1", role: "admin", status: "active" }),
@@ -164,7 +157,6 @@ describe("ProtectedLayout", () => {
   });
 
   it("redirects with a message when signed out happens in another tab", async () => {
-    getSession.mockResolvedValue({ data: { session: { access_token: "tok" } } });
     window.sessionStorage.setItem(
       "torpreca:auth-user",
       JSON.stringify({ id: "u1", role: "admin", status: "active" }),
@@ -177,10 +169,9 @@ describe("ProtectedLayout", () => {
     );
     await waitFor(() => expect(screen.getByText("secret")).toBeInTheDocument());
 
-    // Simulates Supabase's own storage-event-driven notification of a
-    // sign-out that happened in a different tab — nothing in this tab
-    // called signOut() itself.
-    authStateCallback?.("SIGNED_OUT");
+    // Simulates this app's own BroadcastChannel notification of a sign-out
+    // that happened in a different tab — nothing in this tab logged out.
+    crossTabListener?.();
 
     await waitFor(() =>
       expect(replace).toHaveBeenCalledWith("/login?reason=signed-out-elsewhere"),
@@ -188,7 +179,6 @@ describe("ProtectedLayout", () => {
   });
 
   it("hides 'Logs del sistema' from the nav for a non-super_admin role", async () => {
-    getSession.mockResolvedValue({ data: { session: { access_token: "tok" } } });
     window.sessionStorage.setItem(
       "torpreca:auth-user",
       JSON.stringify({ id: "u1", role: "admin", status: "active" }),
@@ -205,7 +195,6 @@ describe("ProtectedLayout", () => {
   });
 
   it("shows 'Logs del sistema' in the nav for super_admin", async () => {
-    getSession.mockResolvedValue({ data: { session: { access_token: "tok" } } });
     window.sessionStorage.setItem(
       "torpreca:auth-user",
       JSON.stringify({ id: "u1", role: "super_admin", status: "active" }),
@@ -222,11 +211,11 @@ describe("ProtectedLayout", () => {
   });
 
   it("shows a blocking session-expired dialog on inactivity timeout, signs out, and doesn't redirect on its own", async () => {
-    getSession.mockResolvedValue({ data: { session: { access_token: "tok" } } });
     window.sessionStorage.setItem(
       "torpreca:auth-user",
       JSON.stringify({ id: "u1", role: "admin", status: "active" }),
     );
+    fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
 
     render(
       <ProtectedLayout>
@@ -240,17 +229,23 @@ describe("ProtectedLayout", () => {
 
     await waitFor(() => expect(screen.getByText("Tu sesión expiró")).toBeInTheDocument());
     expect(screen.queryByText("secret")).not.toBeInTheDocument();
-    expect(signOut).toHaveBeenCalled();
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/auth/logout",
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    expect(announceSignedOut).toHaveBeenCalled();
     expect(replace).not.toHaveBeenCalled();
     expect(window.sessionStorage.getItem("torpreca:auth-user")).toBeNull();
   });
 
   it("clicking 'Iniciar sesión de nuevo' on the expired dialog redirects with the inactivity reason", async () => {
-    getSession.mockResolvedValue({ data: { session: { access_token: "tok" } } });
     window.sessionStorage.setItem(
       "torpreca:auth-user",
       JSON.stringify({ id: "u1", role: "admin", status: "active" }),
     );
+    fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
 
     render(
       <ProtectedLayout>
@@ -269,11 +264,11 @@ describe("ProtectedLayout", () => {
 
   it("carries an encoded returnTo when the timeout fires off the home page", async () => {
     window.history.pushState({}, "", "/users/42?tab=history");
-    getSession.mockResolvedValue({ data: { session: { access_token: "tok" } } });
     window.sessionStorage.setItem(
       "torpreca:auth-user",
       JSON.stringify({ id: "u1", role: "admin", status: "active" }),
     );
+    fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
 
     render(
       <ProtectedLayout>
@@ -297,7 +292,6 @@ describe("ProtectedLayout", () => {
   });
 
   it("clicking 'Cerrar sesión' redirects without the cross-tab message", async () => {
-    getSession.mockResolvedValue({ data: { session: { access_token: "tok" } } });
     window.sessionStorage.setItem(
       "torpreca:auth-user",
       JSON.stringify({ id: "u1", role: "admin", status: "active" }),
@@ -314,6 +308,11 @@ describe("ProtectedLayout", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cerrar sesión" }));
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/auth/logout",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(announceSignedOut).toHaveBeenCalled();
     expect(replace).not.toHaveBeenCalledWith("/login?reason=signed-out-elsewhere");
   });
 });

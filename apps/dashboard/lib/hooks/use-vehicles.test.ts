@@ -2,8 +2,6 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { withQueryClient } from "@/lib/test-utils/query-client";
 
-vi.mock("@/lib/supabase/access-token", () => ({ getAccessToken: vi.fn(async () => "tok") }));
-
 const listAllVehicles = vi.fn();
 const createVehicle = vi.fn();
 const updateVehicle = vi.fn();
