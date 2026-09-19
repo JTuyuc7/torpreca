@@ -1,9 +1,14 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff, Info, Mail } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { type FormEvent, Suspense, useState } from "react";
+import { Suspense, useState } from "react";
+import { useForm } from "react-hook-form";
+import { ErrorBanner } from "@/components/ui/error-banner";
+import { FieldError } from "@/components/ui/field-error";
 import { reportLoginFailed, verifySession } from "@/lib/api/auth-client";
+import { type LoginFormValues, LoginSchema } from "@/lib/auth/login-schema";
 import { decodeReturnTo } from "@/lib/auth/return-to";
 import { writeCachedAuthUser } from "@/lib/auth/session-cache";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
@@ -45,14 +50,21 @@ function SessionNotice() {
 export default function LoginPage() {
   usePageTitle("Iniciar sesión");
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isValid },
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(LoginSchema),
+    mode: "onChange",
+    defaultValues: { email: "", password: "" },
+  });
+
+  async function onSubmit({ email, password }: LoginFormValues) {
     setError(null);
     setLoading(true);
 
@@ -103,7 +115,7 @@ export default function LoginPage() {
       </div>
 
       <div className="flex flex-1 items-center justify-center px-4 py-16">
-        <form onSubmit={handleSubmit} className="w-full max-w-sm">
+        <form onSubmit={handleSubmit(onSubmit)} noValidate className="w-full max-w-sm">
           <h2 className="text-2xl text-text">Iniciar sesión</h2>
           <p className="mt-1 text-sm text-outline">Accede al panel de administración</p>
 
@@ -120,16 +132,19 @@ export default function LoginPage() {
                 id="email"
                 type="email"
                 autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-md border border-outline bg-transparent py-2 pr-9 pl-3 text-text outline-none transition-colors focus:ring-1 focus:ring-primary"
+                aria-invalid={!!errors.email}
+                aria-describedby={errors.email ? "email-error" : undefined}
+                {...register("email")}
+                className={`w-full rounded-md border bg-transparent py-2 pr-9 pl-3 text-text outline-none transition-colors focus:ring-1 focus:ring-primary ${
+                  errors.email ? "border-error" : "border-outline"
+                }`}
               />
               <Mail
                 aria-hidden="true"
                 className="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-outline"
               />
             </div>
+            {errors.email && <FieldError id="email-error">{errors.email.message}</FieldError>}
           </div>
 
           <div className="mt-4">
@@ -141,10 +156,12 @@ export default function LoginPage() {
                 id="password"
                 type={showPassword ? "text" : "password"}
                 autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-md border border-outline bg-transparent py-2 pr-9 pl-3 text-text outline-none transition-colors focus:ring-1 focus:ring-primary"
+                aria-invalid={!!errors.password}
+                aria-describedby={errors.password ? "password-error" : undefined}
+                {...register("password")}
+                className={`w-full rounded-md border bg-transparent py-2 pr-9 pl-3 text-text outline-none transition-colors focus:ring-1 focus:ring-primary ${
+                  errors.password ? "border-error" : "border-outline"
+                }`}
               />
               <button
                 type="button"
@@ -155,18 +172,19 @@ export default function LoginPage() {
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
+            {errors.password && <FieldError id="password-error">{errors.password.message}</FieldError>}
           </div>
 
           {error && (
-            <p role="alert" className="mt-4 text-sm text-error">
-              {error}
-            </p>
+            <div className="mt-4">
+              <ErrorBanner message={error} />
+            </div>
           )}
 
           <button
             type="submit"
-            disabled={loading}
-            className="mt-6 w-full rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
+            disabled={!isValid || loading}
+            className="mt-6 w-full rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-on-primary transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
           >
             {loading ? "Ingresando..." : "Iniciar sesión"}
           </button>

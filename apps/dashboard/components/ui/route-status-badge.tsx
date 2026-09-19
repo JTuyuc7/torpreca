@@ -14,9 +14,9 @@ const STATUS_LABELS: Record<Route["status"], string> = {
 const STATUS_BADGE_CLASSES: Record<Route["status"], string> = {
   pending: "bg-outline/15 text-outline",
   in_progress: "bg-primary/15 text-primary",
-  completed: "bg-primary text-white",
+  completed: "bg-primary text-on-primary",
   delayed: "bg-error/15 text-error",
-  cancelled: "bg-error text-white",
+  cancelled: "bg-error text-on-error",
 };
 
 // Extracted from app/(protected)/rutas/page.tsx (TOR-30) when

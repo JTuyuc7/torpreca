@@ -186,7 +186,7 @@ export default function UsersPage() {
                               role: selectedRole,
                             })
                           }
-                          className="flex h-9 items-center gap-1.5 self-end rounded-md bg-primary px-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
+                          className="flex h-9 items-center gap-1.5 self-end rounded-md bg-primary px-3 text-sm font-medium text-on-primary transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
                         >
                           {isReviewing && <Spinner className="h-3.5 w-3.5" />}
                           Aprobar
@@ -247,7 +247,7 @@ export default function UsersPage() {
                 <button
                   type="submit"
                   disabled={!isValid || inviteUser.isPending}
-                  className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
+                  className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-on-primary transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
                 >
                   {inviteUser.isPending && <Spinner className="h-3.5 w-3.5" />}
                   {inviteUser.isPending ? "Enviando..." : "Enviar invitación"}

@@ -473,7 +473,7 @@ export function RouteKmCalculatorDialog({ onApply }: { onApply: (km: number) => 
             type="button"
             disabled={distanceKm == null}
             onClick={applyValue}
-            className="flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
+            className="flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-on-primary transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
           >
             Usar este valor
           </button>

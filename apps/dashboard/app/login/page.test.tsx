@@ -32,10 +32,12 @@ beforeEach(() => {
   searchParams = new URLSearchParams();
 });
 
-function fillAndSubmit(email: string, password: string) {
+async function fillAndSubmit(email: string, password: string) {
   fireEvent.change(screen.getByLabelText(/correo/i), { target: { value: email } });
   fireEvent.change(screen.getByLabelText("Contraseña"), { target: { value: password } });
-  fireEvent.click(screen.getByRole("button", { name: /iniciar sesión/i }));
+  const submitButton = screen.getByRole("button", { name: /iniciar sesión/i });
+  await waitFor(() => expect(submitButton).not.toBeDisabled());
+  fireEvent.click(submitButton);
 }
 
 describe("LoginPage", () => {
@@ -44,7 +46,7 @@ describe("LoginPage", () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
 
     render(<LoginPage />);
-    fillAndSubmit("bad@example.com", "wrong");
+    await fillAndSubmit("bad@example.com", "wrong");
 
     await waitFor(() =>
       expect(screen.getByRole("alert")).toHaveTextContent(/credenciales inválidas/i),
@@ -66,7 +68,7 @@ describe("LoginPage", () => {
     );
 
     render(<LoginPage />);
-    fillAndSubmit("admin@example.com", "correct");
+    await fillAndSubmit("admin@example.com", "correct");
 
     await waitFor(() => expect(push).toHaveBeenCalledWith("/"));
   });
@@ -79,7 +81,7 @@ describe("LoginPage", () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 403 }));
 
     render(<LoginPage />);
-    fillAndSubmit("driver@example.com", "correct");
+    await fillAndSubmit("driver@example.com", "correct");
 
     await waitFor(() =>
       expect(screen.getByRole("alert")).toHaveTextContent(/no tiene acceso al panel administrativo/i),
@@ -122,7 +124,7 @@ describe("LoginPage", () => {
     );
 
     render(<LoginPage />);
-    fillAndSubmit("admin@example.com", "correct");
+    await fillAndSubmit("admin@example.com", "correct");
 
     await waitFor(() => expect(push).toHaveBeenCalledWith("/users/42?tab=history"));
 
@@ -140,7 +142,7 @@ describe("LoginPage", () => {
     );
 
     render(<LoginPage />);
-    fillAndSubmit("admin@example.com", "correct");
+    await fillAndSubmit("admin@example.com", "correct");
 
     await waitFor(() => expect(push).toHaveBeenCalledWith("/"));
 
