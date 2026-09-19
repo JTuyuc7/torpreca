@@ -2,8 +2,6 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { withQueryClient } from "@/lib/test-utils/query-client";
 
-vi.mock("@/lib/supabase/access-token", () => ({ getAccessToken: vi.fn(async () => "tok") }));
-
 const listRoutes = vi.fn();
 const createRoute = vi.fn();
 const updateRoute = vi.fn();
@@ -89,7 +87,7 @@ describe("useRoutes", () => {
     result.current.updateRoute.mutate({ id: pendingRoute.id, input: { plannedKm: 25 } });
 
     await waitFor(() => expect(result.current.routes).toEqual([edited]));
-    expect(updateRoute).toHaveBeenCalledWith("tok", pendingRoute.id, { plannedKm: 25 });
+    expect(updateRoute).toHaveBeenCalledWith(pendingRoute.id, { plannedKm: 25 });
   });
 
   it("updateRoute surfaces a 409 as a friendly 'not pending' message", async () => {

@@ -7,10 +7,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { logout as logoutRequest, verifySession } from "@/lib/api/auth-client";
 import { encodeReturnTo } from "@/lib/auth/return-to";
+import { announceSignedOut, onSignedOutElsewhere } from "@/lib/auth/session-broadcast";
 import { clearCachedAuthUser, readCachedAuthUser, writeCachedAuthUser } from "@/lib/auth/session-cache";
 import { useInactivityTimeout } from "@/lib/hooks/use-inactivity-timeout";
 import { readStoredSidebarCollapsed, writeStoredSidebarCollapsed } from "@/lib/preferences/sidebar";
-import { supabase } from "@/lib/supabase/client";
 import { AuthUserProvider } from "./auth-context";
 import { SessionExpiredDialog } from "./session-expired-dialog";
 
@@ -195,47 +195,22 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     });
   }
 
-  // Set right before this tab's own signOut() call, so the onAuthStateChange
-  // listener below can tell "I just logged myself out" (silent redirect)
-  // apart from "signed out elsewhere" (another tab, or an expired/revoked
-  // session) — the latter shows a message explaining why the user landed
-  // back on /login.
-  const loggingOutHereRef = useRef(false);
-
-  // Set right before the inactivity-timeout signOut() call below, so the
-  // listener knows the resulting SIGNED_OUT event is expected and shouldn't
-  // navigate on its own — the SessionExpiredDialog owns that transition
-  // (via its button), not the cross-tab "signed out elsewhere" path.
-  const inactivityTimeoutRef = useRef(false);
-
   // Where the user was when the inactivity timeout fired — read straight
   // from window.location instead of usePathname()/useSearchParams() since
   // it's only ever needed inside an event handler, not during render.
   const returnToRef = useRef<string | null>(null);
 
-  // Supabase persists its session in localStorage (not cookies) and already
-  // fires a `storage` event to every open tab on sign-out — this listener is
-  // what actually reacts to it. Without it, a tab stays on a protected page
-  // showing stale data/actions against a session that no longer exists,
-  // until the user happens to navigate or reload.
+  // TOR-124: the session lives in an httpOnly cookie now, invisible to JS in
+  // every tab — there's no shared browser-side event (like the old `storage`
+  // write on sign-out) left to listen for, so each tab explicitly announces
+  // its own sign-out via BroadcastChannel and every OTHER tab reacts here.
+  // (A tab never receives its own broadcast, so this can't double-fire
+  // alongside this tab's own logout/inactivity-timeout handling below.)
   useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
-      if (event !== "SIGNED_OUT") return;
-      if (inactivityTimeoutRef.current) {
-        inactivityTimeoutRef.current = false;
-        return;
-      }
+    return onSignedOutElsewhere(() => {
       clearCachedAuthUser();
-      if (loggingOutHereRef.current) {
-        loggingOutHereRef.current = false;
-        router.replace("/login");
-      } else {
-        router.replace("/login?reason=signed-out-elsewhere");
-      }
+      router.replace("/login?reason=signed-out-elsewhere");
     });
-    return () => subscription.unsubscribe();
   }, [router]);
 
   // TOR-123: Supabase's refresh token doesn't expire on its own by
@@ -246,11 +221,11 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   useInactivityTimeout(
     INACTIVITY_TIMEOUT_MS,
     () => {
-      inactivityTimeoutRef.current = true;
       returnToRef.current = window.location.pathname + window.location.search;
       clearCachedAuthUser();
       setSessionExpired(true);
-      void supabase.auth.signOut();
+      void logoutRequest();
+      announceSignedOut();
     },
     !!authUser,
   );
@@ -259,15 +234,14 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     let cancelled = false;
 
     async function verify() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) {
-        router.replace("/login");
-        return;
-      }
-
+      // Trusting the cache without re-validating the underlying session on
+      // every mount (unlike the pre-TOR-124 version) isn't a choice here —
+      // an httpOnly cookie can't be read from JS at all, so there's no local
+      // "is there still a session" check left to do. Every /api/* call this
+      // cached session goes on to make is still independently authorized
+      // server-side (lib/auth/server-access-token.ts), so a stale cache
+      // just means the first such call 401s instead of this mount catching
+      // it — not a gap, just where the check ends up happening.
       const cached = readCachedAuthUser();
       if (cached) {
         if (!cancelled) {
@@ -277,19 +251,17 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
         return;
       }
 
-      // No cached role for this browser session (new tab, or a Supabase
-      // session resumed from a previous visit) — re-confirm with the
-      // backend. This also (re)logs auth.login, which is fine: it only
-      // fires once per browser session, not once per navigation, since the
-      // cache above short-circuits every mount after the first.
-      const result = await verifySession(session.access_token);
+      // No cached role for this browser session (new tab, or a session
+      // resumed from a previous visit) — re-confirm with the backend. This
+      // also (re)logs auth.login, which is fine: it only fires once per
+      // browser session, not once per navigation, since the cache above
+      // short-circuits every mount after the first.
+      const result = await verifySession();
 
       if (!result.ok) {
-        // Silent redirect (not the "signed out elsewhere" messaging below):
-        // this is a rejected/invalid session on first load, not a real
-        // sign-out event from another tab.
-        loggingOutHereRef.current = true;
-        await supabase.auth.signOut();
+        // A rejected/invalid session on first load, not a real cross-tab
+        // sign-out — no broadcast, just clean up and leave.
+        if (result.status !== 401) await logoutRequest();
         if (!cancelled) router.replace("/login");
         return;
       }
@@ -308,19 +280,10 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   }, [router]);
 
   async function handleLogout() {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (session) {
-      await logoutRequest(session.access_token);
-    }
-
-    loggingOutHereRef.current = true;
-    // clearCachedAuthUser() + the /login redirect happen in the
-    // onAuthStateChange listener above, triggered by this signOut() call —
-    // single place for that logic, shared with the cross-tab case.
-    await supabase.auth.signOut();
+    await logoutRequest();
+    clearCachedAuthUser();
+    announceSignedOut();
+    router.replace("/login");
   }
 
   if (sessionExpired) {

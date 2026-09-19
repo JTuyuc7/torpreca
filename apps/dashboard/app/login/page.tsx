@@ -7,12 +7,11 @@ import { Suspense, useState } from "react";
 import { useForm } from "react-hook-form";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { FieldError } from "@/components/ui/field-error";
-import { reportLoginFailed, verifySession } from "@/lib/api/auth-client";
+import { login } from "@/lib/api/auth-client";
 import { type LoginFormValues, LoginSchema } from "@/lib/auth/login-schema";
 import { decodeReturnTo } from "@/lib/auth/return-to";
 import { writeCachedAuthUser } from "@/lib/auth/session-cache";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
-import { supabase } from "@/lib/supabase/client";
 
 // One notice per `?reason=` value redirects to /login carry — TOR-123 added
 // "inactivity" alongside the pre-existing cross-tab sign-out case.
@@ -68,26 +67,16 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
 
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (signInError || !data.session) {
-      reportLoginFailed(email);
-      setError("Credenciales inválidas.");
-      setLoading(false);
-      return;
-    }
-
-    const result = await verifySession(data.session.access_token);
+    // TOR-124: signInWithPassword + the role check both happen server-side
+    // now, inside POST /api/auth/login — this only ever gets back the
+    // resolved AuthUser (or a status to explain the failure), never a token.
+    const result = await login(email, password);
 
     if (!result.ok) {
-      await supabase.auth.signOut();
       setError(
         result.status === 403
           ? "Esta cuenta no tiene acceso al panel administrativo."
-          : "No se pudo iniciar sesión. Intenta de nuevo.",
+          : "Credenciales inválidas.",
       );
       setLoading(false);
       return;

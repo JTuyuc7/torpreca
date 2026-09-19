@@ -20,19 +20,16 @@ describe("getDashboardSummary", () => {
   it("returns ok:true with the parsed summary on success", async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify(summary), { status: 200 }));
 
-    const result = await getDashboardSummary("tok");
+    const result = await getDashboardSummary();
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/dashboard/summary",
-      expect.objectContaining({ headers: { authorization: "Bearer tok" } }),
-    );
+    expect(fetchMock).toHaveBeenCalledWith("/api/dashboard/summary");
     expect(result).toEqual({ ok: true, summary });
   });
 
   it("returns ok:false with the status on failure", async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 403 }));
 
-    const result = await getDashboardSummary("tok");
+    const result = await getDashboardSummary();
 
     expect(result).toEqual({ ok: false, status: 403 });
   });
@@ -40,7 +37,7 @@ describe("getDashboardSummary", () => {
   it("returns ok:false, status:0 when fetch throws", async () => {
     fetchMock.mockRejectedValue(new Error("network"));
 
-    const result = await getDashboardSummary("tok");
+    const result = await getDashboardSummary();
 
     expect(result).toEqual({ ok: false, status: 0 });
   });
@@ -62,12 +59,9 @@ describe("getLatestLocations", () => {
     };
     fetchMock.mockResolvedValue(new Response(JSON.stringify([location]), { status: 200 }));
 
-    const result = await getLatestLocations("tok");
+    const result = await getLatestLocations();
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/locations/latest",
-      expect.objectContaining({ headers: { authorization: "Bearer tok" } }),
-    );
+    expect(fetchMock).toHaveBeenCalledWith("/api/locations/latest");
     expect(result).toEqual({ ok: true, locations: [location] });
   });
 });
@@ -80,19 +74,16 @@ describe("mintWsTicket", () => {
       }),
     );
 
-    const result = await mintWsTicket("tok");
+    const result = await mintWsTicket();
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/ws-tickets",
-      expect.objectContaining({ method: "POST", headers: { authorization: "Bearer tok" } }),
-    );
+    expect(fetchMock).toHaveBeenCalledWith("/api/ws-tickets", { method: "POST" });
     expect(result).toEqual({ ok: true, ticket: "abc" });
   });
 
   it("returns ok:false with the status on failure", async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 401 }));
 
-    const result = await mintWsTicket("tok");
+    const result = await mintWsTicket();
 
     expect(result).toEqual({ ok: false, status: 401 });
   });

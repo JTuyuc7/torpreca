@@ -30,19 +30,16 @@ describe("listActiveVehicles", () => {
   it("returns ok:true with the parsed vehicles on success", async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify([vehicle]), { status: 200 }));
 
-    const result = await listActiveVehicles("tok");
+    const result = await listActiveVehicles();
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/vehicles",
-      expect.objectContaining({ headers: { authorization: "Bearer tok" } }),
-    );
+    expect(fetchMock).toHaveBeenCalledWith("/api/vehicles");
     expect(result).toEqual({ ok: true, vehicles: [vehicle] });
   });
 
   it("returns ok:false with the response status on failure", async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 500 }));
 
-    const result = await listActiveVehicles("tok");
+    const result = await listActiveVehicles();
 
     expect(result).toEqual({ ok: false, status: 500 });
   });
@@ -50,7 +47,7 @@ describe("listActiveVehicles", () => {
   it("returns ok:false with status 0 instead of throwing on a network error", async () => {
     fetchMock.mockRejectedValue(new Error("network down"));
 
-    const result = await listActiveVehicles("tok");
+    const result = await listActiveVehicles();
 
     expect(result).toEqual({ ok: false, status: 0 });
   });
@@ -60,19 +57,16 @@ describe("listAllVehicles", () => {
   it("requests all=true and returns ok:true with the parsed vehicles", async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify([vehicle]), { status: 200 }));
 
-    const result = await listAllVehicles("tok");
+    const result = await listAllVehicles();
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/vehicles?all=true",
-      expect.objectContaining({ headers: { authorization: "Bearer tok" } }),
-    );
+    expect(fetchMock).toHaveBeenCalledWith("/api/vehicles?all=true");
     expect(result).toEqual({ ok: true, vehicles: [vehicle] });
   });
 
   it("returns ok:false with the response status on failure", async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 500 }));
 
-    const result = await listAllVehicles("tok");
+    const result = await listAllVehicles();
 
     expect(result).toEqual({ ok: false, status: 500 });
   });
@@ -82,7 +76,7 @@ describe("createVehicle", () => {
   it("POSTs the input and returns the created vehicle", async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify(vehicle), { status: 201 }));
 
-    const result = await createVehicle("tok", {
+    const result = await createVehicle({
       plate: "P-123ABC",
       model: "NPR",
       capacity: 10,
@@ -94,7 +88,7 @@ describe("createVehicle", () => {
       "/api/vehicles",
       expect.objectContaining({
         method: "POST",
-        headers: { authorization: "Bearer tok", "content-type": "application/json" },
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({
           plate: "P-123ABC",
           model: "NPR",
@@ -110,7 +104,7 @@ describe("createVehicle", () => {
   it("returns ok:false with the response status on failure", async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 409 }));
 
-    const result = await createVehicle("tok", {
+    const result = await createVehicle({
       plate: "P-123ABC",
       model: "NPR",
       capacity: null,
@@ -127,13 +121,13 @@ describe("updateVehicle", () => {
     const updated = { ...vehicle, model: "NQR" };
     fetchMock.mockResolvedValue(new Response(JSON.stringify(updated), { status: 200 }));
 
-    const result = await updateVehicle("tok", "v1", { model: "NQR" });
+    const result = await updateVehicle("v1", { model: "NQR" });
 
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/vehicles/v1",
       expect.objectContaining({
         method: "PATCH",
-        headers: { authorization: "Bearer tok", "content-type": "application/json" },
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({ model: "NQR" }),
       }),
     );
@@ -143,7 +137,7 @@ describe("updateVehicle", () => {
   it("returns ok:false with the response status on failure", async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 409 }));
 
-    const result = await updateVehicle("tok", "v1", { plate: "dup" });
+    const result = await updateVehicle("v1", { plate: "dup" });
 
     expect(result).toEqual({ ok: false, status: 409 });
   });
@@ -153,11 +147,11 @@ describe("deactivateVehicle", () => {
   it("DELETEs the vehicle and returns ok:true", async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
 
-    const result = await deactivateVehicle("tok", "v1");
+    const result = await deactivateVehicle("v1");
 
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/vehicles/v1",
-      expect.objectContaining({ method: "DELETE", headers: { authorization: "Bearer tok" } }),
+      expect.objectContaining({ method: "DELETE" }),
     );
     expect(result).toEqual({ ok: true });
   });
@@ -165,7 +159,7 @@ describe("deactivateVehicle", () => {
   it("returns ok:false with the response status on failure", async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 404 }));
 
-    const result = await deactivateVehicle("tok", "v1");
+    const result = await deactivateVehicle("v1");
 
     expect(result).toEqual({ ok: false, status: 404 });
   });

@@ -1,7 +1,6 @@
 import type { Location } from "@torpreca/shared";
 import { useEffect, useState } from "react";
 import { getLatestLocations, mintWsTicket } from "@/lib/api/dashboard-client";
-import { getAccessToken } from "@/lib/supabase/access-token";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL as string;
 
@@ -55,15 +54,14 @@ export function useLiveLocations() {
 
     async function connect() {
       setStatus("connecting");
-      const token = await getAccessToken();
 
-      const snapshot = await getLatestLocations(token);
+      const snapshot = await getLatestLocations();
       if (cancelled) return;
       if (snapshot.ok) {
         setLocationsByDriver(new Map(snapshot.locations.map((l) => [l.driverId, l])));
       }
 
-      const ticketResult = await mintWsTicket(token);
+      const ticketResult = await mintWsTicket();
       if (cancelled) return;
       if (!ticketResult.ok) {
         setStatus("error");

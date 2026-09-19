@@ -28,19 +28,16 @@ describe("listRoutes", () => {
   it("returns ok:true with the parsed routes on success", async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify([route]), { status: 200 }));
 
-    const result = await listRoutes("tok");
+    const result = await listRoutes();
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/routes",
-      expect.objectContaining({ headers: { authorization: "Bearer tok" } }),
-    );
+    expect(fetchMock).toHaveBeenCalledWith("/api/routes");
     expect(result).toEqual({ ok: true, routes: [route] });
   });
 
   it("returns ok:false with the response status on failure", async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 500 }));
 
-    const result = await listRoutes("tok");
+    const result = await listRoutes();
 
     expect(result).toEqual({ ok: false, status: 500 });
   });
@@ -48,7 +45,7 @@ describe("listRoutes", () => {
   it("returns ok:false with status 0 instead of throwing on a network error", async () => {
     fetchMock.mockRejectedValue(new Error("network down"));
 
-    const result = await listRoutes("tok");
+    const result = await listRoutes();
 
     expect(result).toEqual({ ok: false, status: 0 });
   });
@@ -58,7 +55,7 @@ describe("createRoute", () => {
   it("POSTs the input and returns the created route", async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify(route), { status: 201 }));
 
-    const result = await createRoute("tok", {
+    const result = await createRoute({
       code: "R-20260910-01",
       driverId: "driver-1",
       vehicleId: null,
@@ -70,7 +67,7 @@ describe("createRoute", () => {
       "/api/routes",
       expect.objectContaining({
         method: "POST",
-        headers: { authorization: "Bearer tok", "content-type": "application/json" },
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({
           code: "R-20260910-01",
           driverId: "driver-1",
@@ -86,7 +83,7 @@ describe("createRoute", () => {
   it("returns ok:false with the response status on failure", async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 400 }));
 
-    const result = await createRoute("tok", {
+    const result = await createRoute({
       code: "R-1",
       driverId: "driver-1",
       vehicleId: null,
@@ -103,13 +100,13 @@ describe("updateRoute", () => {
     const updated = { ...route, plannedKm: 25 };
     fetchMock.mockResolvedValue(new Response(JSON.stringify(updated), { status: 200 }));
 
-    const result = await updateRoute("tok", "r1", { plannedKm: 25 });
+    const result = await updateRoute("r1", { plannedKm: 25 });
 
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/routes/r1",
       expect.objectContaining({
         method: "PATCH",
-        headers: { authorization: "Bearer tok", "content-type": "application/json" },
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({ plannedKm: 25 }),
       }),
     );
@@ -119,7 +116,7 @@ describe("updateRoute", () => {
   it("returns ok:false with the response status on failure", async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 409 }));
 
-    const result = await updateRoute("tok", "r1", { plannedKm: 25 });
+    const result = await updateRoute("r1", { plannedKm: 25 });
 
     expect(result).toEqual({ ok: false, status: 409 });
   });
