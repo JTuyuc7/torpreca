@@ -6,6 +6,7 @@ import type { Route } from "@torpreca/shared";
 import { Circle, Route as RouteIcon } from "lucide-react";
 import { useRef, useState } from "react";
 import { Map as MapboxMap, type MapRef, Marker } from "react-map-gl/mapbox";
+import { AddressSearch } from "@/components/ui/address-search";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { Section } from "@/components/ui/section";
@@ -113,6 +114,11 @@ export default function HomePage() {
     readStoredMapStyle(),
   );
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
+  const [searchedAddress, setSearchedAddress] = useState<{
+    lng: number;
+    lat: number;
+    name: string;
+  } | null>(null);
   const mapRef = useRef<MapRef>(null);
 
   const driverNames = new Map((users ?? []).map((u) => [u.id, u.name]));
@@ -123,7 +129,14 @@ export default function HomePage() {
     const location = locationByDriver.get(driverId);
     if (!location) return;
     setSelectedDriverId(driverId);
+    setSearchedAddress(null);
     mapRef.current?.flyTo({ center: [location.lng, location.lat], zoom: 15, duration: 800 });
+  }
+
+  function focusOnAddress(coordinates: { lng: number; lat: number }, name: string) {
+    setSelectedDriverId(null);
+    setSearchedAddress({ ...coordinates, name });
+    mapRef.current?.flyTo({ center: [coordinates.lng, coordinates.lat], zoom: 15, duration: 800 });
   }
 
   return (
@@ -170,22 +183,31 @@ export default function HomePage() {
             />
             {STATUS_LABEL[status]}
           </div>
-          <Select
-            aria-label="Tipo de mapa"
-            className="w-36"
-            value={mapStyle}
-            onChange={(e) => {
-              const next = e.target.value as (typeof MAP_STYLES)[number]["value"];
-              setMapStyle(next);
-              writeStoredMapStyle(next);
-            }}
-          >
-            {MAP_STYLES.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </Select>
+          <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
+            <div className="w-full sm:w-64">
+              <AddressSearch
+                accessToken={MAPBOX_TOKEN}
+                proximity={{ lng: INITIAL_VIEW.longitude, lat: INITIAL_VIEW.latitude }}
+                onSelect={focusOnAddress}
+              />
+            </div>
+            <Select
+              aria-label="Tipo de mapa"
+              className="w-36"
+              value={mapStyle}
+              onChange={(e) => {
+                const next = e.target.value as (typeof MAP_STYLES)[number]["value"];
+                setMapStyle(next);
+                writeStoredMapStyle(next);
+              }}
+            >
+              {MAP_STYLES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </Select>
+          </div>
         </div>
         <div className="flex flex-col gap-4 lg:flex-row">
           <div className="h-[28rem] flex-1 overflow-hidden rounded-md">
@@ -207,6 +229,14 @@ export default function HomePage() {
                   />
                 </Marker>
               ))}
+              {searchedAddress && (
+                <Marker longitude={searchedAddress.lng} latitude={searchedAddress.lat}>
+                  <div
+                    title={searchedAddress.name}
+                    className="h-4 w-4 -translate-y-1/2 rounded-full border-2 border-white bg-secondary shadow"
+                  />
+                </Marker>
+              )}
             </MapboxMap>
           </div>
           <div className="flex w-full flex-col gap-2 lg:w-64">
