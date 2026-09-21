@@ -1,12 +1,5 @@
 import type { Route } from "@torpreca/shared";
-
-const STATUS_LABELS: Record<Route["status"], string> = {
-  pending: "Pendiente",
-  in_progress: "En curso",
-  completed: "Completada",
-  delayed: "Retrasada",
-  cancelled: "Cancelada",
-};
+import { useTranslation } from "@/lib/i18n/use-translation";
 
 // Only the tokens the design system actually defines (outline/primary/error)
 // — no new colors invented for this: neutral for pending, primary for the
@@ -23,11 +16,12 @@ const STATUS_BADGE_CLASSES: Record<Route["status"], string> = {
 // "Detalle de conductor" (TOR-33) became a second screen needing the same
 // route-status coloring for a driver's route history.
 export function RouteStatusBadge({ status }: { status: Route["status"] }) {
+  const { t } = useTranslation();
   return (
     <span
       className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE_CLASSES[status]}`}
     >
-      {STATUS_LABELS[status]}
+      {t.routeStatus[status]}
     </span>
   );
 }

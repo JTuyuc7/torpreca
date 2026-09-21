@@ -20,6 +20,7 @@ export * from "./schemas/stop.schema";
 export * from "./schemas/sync-event.schema";
 export * from "./schemas/sync-queue-item.schema";
 export * from "./schemas/user.schema";
+export * from "./schemas/user-preferences.schema";
 export * from "./schemas/vehicle.schema";
 export * from "./schemas/ws-message.schema";
 export * from "./security/hmac";

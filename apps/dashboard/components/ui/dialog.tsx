@@ -2,6 +2,7 @@
 
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
+import { useTranslation } from "@/lib/i18n/use-translation";
 
 // Headless primitives from Radix (focus trap, scroll lock, Esc-to-close,
 // aria wiring) — we only own the Tailwind styling on top, same pattern as
@@ -17,6 +18,9 @@ export function DialogContent({
   children: React.ReactNode;
   className?: string;
 }) {
+  const { t } = useTranslation();
+  const closeLabel = t.dialog.close;
+
   return (
     <DialogPrimitive.Portal>
       {/* Fixed black scrim (not a theme token) — a dark overlay reads the
@@ -35,7 +39,7 @@ export function DialogContent({
           // Confirmation views have no form fields — fall back to the first
           // real action button instead (skips the icon-only close button).
           const fallback = Array.from(content.querySelectorAll<HTMLElement>("button")).find(
-            (button) => button.getAttribute("aria-label") !== "Cerrar",
+            (button) => button.getAttribute("aria-label") !== closeLabel,
           );
           (field ?? fallback)?.focus();
         }}
@@ -44,7 +48,7 @@ export function DialogContent({
         {children}
         <DialogPrimitive.Close
           className="absolute right-4 top-4 rounded-md p-1 text-outline outline-none transition-opacity hover:opacity-70 focus-visible:ring-1 focus-visible:ring-primary cursor-pointer"
-          aria-label="Cerrar"
+          aria-label={closeLabel}
         >
           <X size={16} />
         </DialogPrimitive.Close>

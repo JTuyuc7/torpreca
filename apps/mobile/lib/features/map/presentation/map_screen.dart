@@ -6,7 +6,6 @@ import 'package:geolocator/geolocator.dart' as geo;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../auth/data/auth_repository.dart';
 import '../../tracking/data/tracking_service.dart';
 
 /// Guatemala City — same fallback center as the dashboard's live map
@@ -25,9 +24,7 @@ Point get _fallbackCenter => Point(coordinates: Position(-90.5069, 14.6349));
 /// — that's "Lista de paradas" (TOR-35) and "Detalle de parada" (TOR-20),
 /// separate tickets.
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key, required this.authRepository});
-
-  final AuthRepository authRepository;
+  const MapScreen({super.key});
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -112,16 +109,9 @@ class _MapScreenState extends State<MapScreen> {
     final initialCenter = _initialCenter;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Torpreca'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Cerrar sesión',
-            onPressed: () => widget.authRepository.signOut(),
-          ),
-        ],
-      ),
+      // TOR-11: logout moved to the Perfil tab — this app bar no longer
+      // needs an authRepository, so the constructor param was dropped too.
+      appBar: AppBar(title: const Text('Torpreca')),
       body: initialCenter == null
           ? const Center(child: CircularProgressIndicator())
           : Stack(

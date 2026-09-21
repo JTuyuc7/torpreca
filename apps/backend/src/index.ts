@@ -27,6 +27,10 @@ import {
   registerMobileSyncQueueRoutes,
   registerSyncQueueRoutes,
 } from "./modules/sync-queue/sync-queue.routes";
+import {
+  registerMobileUserPreferencesRoutes,
+  registerUserPreferencesRoutes,
+} from "./modules/user-preferences/user-preferences.routes";
 import { registerUsersRoutes } from "./modules/users/users.routes";
 import { registerVehiclesRoutes } from "./modules/vehicles/vehicles.routes";
 import {
@@ -58,6 +62,8 @@ registerSyncQueueRoutes(v1);
 registerMobileSyncQueueRoutes(v1);
 registerMobileDailyReportsRoutes(v1);
 registerAuditLogsRoutes(v1);
+registerUserPreferencesRoutes(v1);
+registerMobileUserPreferencesRoutes(v1);
 
 // Unversioned infra routes — not signed, not tied to an API version.
 router.get("/health", () => Response.json({ ok: true }));

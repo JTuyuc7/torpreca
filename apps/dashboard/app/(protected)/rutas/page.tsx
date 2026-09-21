@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
 import { useRoutes } from "@/lib/hooks/use-routes";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import { useUsers } from "@/lib/hooks/use-users";
 import { useVehicles } from "@/lib/hooks/use-vehicles";
 import { RouteKmCalculatorDialog } from "./route-km-calculator-dialog";
@@ -77,6 +78,7 @@ function CreateRouteForm({
   routes: Route[];
   createRoute: ReturnType<typeof useRoutes>["createRoute"];
 }) {
+  const { t } = useTranslation();
   const {
     register,
     handleSubmit,
@@ -104,11 +106,11 @@ function CreateRouteForm({
   }
 
   return (
-    <Section title="Crear ruta" description="Asigna un conductor y, opcionalmente, un vehículo.">
+    <Section title={t.rutas.createTitle} description={t.rutas.createDescription}>
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1">
           <label htmlFor="code" className="text-xs text-outline">
-            Código (autogenerado)
+            {t.rutas.codeLabel}
           </label>
           <Input
             id="code"
@@ -119,18 +121,18 @@ function CreateRouteForm({
         </div>
         <div className="flex flex-col gap-1">
           <label htmlFor="date" className="text-xs text-outline">
-            Fecha
+            {t.rutas.dateLabel}
           </label>
           <Input id="date" type="date" {...register("date")} />
-          {errors.date && <FieldError>Selecciona una fecha.</FieldError>}
+          {errors.date && <FieldError>{t.rutas.dateRequired}</FieldError>}
         </div>
         <div className="flex flex-col gap-1">
           <label htmlFor="driverId" className="text-xs text-outline">
-            Conductor
+            {t.rutas.driverLabel}
           </label>
           <Select id="driverId" {...register("driverId")}>
             <option value="" disabled>
-              Selecciona
+              {t.rutas.selectPlaceholder}
             </option>
             {drivers.map((d) => (
               <option key={d.id} value={d.id}>
@@ -138,17 +140,17 @@ function CreateRouteForm({
               </option>
             ))}
           </Select>
-          {errors.driverId && <FieldError>Selecciona un conductor.</FieldError>}
+          {errors.driverId && <FieldError>{t.rutas.driverRequired}</FieldError>}
         </div>
         <div className="flex flex-col gap-1">
           <label htmlFor="vehicleId" className="text-xs text-outline">
-            Vehículo
+            {t.rutas.vehicleLabel}
           </label>
           <Select
             id="vehicleId"
             {...register("vehicleId", { setValueAs: (v) => (v === "" ? null : v) })}
           >
-            <option value="">Sin vehículo</option>
+            <option value="">{t.rutas.noVehicle}</option>
             {vehicles.map((v) => (
               <option key={v.id} value={v.id}>
                 {v.plate}
@@ -158,7 +160,7 @@ function CreateRouteForm({
         </div>
         <div className="flex flex-col gap-1">
           <label htmlFor="plannedKm" className="text-xs text-outline">
-            Km planeados
+            {t.rutas.plannedKmLabel}
           </label>
           <div className="flex items-center gap-2">
             <Input
@@ -172,7 +174,7 @@ function CreateRouteForm({
               onApply={(km) => setValue("plannedKm", km, { shouldValidate: true })}
             />
           </div>
-          {errors.plannedKm && <FieldError>Debe ser 0 o mayor.</FieldError>}
+          {errors.plannedKm && <FieldError>{t.rutas.plannedKmInvalid}</FieldError>}
         </div>
         <button
           type="submit"
@@ -180,7 +182,7 @@ function CreateRouteForm({
           className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-on-primary transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
         >
           {createRoute.isPending && <Spinner className="h-3.5 w-3.5" />}
-          {createRoute.isPending ? "Creando..." : "Crear ruta"}
+          {createRoute.isPending ? t.rutas.creating : t.rutas.createRoute}
         </button>
         {createRoute.isError && <FieldError>{createRoute.error.message}</FieldError>}
       </form>
@@ -201,6 +203,7 @@ function RouteEditRow({
   updateRoute: ReturnType<typeof useRoutes>["updateRoute"];
   onCancel: () => void;
 }) {
+  const { t } = useTranslation();
   const {
     register,
     handleSubmit,
@@ -240,7 +243,7 @@ function RouteEditRow({
       </td>
       <td className="py-3 pr-4">
         <Select {...register("vehicleId", { setValueAs: (v) => (v === "" ? null : v) })}>
-          <option value="">Sin vehículo</option>
+          <option value="">{t.rutas.noVehicle}</option>
           {vehicles.map((v) => (
             <option key={v.id} value={v.id}>
               {v.plate}
@@ -250,7 +253,7 @@ function RouteEditRow({
       </td>
       <td className="py-3 pr-4">
         <Input type="date" {...register("date")} />
-        {errors.date && <FieldError>Requerida</FieldError>}
+        {errors.date && <FieldError>{t.rutas.dateRequiredShort}</FieldError>}
       </td>
       <td className="py-3 pr-4">
         <RouteStatusBadge status={route.status} />
@@ -267,7 +270,7 @@ function RouteEditRow({
             onApply={(km) => setValue("plannedKm", km, { shouldValidate: true })}
           />
         </div>
-        {errors.plannedKm && <FieldError>≥ 0</FieldError>}
+        {errors.plannedKm && <FieldError>{t.rutas.plannedKmInvalidShort}</FieldError>}
       </td>
       <td className="py-3">
         <div className="flex items-center gap-2">
@@ -278,7 +281,7 @@ function RouteEditRow({
             className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-on-primary transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
           >
             {isSaving && <Spinner className="h-3.5 w-3.5" />}
-            Guardar
+            {t.common.save}
           </button>
           <button
             type="button"
@@ -286,7 +289,7 @@ function RouteEditRow({
             onClick={onCancel}
             className="flex h-9 items-center rounded-md border border-outline px-3 text-sm font-medium text-text transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
           >
-            Cancelar
+            {t.common.cancel}
           </button>
         </div>
       </td>
@@ -295,7 +298,8 @@ function RouteEditRow({
 }
 
 export default function RutasPage() {
-  usePageTitle("Gestión de rutas");
+  const { t } = useTranslation();
+  usePageTitle(t.rutas.title);
   const { routes, isLoading, error, refetch, createRoute, updateRoute } = useRoutes();
   const { users } = useUsers();
   const { vehicles } = useVehicles();
@@ -314,15 +318,15 @@ export default function RutasPage() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
       <div>
-        <h1 className="text-xl text-text">Gestión de rutas</h1>
-        <p className="text-sm text-outline">Crear, asignar y editar rutas de reparto.</p>
+        <h1 className="text-xl text-text">{t.rutas.title}</h1>
+        <p className="text-sm text-outline">{t.rutas.subtitle}</p>
       </div>
 
       {error && <ErrorBanner message={error} onRetry={() => refetch()} />}
       {updateRoute.isError && <ErrorBanner message={updateRoute.error.message} />}
 
       {isLoading && (
-        <div className="flex flex-col gap-6" aria-busy="true" aria-label="Cargando rutas">
+        <div className="flex flex-col gap-6" aria-busy="true" aria-label={t.rutas.loadingLabel}>
           <Skeleton className="h-28 w-full" />
           <Skeleton className="h-40 w-full" />
         </div>
@@ -340,23 +344,23 @@ export default function RutasPage() {
           {routes.length === 0 && (
             <EmptyState
               icon={RouteIcon}
-              title="No hay rutas registradas."
-              description="Usa el formulario de arriba para crear la primera ruta del día: elegí un conductor y, si aplica, un vehículo."
+              title={t.rutas.noRoutesTitle}
+              description={t.rutas.noRoutesDescription}
             />
           )}
 
           {routes.length > 0 && (
-            <Section title="Todas las rutas">
+            <Section title={t.rutas.allRoutesTitle}>
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-outline/30 text-xs text-outline">
-                    <th className="py-2 pr-4">Código</th>
-                    <th className="py-2 pr-4">Conductor</th>
-                    <th className="py-2 pr-4">Vehículo</th>
-                    <th className="py-2 pr-4">Fecha</th>
-                    <th className="py-2 pr-4">Estado</th>
-                    <th className="py-2 pr-4">Km (plan/real)</th>
-                    <th className="py-2">Acciones</th>
+                    <th className="py-2 pr-4">{t.rutas.tableCode}</th>
+                    <th className="py-2 pr-4">{t.rutas.tableDriver}</th>
+                    <th className="py-2 pr-4">{t.rutas.tableVehicle}</th>
+                    <th className="py-2 pr-4">{t.rutas.tableDate}</th>
+                    <th className="py-2 pr-4">{t.rutas.tableStatus}</th>
+                    <th className="py-2 pr-4">{t.rutas.tableKm}</th>
+                    <th className="py-2">{t.rutas.tableActions}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -396,7 +400,7 @@ export default function RutasPage() {
                               onClick={() => setEditingId(route.id)}
                               className="flex h-9 items-center rounded-md border border-outline px-3 text-sm font-medium text-text transition-opacity hover:opacity-90 cursor-pointer"
                             >
-                              Editar
+                              {t.common.edit}
                             </button>
                           )}
                         </td>

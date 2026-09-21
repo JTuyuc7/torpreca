@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -5,8 +7,10 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/api/mobile_auth_client.dart';
+import 'core/api/preferences_client.dart';
 import 'core/env.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/theme_controller.dart';
 import 'features/auth/data/auth_repository.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/home/presentation/home_shell.dart';
@@ -35,12 +39,19 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Torpreca',
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
-      home: const AuthGate(),
+    // TOR-131: themeMode is no longer hardcoded — ThemeController.mode is
+    // overwritten from the driver's saved preference right after login (see
+    // _SessionGateState._verify() below) and again from Perfil (TOR-11)
+    // whenever they change it there.
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: ThemeController.mode,
+      builder: (context, mode, _) => MaterialApp(
+        title: 'Torpreca',
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: mode,
+        home: const AuthGate(),
+      ),
     );
   }
 }
@@ -149,6 +160,20 @@ class _SessionGateState extends State<_SessionGate> {
       return;
     }
     setState(() => _checking = false);
+    unawaited(_syncTheme());
+  }
+
+  // Fire-and-forget: never blocks showing HomeShell, and a failure here just
+  // leaves ThemeController at its current value (system, or whatever the
+  // last successful sync set) instead of surfacing an error the driver can't
+  // act on.
+  Future<void> _syncTheme() async {
+    try {
+      final preferences = await PreferencesClient().get(widget.accessToken);
+      ThemeController.mode.value = ThemeController.fromApiValue(preferences.theme);
+    } catch (_) {
+      // Ignored on purpose — see comment above.
+    }
   }
 
   @override

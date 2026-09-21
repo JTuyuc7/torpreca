@@ -32,21 +32,17 @@ import { Spinner } from "@/components/ui/spinner";
 import { useLiveLocations } from "@/lib/hooks/use-live-locations";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
 import { useRoutes } from "@/lib/hooks/use-routes";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import { useUsers } from "@/lib/hooks/use-users";
-
-const STATUS_LABELS: Record<User["status"], string> = {
-  pending: "Pendiente",
-  active: "Activo",
-  rejected: "Rechazado",
-  deactivated: "Desactivado",
-};
 
 function FieldError({ children }: { children: React.ReactNode }) {
   return <p className="text-xs text-error">{children}</p>;
 }
 
 export default function UsersPage() {
-  usePageTitle("Gestión de usuarios");
+  const { t } = useTranslation();
+  const STATUS_LABELS: Record<User["status"], string> = t.users.status;
+  usePageTitle(t.users.title);
   const {
     users,
     isLoading,
@@ -114,8 +110,8 @@ export default function UsersPage() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
       <div>
-        <h1 className="text-xl text-text">Gestión de usuarios</h1>
-        <p className="text-sm text-outline">Conductores, supervisores y administradores.</p>
+        <h1 className="text-xl text-text">{t.users.title}</h1>
+        <p className="text-sm text-outline">{t.users.subtitle}</p>
       </div>
 
       {error && <ErrorBanner message={error} onRetry={() => refetch()} />}
@@ -125,7 +121,7 @@ export default function UsersPage() {
       {inviteUser.isError && <ErrorBanner message={inviteUser.error.message} />}
 
       {isLoading && (
-        <div className="flex flex-col gap-6" aria-busy="true" aria-label="Cargando usuarios">
+        <div className="flex flex-col gap-6" aria-busy="true" aria-label={t.users.loadingLabel}>
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-28 w-full" />
           <Skeleton className="h-40 w-full" />
@@ -135,7 +131,7 @@ export default function UsersPage() {
       {users !== undefined && (
         <div className="flex flex-col gap-6 animate-fade-in">
           {pendingUsers.length > 0 && (
-            <Section title="Conductores por aprobar">
+            <Section title={t.users.pendingApprovalTitle}>
               <ul className="flex flex-col gap-2">
                 {pendingUsers.map((user) => {
                   const selectedRole = pendingRoles[user.id] ?? "driver";
@@ -150,13 +146,13 @@ export default function UsersPage() {
                         <p className="text-sm font-medium text-text">{user.name}</p>
                         <p className="text-xs text-outline">{user.email}</p>
                         <p className="text-xs text-outline">
-                          Solicitado el {new Date(user.createdAt).toLocaleDateString()}
+                          {t.users.requestedOn} {new Date(user.createdAt).toLocaleDateString()}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="flex flex-col gap-1">
                           <label htmlFor={`role-${user.id}`} className="text-[10px] text-outline">
-                            Aprobar como
+                            {t.users.approveAs}
                           </label>
                           <Select
                             id={`role-${user.id}`}
@@ -189,7 +185,7 @@ export default function UsersPage() {
                           className="flex h-9 items-center gap-1.5 self-end rounded-md bg-primary px-3 text-sm font-medium text-on-primary transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
                         >
                           {isReviewing && <Spinner className="h-3.5 w-3.5" />}
-                          Aprobar
+                          {t.users.approve}
                         </button>
                         <button
                           type="button"
@@ -198,7 +194,7 @@ export default function UsersPage() {
                           className="flex h-9 items-center gap-1.5 self-end rounded-md border border-error px-3 text-sm font-medium text-error transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
                         >
                           {isReviewing && <Spinner className="h-3.5 w-3.5" />}
-                          Rechazar
+                          {t.users.reject}
                         </button>
                       </div>
                     </li>
@@ -209,10 +205,7 @@ export default function UsersPage() {
           )}
 
           {isSuperAdmin && (
-            <Section
-              title="Invitar usuario"
-              description="Supervisores y administradores — Supabase le envía un correo de invitación para que defina su propia contraseña."
-            >
+            <Section title={t.users.inviteTitle} description={t.users.inviteDescription}>
               <form
                 onSubmit={handleSubmit(onInvite)}
                 noValidate
@@ -220,21 +213,21 @@ export default function UsersPage() {
               >
                 <div className="flex flex-col gap-1">
                   <label htmlFor="name" className="text-xs text-outline">
-                    Nombre
+                    {t.users.nameLabel}
                   </label>
                   <Input id="name" {...register("name")} />
-                  {errors.name && <FieldError>Requerido.</FieldError>}
+                  {errors.name && <FieldError>{t.common.required}</FieldError>}
                 </div>
                 <div className="flex flex-col gap-1">
                   <label htmlFor="email" className="text-xs text-outline">
-                    Email
+                    {t.users.emailLabel}
                   </label>
                   <Input id="email" type="email" {...register("email")} />
-                  {errors.email && <FieldError>Correo inválido.</FieldError>}
+                  {errors.email && <FieldError>{t.users.invalidEmail}</FieldError>}
                 </div>
                 <div className="flex flex-col gap-1">
                   <label htmlFor="role" className="text-xs text-outline">
-                    Rol
+                    {t.users.roleLabel}
                   </label>
                   <Select id="role" {...register("role")}>
                     {INVITABLE_ROLES.map((r) => (
@@ -250,11 +243,11 @@ export default function UsersPage() {
                   className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-on-primary transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
                 >
                   {inviteUser.isPending && <Spinner className="h-3.5 w-3.5" />}
-                  {inviteUser.isPending ? "Enviando..." : "Enviar invitación"}
+                  {inviteUser.isPending ? t.users.sending : t.users.sendInvite}
                 </button>
                 {invitedEmail && (
                   <p className="w-full text-sm text-primary">
-                    Invitación enviada a {invitedEmail}.
+                    {t.users.inviteSent} {invitedEmail}.
                   </p>
                 )}
               </form>
@@ -264,25 +257,25 @@ export default function UsersPage() {
           {otherUsers.length === 0 && pendingUsers.length === 0 && (
             <EmptyState
               icon={UsersIcon}
-              title="No hay usuarios registrados."
+              title={t.users.noUsersTitle}
               description={
                 isSuperAdmin
-                  ? "Los conductores aparecen aquí cuando se registran desde la app móvil. Como super_admin también podés invitar a un supervisor o administrador con el formulario de arriba."
-                  : "Los conductores aparecen aquí cuando se registran desde la app móvil, y un super_admin puede invitar cuentas de supervisor o administrador."
+                  ? t.users.noUsersDescriptionSuperAdmin
+                  : t.users.noUsersDescriptionOther
               }
             />
           )}
 
           {otherUsers.length > 0 && (
             <Section
-              title="Todos los usuarios"
+              title={t.users.allUsersTitle}
               action={
                 <button
                   type="button"
                   disabled={isRefetching}
                   onClick={() => refetch()}
-                  title="Actualizar"
-                  aria-label="Actualizar"
+                  title={t.users.refresh}
+                  aria-label={t.users.refresh}
                   className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-outline/30 text-outline transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
                 >
                   <RefreshCw size={14} className={isRefetching ? "animate-spin" : undefined} />
@@ -293,13 +286,13 @@ export default function UsersPage() {
                 <table className="w-full text-left text-sm">
                   <thead>
                     <tr className="border-b border-outline/30 text-xs text-outline">
-                      <th className="py-2 pr-4">Usuario</th>
-                      <th className="py-2 pr-4">Rol</th>
-                      <th className="py-2 pr-4">Estado operativo</th>
-                      <th className="py-2 pr-4">Ruta de hoy</th>
-                      <th className="py-2 pr-4">Estado</th>
-                      <th className="py-2 pr-4">Creado</th>
-                      <th className="py-2">Acciones</th>
+                      <th className="py-2 pr-4">{t.users.tableUser}</th>
+                      <th className="py-2 pr-4">{t.users.tableRole}</th>
+                      <th className="py-2 pr-4">{t.users.tableOperationalStatus}</th>
+                      <th className="py-2 pr-4">{t.users.tableTodaysRoute}</th>
+                      <th className="py-2 pr-4">{t.users.tableStatus}</th>
+                      <th className="py-2 pr-4">{t.users.tableCreated}</th>
+                      <th className="py-2">{t.common.actions}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -338,7 +331,7 @@ export default function UsersPage() {
                                   size={8}
                                   className={isOnline ? "fill-primary text-primary" : "fill-outline text-outline"}
                                 />
-                                {isOnline ? "En línea" : "Fuera de línea"}
+                                {isOnline ? t.users.online : t.users.offline}
                               </span>
                             ) : (
                               "—"
@@ -356,7 +349,7 @@ export default function UsersPage() {
                                   <button
                                     type="button"
                                     disabled={isUpdatingRole || isDeactivating}
-                                    aria-label={`Acciones para ${user.name}`}
+                                    aria-label={`${t.users.actionsFor} ${user.name}`}
                                     className="flex h-9 w-9 items-center justify-center rounded-md border border-outline/30 text-outline transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
                                   >
                                     {isUpdatingRole || isDeactivating ? (
@@ -369,7 +362,7 @@ export default function UsersPage() {
                                 <DropdownMenuContent>
                                   {canChangeRole && (
                                     <>
-                                      <DropdownMenuLabel>Cambiar rol</DropdownMenuLabel>
+                                      <DropdownMenuLabel>{t.users.changeRole}</DropdownMenuLabel>
                                       {PROMOTABLE_ROLES.filter((r) => r !== user.role).map((r) => (
                                         <DropdownMenuItem
                                           key={r}
@@ -386,7 +379,7 @@ export default function UsersPage() {
                                       destructive
                                       onSelect={() => deactivateUser.mutate(user.id)}
                                     >
-                                      Desactivar
+                                      {t.users.deactivate}
                                     </DropdownMenuItem>
                                   )}
                                 </DropdownMenuContent>
