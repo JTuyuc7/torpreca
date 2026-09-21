@@ -6,6 +6,7 @@ import type { Route } from "@torpreca/shared";
 import { Circle, Route as RouteIcon } from "lucide-react";
 import { useRef, useState } from "react";
 import { Map as MapboxMap, type MapRef, Marker } from "react-map-gl/mapbox";
+import { useAuthUser } from "@/app/(protected)/auth-context";
 import { AddressSearch } from "@/components/ui/address-search";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorBanner } from "@/components/ui/error-banner";
@@ -17,21 +18,20 @@ import { useLiveLocations } from "@/lib/hooks/use-live-locations";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
 import { useRoutes } from "@/lib/hooks/use-routes";
 import { useUsers } from "@/lib/hooks/use-users";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import { MAP_STYLES } from "@/lib/map/styles";
 import { readStoredMapStyle, writeStoredMapStyle } from "@/lib/preferences/map-style";
+import { usePreferences } from "@/lib/preferences/preferences-context";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN as string;
 
 // Guatemala City — Torpreca's operating area. Just a sane default center for
-// an empty map; it re-centers on nothing in particular until a route in the
-// side list is clicked (see focusOnDriver below).
-const INITIAL_VIEW = { longitude: -90.5069, latitude: 14.6349, zoom: 11 };
+// an empty map when the viewer has no saved preference yet (TOR-131's
+// "Guardar vista actual" button, below); re-centers on nothing in particular
+// until a route in the side list is clicked (see focusOnDriver below).
+const DEFAULT_VIEW = { longitude: -90.5069, latitude: 14.6349, zoom: 11 };
 
-const STATUS_LABEL: Record<ReturnType<typeof useLiveLocations>["status"], string> = {
-  connecting: "Conectando...",
-  connected: "En vivo",
-  error: "Sin conexión",
-};
+const MAP_VIEW_ROLES = new Set(["admin", "supervisor", "super_admin"]);
 
 function MetricCard({ label, value }: { label: string; value: number }) {
   return (
@@ -55,13 +55,15 @@ function ActiveRoutesList({
   selectedDriverId: string | null;
   onSelect: (driverId: string) => void;
 }) {
+  const { t } = useTranslation();
+
   if (routes.length === 0) {
     return (
       <EmptyState
         icon={RouteIcon}
-        title="No hay rutas en curso ahora mismo."
-        description="Creá una ruta y asignale un conductor para verla aparecer acá en vivo."
-        action={{ label: "Ir a Gestión de rutas", href: "/rutas" }}
+        title={t.panel.noRoutesInProgressTitle}
+        description={t.panel.noRoutesInProgressDescription}
+        action={{ label: t.panel.goToRoutes, href: "/rutas" }}
         compact
       />
     );
@@ -77,7 +79,7 @@ function ActiveRoutesList({
               type="button"
               onClick={() => onSelect(route.driverId)}
               disabled={!online}
-              title={online ? undefined : "Sin ubicación reciente de este conductor"}
+              title={online ? undefined : t.panel.noRecentLocationTitle}
               className={`flex w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                 selectedDriverId === route.driverId
                   ? "border-primary bg-primary/10"
@@ -103,11 +105,21 @@ function ActiveRoutesList({
 }
 
 export default function HomePage() {
-  usePageTitle("Panel principal");
+  const { t, language } = useTranslation();
+  usePageTitle(t.panel.title);
   const { summary, isLoading, error } = useDashboardSummary();
   const { locations, status } = useLiveLocations();
   const { routes } = useRoutes();
   const { users } = useUsers();
+  const { defaultMapView, saveDefaultMapView } = usePreferences();
+  const role = useAuthUser()?.role;
+  const canSaveMapView = !!role && MAP_VIEW_ROLES.has(role);
+
+  const STATUS_LABEL: Record<ReturnType<typeof useLiveLocations>["status"], string> = {
+    connecting: t.panel.statusConnecting,
+    connected: t.panel.statusConnected,
+    error: t.panel.statusError,
+  };
 
   // Lazy initializer: reads localStorage once on mount, not on every render.
   const [mapStyle, setMapStyle] = useState<(typeof MAP_STYLES)[number]["value"]>(() =>
@@ -119,11 +131,29 @@ export default function HomePage() {
     lat: number;
     name: string;
   } | null>(null);
+  const [savedViewNotice, setSavedViewNotice] = useState(false);
   const mapRef = useRef<MapRef>(null);
+
+  // TOR-131: initialViewState only applies once, at mount — usePreferences()
+  // resolves this from localStorage synchronously on a returning visit (see
+  // preferences-context.tsx), so this is only ever the Guatemala City
+  // fallback on a device/browser that has never saved a preference yet.
+  const initialView = defaultMapView
+    ? { longitude: defaultMapView.lng, latitude: defaultMapView.lat, zoom: defaultMapView.zoom }
+    : DEFAULT_VIEW;
 
   const driverNames = new Map((users ?? []).map((u) => [u.id, u.name]));
   const activeRoutes = (routes ?? []).filter((r) => r.status === "in_progress");
   const locationByDriver = new Map(locations.map((l) => [l.driverId, l]));
+
+  function handleSaveCurrentView() {
+    const map = mapRef.current;
+    if (!map) return;
+    const center = map.getCenter();
+    saveDefaultMapView({ lat: center.lat, lng: center.lng, zoom: map.getZoom() });
+    setSavedViewNotice(true);
+    setTimeout(() => setSavedViewNotice(false), 3000);
+  }
 
   function focusOnDriver(driverId: string) {
     const location = locationByDriver.get(driverId);
@@ -142,8 +172,8 @@ export default function HomePage() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
       <div>
-        <h1 className="text-xl text-text">Panel principal</h1>
-        <p className="text-sm text-outline">Estado de la flota en tiempo real.</p>
+        <h1 className="text-xl text-text">{t.panel.title}</h1>
+        <p className="text-sm text-outline">{t.panel.subtitle}</p>
       </div>
 
       {error && <ErrorBanner message={error} />}
@@ -160,15 +190,15 @@ export default function HomePage() {
 
       {summary && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 animate-fade-in">
-          <MetricCard label="Rutas en progreso" value={summary.routesInProgress} />
-          <MetricCard label="Rutas pendientes hoy" value={summary.routesPendingToday} />
-          <MetricCard label="Conductores en línea" value={summary.driversOnline} />
-          <MetricCard label="Conductores activos" value={summary.driversActive} />
-          <MetricCard label="Vehículos activos" value={summary.vehiclesActive} />
+          <MetricCard label={t.panel.routesInProgress} value={summary.routesInProgress} />
+          <MetricCard label={t.panel.routesPendingToday} value={summary.routesPendingToday} />
+          <MetricCard label={t.panel.driversOnline} value={summary.driversOnline} />
+          <MetricCard label={t.panel.driversActive} value={summary.driversActive} />
+          <MetricCard label={t.panel.vehiclesActive} value={summary.vehiclesActive} />
         </div>
       )}
 
-      <Section title="Mapa en vivo">
+      <Section title={t.panel.liveMap}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-1.5 text-xs text-outline">
             <Circle
@@ -187,12 +217,14 @@ export default function HomePage() {
             <div className="w-full sm:w-64">
               <AddressSearch
                 accessToken={MAPBOX_TOKEN}
-                proximity={{ lng: INITIAL_VIEW.longitude, lat: INITIAL_VIEW.latitude }}
+                proximity={{ lng: DEFAULT_VIEW.longitude, lat: DEFAULT_VIEW.latitude }}
                 onSelect={focusOnAddress}
+                placeholder={t.panel.addressSearchPlaceholder}
+                language={language}
               />
             </div>
             <Select
-              aria-label="Tipo de mapa"
+              aria-label={t.panel.mapTypeLabel}
               className="w-36"
               value={mapStyle}
               onChange={(e) => {
@@ -207,6 +239,15 @@ export default function HomePage() {
                 </option>
               ))}
             </Select>
+            {canSaveMapView && (
+              <button
+                type="button"
+                onClick={handleSaveCurrentView}
+                className="flex h-9 items-center whitespace-nowrap rounded-md border border-outline px-3 text-sm font-medium text-text transition-opacity hover:opacity-90 cursor-pointer"
+              >
+                {savedViewNotice ? t.panel.savedView : t.panel.saveCurrentView}
+              </button>
+            )}
           </div>
         </div>
         <div className="flex flex-col gap-4 lg:flex-row">
@@ -214,7 +255,7 @@ export default function HomePage() {
             <MapboxMap
               ref={mapRef}
               mapboxAccessToken={MAPBOX_TOKEN}
-              initialViewState={INITIAL_VIEW}
+              initialViewState={initialView}
               mapStyle={mapStyle}
             >
               {locations.map((location) => (
@@ -240,7 +281,7 @@ export default function HomePage() {
             </MapboxMap>
           </div>
           <div className="flex w-full flex-col gap-2 lg:w-64">
-            <h3 className="text-xs font-medium text-outline">Rutas en curso</h3>
+            <h3 className="text-xs font-medium text-outline">{t.panel.routesInCourse}</h3>
             <ActiveRoutesList
               routes={activeRoutes}
               driverNames={driverNames}

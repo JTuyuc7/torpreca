@@ -17,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { useFavoriteRoutes } from "@/lib/hooks/use-favorite-routes";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import {
   hideFavoriteRoute,
   readHiddenFavoriteRouteIds,
@@ -52,6 +53,7 @@ function PointMarker({ role }: { role: PointRole }) {
 }
 
 export function RouteKmCalculatorDialog({ onApply }: { onApply: (km: number) => void }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [origin, setOrigin] = useState<LngLat | null>(null);
   const [destination, setDestination] = useState<LngLat | null>(null);
@@ -113,11 +115,11 @@ export function RouteKmCalculatorDialog({ onApply }: { onApply: (km: number) => 
         message?: string;
       };
       if (!res.ok || data.code !== "Ok" || !data.routes?.[0]) {
-        throw new Error(data.message ?? "No se pudo calcular la ruta entre esos dos puntos.");
+        throw new Error(data.message ?? t.kmCalculator.errorRoute);
       }
       setDistanceKm(metersToKm(data.routes[0].distance));
     } catch {
-      setCalcError("No se pudo calcular la distancia. Verifica los puntos e intenta de nuevo.");
+      setCalcError(t.kmCalculator.errorDistance);
     } finally {
       setCalculating(false);
     }
@@ -157,11 +159,7 @@ export function RouteKmCalculatorDialog({ onApply }: { onApply: (km: number) => 
       if (!res.ok || !feature) throw new Error("not found");
       commitPoint(role, { lng: feature.center[0], lat: feature.center[1] }, { fly: true });
     } catch {
-      setGeocodeError(
-        role === "origin"
-          ? "No se encontró esa dirección de origen."
-          : "No se encontró esa dirección de destino.",
-      );
+      setGeocodeError(role === "origin" ? t.kmCalculator.errorOrigin : t.kmCalculator.errorDestination);
     } finally {
       setGeocoding(null);
     }
@@ -239,7 +237,7 @@ export function RouteKmCalculatorDialog({ onApply }: { onApply: (km: number) => 
           className="flex h-9 items-center gap-1.5 rounded-md border border-outline px-3 text-sm font-medium text-text transition-opacity hover:opacity-90 cursor-pointer"
         >
           <MapIcon size={14} />
-          Calcular en mapa
+          {t.kmCalculator.trigger}
         </button>
       </DialogTrigger>
       {/* !max-w-6xl (important modifier): DialogContent's base className
@@ -248,7 +246,7 @@ export function RouteKmCalculatorDialog({ onApply }: { onApply: (km: number) => 
           order, so plain max-w-6xl here was silently losing to it. */}
       <DialogContent className="!max-w-6xl">
         <DialogHeader>
-          <DialogTitle>Calcular Km en mapa</DialogTitle>
+          <DialogTitle>{t.kmCalculator.title}</DialogTitle>
         </DialogHeader>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_1fr]">
@@ -258,14 +256,16 @@ export function RouteKmCalculatorDialog({ onApply }: { onApply: (km: number) => 
             {favoriteRoutes && favoriteRoutes.length > 0 && (
               <div className="flex flex-col gap-1">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs text-outline">Favoritas</span>
+                  <span className="text-xs text-outline">{t.kmCalculator.favorites}</span>
                   {hiddenCount > 0 && (
                     <button
                       type="button"
                       onClick={() => setShowHidden((v) => !v)}
                       className="text-xs text-outline underline transition-opacity hover:opacity-70 cursor-pointer"
                     >
-                      {showHidden ? "Ocultar ocultas" : `Mostrar ocultas (${hiddenCount})`}
+                      {showHidden
+                        ? t.kmCalculator.hideHidden
+                        : `${t.kmCalculator.showHidden} (${hiddenCount})`}
                     </button>
                   )}
                 </div>
@@ -288,8 +288,8 @@ export function RouteKmCalculatorDialog({ onApply }: { onApply: (km: number) => 
                           type="button"
                           aria-label={
                             isHidden
-                              ? `Mostrar favorita ${favorite.label}`
-                              : `Ocultar favorita ${favorite.label}`
+                              ? `${t.kmCalculator.showFavorite} ${favorite.label}`
+                              : `${t.kmCalculator.hideFavorite} ${favorite.label}`
                           }
                           onClick={() => toggleHidden(favorite.id)}
                           className="rounded-md p-1 text-outline transition-opacity hover:opacity-70 cursor-pointer"
@@ -298,7 +298,7 @@ export function RouteKmCalculatorDialog({ onApply }: { onApply: (km: number) => 
                         </button>
                         <button
                           type="button"
-                          aria-label={`Borrar favorita ${favorite.label}`}
+                          aria-label={`${t.kmCalculator.deleteFavorite} ${favorite.label}`}
                           onClick={() => deleteFavoriteRoute.mutate(favorite.id)}
                           className="rounded-md p-1 text-outline transition-opacity hover:opacity-70 cursor-pointer"
                         >
@@ -313,7 +313,7 @@ export function RouteKmCalculatorDialog({ onApply }: { onApply: (km: number) => 
 
             <div className="flex flex-col gap-1">
               <label htmlFor="originQuery" className="text-xs text-outline">
-                Dirección de origen (opcional — también puedes hacer clic en el mapa)
+                {t.kmCalculator.originLabel}
               </label>
               <div className="flex gap-2">
                 <Input
@@ -326,7 +326,7 @@ export function RouteKmCalculatorDialog({ onApply }: { onApply: (km: number) => 
                       searchAddress("origin");
                     }
                   }}
-                  placeholder="Ej. Bodega Central, zona 4"
+                  placeholder={t.kmCalculator.originPlaceholder}
                   className="flex-1"
                 />
                 <button
@@ -334,7 +334,7 @@ export function RouteKmCalculatorDialog({ onApply }: { onApply: (km: number) => 
                   onClick={() => searchAddress("origin")}
                   disabled={geocoding === "origin" || !originQuery.trim()}
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-outline text-text transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
-                  aria-label="Buscar dirección de origen"
+                  aria-label={t.kmCalculator.searchOrigin}
                 >
                   {geocoding === "origin" ? <Spinner className="h-3.5 w-3.5" /> : <Search size={14} />}
                 </button>
@@ -342,7 +342,7 @@ export function RouteKmCalculatorDialog({ onApply }: { onApply: (km: number) => 
             </div>
             <div className="flex flex-col gap-1">
               <label htmlFor="destinationQuery" className="text-xs text-outline">
-                Dirección de destino (opcional)
+                {t.kmCalculator.destinationLabel}
               </label>
               <div className="flex gap-2">
                 <Input
@@ -355,7 +355,7 @@ export function RouteKmCalculatorDialog({ onApply }: { onApply: (km: number) => 
                       searchAddress("destination");
                     }
                   }}
-                  placeholder="Ej. 5ta avenida, zona 1"
+                  placeholder={t.kmCalculator.destinationPlaceholder}
                   className="flex-1"
                 />
                 <button
@@ -363,7 +363,7 @@ export function RouteKmCalculatorDialog({ onApply }: { onApply: (km: number) => 
                   onClick={() => searchAddress("destination")}
                   disabled={geocoding === "destination" || !destinationQuery.trim()}
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-outline text-text transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
-                  aria-label="Buscar dirección de destino"
+                  aria-label={t.kmCalculator.searchDestination}
                 >
                   {geocoding === "destination" ? (
                     <Spinner className="h-3.5 w-3.5" />
@@ -376,9 +376,9 @@ export function RouteKmCalculatorDialog({ onApply }: { onApply: (km: number) => 
             {geocodeError && <p className="text-xs text-error">{geocodeError}</p>}
 
             <p className="text-xs text-outline">
-              {!origin && "Busca una dirección o haz clic en el mapa para marcar el punto de origen (A)."}
-              {origin && !destination && "Ahora busca una dirección o haz clic para marcar el destino (B)."}
-              {origin && destination && "Ambos puntos marcados."}
+              {!origin && t.kmCalculator.hintPickOrigin}
+              {origin && !destination && t.kmCalculator.hintPickDestination}
+              {origin && destination && t.kmCalculator.hintBothPicked}
             </p>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -388,13 +388,15 @@ export function RouteKmCalculatorDialog({ onApply }: { onApply: (km: number) => 
                 className="flex h-9 items-center gap-1.5 rounded-md border border-outline px-3 text-sm font-medium text-text transition-opacity hover:opacity-90 cursor-pointer"
               >
                 <RotateCcw size={14} />
-                Reiniciar
+                {t.kmCalculator.reset}
               </button>
-              {calculating && <span className="text-sm text-outline">Calculando...</span>}
+              {calculating && <span className="text-sm text-outline">{t.kmCalculator.calculating}</span>}
             </div>
             {calcError && <span className="text-sm text-error">{calcError}</span>}
             {distanceKm != null && !calculating && (
-              <span className="text-sm font-medium text-text">Distancia: {distanceKm} km</span>
+              <span className="text-sm font-medium text-text">
+                {t.kmCalculator.distance}: {distanceKm} km
+              </span>
             )}
 
             {createFavoriteRoute.isError && (
@@ -431,7 +433,8 @@ export function RouteKmCalculatorDialog({ onApply }: { onApply: (km: number) => 
 
         {duplicateFavorite && (
           <p className="mt-2 text-right text-xs text-error">
-            Ya existe la favorita “{duplicateFavorite.label}” con este mismo origen y destino.
+            {t.kmCalculator.duplicateFavorite} “{duplicateFavorite.label}”{" "}
+            {t.kmCalculator.duplicateFavoriteSuffix}
           </p>
         )}
 
@@ -444,13 +447,13 @@ export function RouteKmCalculatorDialog({ onApply }: { onApply: (km: number) => 
                   (what items-center aligns to) sits lower than theirs, throwing
                   off the row's vertical alignment. */}
               <label htmlFor="favoriteLabel" className="sr-only">
-                Nombre para guardar como favorita (opcional)
+                {t.kmCalculator.favoriteNameLabel}
               </label>
               <Input
                 id="favoriteLabel"
                 value={favoriteLabel}
                 onChange={(e) => setFavoriteLabel(e.target.value)}
-                placeholder="Nombre para guardar como favorita (opcional)"
+                placeholder={t.kmCalculator.favoriteNameLabel}
                 className="w-64"
               />
             </>
@@ -467,7 +470,7 @@ export function RouteKmCalculatorDialog({ onApply }: { onApply: (km: number) => 
             className="flex h-9 items-center gap-1.5 rounded-md border border-outline px-3 text-sm font-medium text-text transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
           >
             {createFavoriteRoute.isPending && <Spinner className="h-3.5 w-3.5" />}
-            Guardar como favorita y usar
+            {t.kmCalculator.saveAndUse}
           </button>
           <button
             type="button"
@@ -475,7 +478,7 @@ export function RouteKmCalculatorDialog({ onApply }: { onApply: (km: number) => 
             onClick={applyValue}
             className="flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-on-primary transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
           >
-            Usar este valor
+            {t.kmCalculator.useThisValue}
           </button>
         </DialogFooter>
       </DialogContent>

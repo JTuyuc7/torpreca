@@ -13,6 +13,7 @@ import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuditLogs } from "@/lib/hooks/use-audit-logs";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import { useUsers } from "@/lib/hooks/use-users";
 
 const PAGE_SIZE_OPTIONS = [20, 30, 50, 100] as const;
@@ -47,7 +48,8 @@ export default function LogsPage() {
 }
 
 function LogsPageContent() {
-  usePageTitle("Logs del sistema");
+  const { t } = useTranslation();
+  usePageTitle(t.logs.title);
   const authUser = useAuthUser();
   const { users } = useUsers();
   const router = useRouter();
@@ -133,11 +135,7 @@ function LogsPageContent() {
   if (authUser?.role !== "super_admin") {
     return (
       <div className="flex flex-1 flex-col gap-6 p-6">
-        <EmptyState
-          icon={ScrollText}
-          title="No tenés acceso a esta pantalla."
-          description="Los logs del sistema solo están disponibles para super_admin."
-        />
+        <EmptyState icon={ScrollText} title={t.logs.noAccessTitle} description={t.logs.noAccessDescription} />
       </div>
     );
   }
@@ -153,14 +151,14 @@ function LogsPageContent() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
       <div>
-        <h1 className="text-xl text-text">Logs del sistema</h1>
-        <p className="text-sm text-outline">Historial de eventos de auditoría.</p>
+        <h1 className="text-xl text-text">{t.logs.title}</h1>
+        <p className="text-sm text-outline">{t.logs.subtitle}</p>
       </div>
 
       {error && <ErrorBanner message={error} onRetry={() => refetch()} />}
 
       {isLoading && (
-        <div className="flex flex-col gap-6" aria-busy="true" aria-label="Cargando logs">
+        <div className="flex flex-col gap-6" aria-busy="true" aria-label={t.logs.loadingLabel}>
           <Skeleton className="h-20 w-full" />
           <Skeleton className="h-96 w-full" />
         </div>
@@ -168,11 +166,11 @@ function LogsPageContent() {
 
       {logs !== undefined && (
         <div className="flex flex-col gap-6 animate-fade-in">
-          <Section title="Filtros">
+          <Section title={t.logs.filtersTitle}>
             <div className="flex flex-wrap items-end gap-3">
               <div className="flex flex-col gap-1">
                 <label htmlFor="actionFilter" className="text-xs text-outline">
-                  Evento
+                  {t.logs.eventLabel}
                 </label>
                 <Select
                   id="actionFilter"
@@ -180,7 +178,7 @@ function LogsPageContent() {
                   onChange={(e) => setDraftAction(e.target.value)}
                   className="w-56"
                 >
-                  <option value="all">Todos</option>
+                  <option value="all">{t.logs.all}</option>
                   {AUDIT_EVENTS.map((event) => (
                     <option key={event} value={event}>
                       {event}
@@ -190,7 +188,7 @@ function LogsPageContent() {
               </div>
               <div className="flex flex-col gap-1">
                 <label htmlFor="userFilter" className="text-xs text-outline">
-                  Usuario
+                  {t.logs.userLabel}
                 </label>
                 <Select
                   id="userFilter"
@@ -198,7 +196,7 @@ function LogsPageContent() {
                   onChange={(e) => setDraftUser(e.target.value)}
                   className="w-56"
                 >
-                  <option value="all">Todos</option>
+                  <option value="all">{t.logs.all}</option>
                   {(users ?? []).map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.name}
@@ -208,7 +206,7 @@ function LogsPageContent() {
               </div>
               <div className="flex flex-col gap-1">
                 <label htmlFor="dateFilter" className="text-xs text-outline">
-                  Fecha
+                  {t.logs.dateLabel}
                 </label>
                 <Input
                   id="dateFilter"
@@ -225,11 +223,11 @@ function LogsPageContent() {
                 className="flex h-9 items-center gap-1.5 rounded-md bg-brand px-3 text-sm text-white transition-opacity hover:opacity-90 disabled:opacity-40 cursor-pointer"
               >
                 <Search size={14} />
-                Aplicar
+                {t.logs.apply}
               </button>
               {hasActiveFilters && (
                 <button type="button" onClick={clearFilters} className="text-sm text-outline hover:underline cursor-pointer">
-                  Limpiar filtros
+                  {t.logs.clearFilters}
                 </button>
               )}
             </div>
@@ -238,23 +236,19 @@ function LogsPageContent() {
           {logs.length === 0 ? (
             <EmptyState
               icon={ScrollText}
-              title={
-                hasActiveFilters
-                  ? "Ningún evento coincide con estos filtros."
-                  : "Todavía no hay eventos registrados."
-              }
-              description={hasActiveFilters ? "Probá ajustando o limpiando los filtros de arriba." : undefined}
+              title={hasActiveFilters ? t.logs.noMatchTitle : t.logs.noEventsTitle}
+              description={hasActiveFilters ? t.logs.noMatchDescription : undefined}
             />
           ) : (
             <Section
-              title="Eventos"
+              title={t.logs.eventsTitle}
               action={
                 <button
                   type="button"
                   disabled={isRefetching}
                   onClick={() => refetch()}
-                  title="Actualizar"
-                  aria-label="Actualizar"
+                  title={t.logs.refresh}
+                  aria-label={t.logs.refresh}
                   className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-outline/30 text-outline transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
                 >
                   <RefreshCw size={14} className={isRefetching ? "animate-spin" : undefined} />
@@ -265,12 +259,12 @@ function LogsPageContent() {
                 <table className="w-full text-left text-sm">
                   <thead>
                     <tr className="border-b border-outline/30 text-xs text-outline">
-                      <th className="py-2 pr-4">Fecha</th>
-                      <th className="py-2 pr-4">Evento</th>
-                      <th className="py-2 pr-4">Usuario</th>
-                      <th className="py-2 pr-4">Rol</th>
-                      <th className="py-2 pr-4">Entidad</th>
-                      <th className="py-2">IP</th>
+                      <th className="py-2 pr-4">{t.logs.tableDate}</th>
+                      <th className="py-2 pr-4">{t.logs.tableEvent}</th>
+                      <th className="py-2 pr-4">{t.logs.tableUser}</th>
+                      <th className="py-2 pr-4">{t.logs.tableRole}</th>
+                      <th className="py-2 pr-4">{t.logs.tableEntity}</th>
+                      <th className="py-2">{t.logs.tableIp}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -292,7 +286,7 @@ function LogsPageContent() {
 
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-outline/10 pt-3">
                 <div className="flex items-center gap-2 text-xs text-outline">
-                  <label htmlFor="pageSize">Filas por página</label>
+                  <label htmlFor="pageSize">{t.logs.rowsPerPage}</label>
                   <Select
                     id="pageSize"
                     value={String(pageSize)}
@@ -308,14 +302,15 @@ function LogsPageContent() {
                 </div>
                 <div className="flex items-center gap-3 text-xs text-outline">
                   <span>
-                    Página {page + 1} de {totalPages} · {total} evento{total === 1 ? "" : "s"}
+                    {t.logs.page} {page + 1} {t.logs.of} {totalPages} · {total}{" "}
+                    {total === 1 ? t.logs.event : t.logs.events}
                   </span>
                   <div className="flex gap-1">
                     <button
                       type="button"
                       disabled={page === 0 || isRefetching}
                       onClick={() => changePage(Math.max(0, page - 1))}
-                      aria-label="Página anterior"
+                      aria-label={t.logs.previousPage}
                       className="flex h-8 w-8 items-center justify-center rounded-md border border-outline/30 text-text transition-opacity hover:opacity-90 disabled:opacity-40 cursor-pointer"
                     >
                       <ChevronLeft size={14} />
@@ -324,7 +319,7 @@ function LogsPageContent() {
                       type="button"
                       disabled={!hasNextPage || isRefetching}
                       onClick={() => changePage(page + 1)}
-                      aria-label="Página siguiente"
+                      aria-label={t.logs.nextPage}
                       className="flex h-8 w-8 items-center justify-center rounded-md border border-outline/30 text-text transition-opacity hover:opacity-90 disabled:opacity-40 cursor-pointer"
                     >
                       <ChevronRight size={14} />

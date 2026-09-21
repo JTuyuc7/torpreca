@@ -1,7 +1,17 @@
 "use client";
 
-import type { AuthUser, Role } from "@torpreca/shared";
-import { FileText, LayoutDashboard, LogOut, Menu, Route, ScrollText, Truck, Users } from "lucide-react";
+import type { AuthUser } from "@torpreca/shared";
+import {
+  FileText,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Route,
+  ScrollText,
+  Settings,
+  Truck,
+  Users,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -10,6 +20,7 @@ import { encodeReturnTo } from "@/lib/auth/return-to";
 import { announceSignedOut, onSignedOutElsewhere } from "@/lib/auth/session-broadcast";
 import { clearCachedAuthUser, readCachedAuthUser, writeCachedAuthUser } from "@/lib/auth/session-cache";
 import { useInactivityTimeout } from "@/lib/hooks/use-inactivity-timeout";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import { readStoredSidebarCollapsed, writeStoredSidebarCollapsed } from "@/lib/preferences/sidebar";
 import { AuthUserProvider } from "./auth-context";
 import { SessionExpiredDialog } from "./session-expired-dialog";
@@ -29,27 +40,30 @@ const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000;
 // `superAdminOnly` items are filtered out of the render entirely for anyone
 // else (CLAUDE.md: "Pantalla de logs solo renderiza si rol === 'super_admin'")
 // — not just disabled-looking, not in the DOM at all.
+type NavKey =
+  | "panelPrincipal"
+  | "conductores"
+  | "rutas"
+  | "vehiculos"
+  | "reportes"
+  | "logsDelSistema"
+  | "ajustes";
+
 const NAV_ITEMS: {
-  label: string;
+  key: NavKey;
   href: string;
   enabled: boolean;
   icon: typeof Users;
   superAdminOnly?: boolean;
 }[] = [
-  { label: "Panel Principal", href: "/", enabled: true, icon: LayoutDashboard },
-  { label: "Conductores", href: "/users", enabled: true, icon: Users },
-  { label: "Rutas", href: "/rutas", enabled: true, icon: Route },
-  { label: "Vehículos", href: "/vehiculos", enabled: true, icon: Truck },
-  { label: "Reportes", href: "/reportes", enabled: false, icon: FileText },
-  { label: "Logs del sistema", href: "/logs", enabled: true, icon: ScrollText, superAdminOnly: true },
+  { key: "panelPrincipal", href: "/", enabled: true, icon: LayoutDashboard },
+  { key: "conductores", href: "/users", enabled: true, icon: Users },
+  { key: "rutas", href: "/rutas", enabled: true, icon: Route },
+  { key: "vehiculos", href: "/vehiculos", enabled: true, icon: Truck },
+  { key: "reportes", href: "/reportes", enabled: false, icon: FileText },
+  { key: "logsDelSistema", href: "/logs", enabled: true, icon: ScrollText, superAdminOnly: true },
+  { key: "ajustes", href: "/ajustes", enabled: true, icon: Settings },
 ];
-
-const ROLE_LABELS: Record<Role, string> = {
-  driver: "Conductor",
-  supervisor: "Supervisor",
-  admin: "Administrador",
-  super_admin: "Super Admin",
-};
 
 // The sidebar always uses the fixed brand blue (bg-brand doesn't swap with
 // the theme, same identity color as the login panel) — unlike the rest of
@@ -68,7 +82,8 @@ function Sidebar({
   onToggleCollapsed: () => void;
 }) {
   const pathname = usePathname();
-  const roleLabel = ROLE_LABELS[authUser.role];
+  const { t } = useTranslation();
+  const roleLabel = t.sidebar.roles[authUser.role];
 
   return (
     <aside
@@ -81,14 +96,14 @@ function Sidebar({
           {!collapsed && (
             <div>
               <p className="text-lg font-semibold tracking-tight text-white">TORPRECA</p>
-              <p className="text-xs text-white/60">Administración</p>
+              <p className="text-xs text-white/60">{t.sidebar.adminPanel}</p>
             </div>
           )}
           <button
             type="button"
             onClick={onToggleCollapsed}
-            aria-label={collapsed ? "Expandir menú" : "Colapsar menú"}
-            title={collapsed ? "Expandir menú" : "Colapsar menú"}
+            aria-label={collapsed ? t.sidebar.expandMenu : t.sidebar.collapseMenu}
+            title={collapsed ? t.sidebar.expandMenu : t.sidebar.collapseMenu}
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-white/80 transition-colors hover:bg-white/10 cursor-pointer"
           >
             <Menu size={18} />
@@ -100,18 +115,19 @@ function Sidebar({
           ).map((item) => {
             const active = item.enabled && pathname === item.href;
             const Icon = item.icon;
+            const label = t.sidebar[item.key];
             if (!item.enabled) {
               return (
                 <span
                   key={item.href}
-                  title={collapsed ? item.label : undefined}
+                  title={collapsed ? label : undefined}
                   className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm text-white/40 ${collapsed ? "justify-center px-0" : ""}`}
                 >
                   <Icon size={16} />
                   {!collapsed && (
                     <>
-                      <span className="flex-1">{item.label}</span>
-                      <span className="text-[10px] uppercase tracking-wide">Próx.</span>
+                      <span className="flex-1">{label}</span>
+                      <span className="text-[10px] uppercase tracking-wide">{t.sidebar.comingSoon}</span>
                     </>
                   )}
                 </span>
@@ -121,7 +137,7 @@ function Sidebar({
               <Link
                 key={item.href}
                 href={item.href}
-                title={collapsed ? item.label : undefined}
+                title={collapsed ? label : undefined}
                 className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${collapsed ? "justify-center px-0" : ""} ${
                   // text-brand (dark, fixed) instead of white: --secondary is
                   // theme-tonal (a light peach in dark mode, see globals.css)
@@ -131,7 +147,7 @@ function Sidebar({
                 }`}
               >
                 <Icon size={16} />
-                {!collapsed && item.label}
+                {!collapsed && label}
               </Link>
             );
           })}
@@ -151,8 +167,8 @@ function Sidebar({
           <button
             type="button"
             onClick={onLogout}
-            title="Cerrar sesión"
-            aria-label="Cerrar sesión"
+            title={t.sidebar.logout}
+            aria-label={t.sidebar.logout}
             className="flex h-8 w-8 items-center justify-center rounded-md text-white/70 transition-colors hover:bg-white/10 hover:text-white cursor-pointer"
           >
             <LogOut size={16} />
@@ -165,7 +181,7 @@ function Sidebar({
               onClick={onLogout}
               className="text-left text-xs font-medium text-white/70 hover:text-white hover:underline cursor-pointer"
             >
-              Cerrar sesión
+              {t.sidebar.logout}
             </button>
           </div>
         )}

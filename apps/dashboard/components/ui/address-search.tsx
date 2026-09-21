@@ -35,10 +35,14 @@ export function AddressSearch({
   accessToken,
   proximity,
   onSelect,
+  placeholder,
+  language,
 }: {
   accessToken: string;
   proximity?: Coordinates;
   onSelect: (coordinates: Coordinates, placeName: string) => void;
+  placeholder: string;
+  language: string;
 }) {
   const [value, setValue] = useState("");
 
@@ -47,10 +51,10 @@ export function AddressSearch({
       accessToken={accessToken}
       value={value}
       onChange={setValue}
-      placeholder="Buscar dirección..."
+      placeholder={placeholder}
       theme={THEME}
       options={{
-        language: "es",
+        language,
         country: "gt",
         limit: 5,
         proximity,
