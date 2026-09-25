@@ -1,4 +1,4 @@
-import type { DashboardSummary } from "@torpreca/shared";
+import { businessDate, type DashboardSummary } from "@torpreca/shared";
 import type { LocationsRepository } from "../locations/locations.repository";
 import type { RoutesRepository } from "../routes/routes.repository";
 import type { UsersRepository } from "../users/users.repository";
@@ -31,7 +31,7 @@ export function createDashboardService(deps: DashboardDeps) {
         deps.locations.listLatestPerDriver(),
       ]);
 
-      const today = new Date().toISOString().slice(0, 10);
+      const today = businessDate();
       const now = Date.now();
 
       return {

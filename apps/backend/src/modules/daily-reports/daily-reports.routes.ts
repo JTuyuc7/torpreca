@@ -1,3 +1,4 @@
+import { businessDate } from "@torpreca/shared";
 import type { Routable } from "../../core/http/router";
 import { auth } from "../../core/middleware/auth";
 import { rateLimitGeneral } from "../../core/middleware/rate-limit";
@@ -14,7 +15,7 @@ const service = createDailyReportsService(
 );
 
 function todayIsoDate(): string {
-  return new Date().toISOString().slice(0, 10);
+  return businessDate();
 }
 
 // Unsigned /mobile route only, same reasoning as routes/stops — Flutter can't

@@ -1,4 +1,4 @@
-import type { Role } from "@torpreca/shared";
+import { businessDate, type Role } from "@torpreca/shared";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -276,7 +276,7 @@ describe("UsersPage", () => {
           id: "r1",
           code: "R-1",
           driverId: "driver-1",
-          date: new Date().toISOString().slice(0, 10),
+          date: businessDate(),
           status: "in_progress",
         },
       ],
