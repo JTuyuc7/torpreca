@@ -11,6 +11,7 @@
 // stops/routes/locations in a single request; ownership holding across every
 // endpoint a driver actually touches, not just the one that created a row).
 import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { businessDate } from "@torpreca/shared";
 import { Router } from "../core/http/router";
 import type { Row, RpcHandler } from "../test-support/fake-supabase";
 import { createFakeSupabase } from "../test-support/fake-supabase";
@@ -131,7 +132,7 @@ beforeEach(() => {
 describe("driver day — end to end across routes, stops, locations and sync-queue", () => {
   it("plans a route, the driver works it via /mobile, then syncs offline progress and finishes", async () => {
     const router = await buildFullRouter();
-    const today = new Date().toISOString().slice(0, 10);
+    const today = businessDate();
 
     // 1. Admin plans the route.
     fake.setAuthUser({ id: ADMIN_AUTH_ID });
@@ -273,7 +274,7 @@ describe("driver day — end to end across routes, stops, locations and sync-que
 
   it("re-syncing the same finish event afterward is a no-op conflict, not a duplicate completion", async () => {
     const router = await buildFullRouter();
-    const today = new Date().toISOString().slice(0, 10);
+    const today = businessDate();
 
     fake.setAuthUser({ id: ADMIN_AUTH_ID });
     const route = (await (

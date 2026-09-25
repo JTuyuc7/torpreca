@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
+  businessDate,
   type InviteUserInput,
   InviteUserSchema,
   INVITABLE_ROLES,
@@ -73,7 +74,7 @@ export default function UsersPage() {
   const { locations } = useLiveLocations();
   const { routes } = useRoutes();
   const onlineDriverIds = new Set(locations.map((l) => l.driverId));
-  const today = new Date().toISOString().slice(0, 10);
+  const today = businessDate();
   const todaysRouteCodeByDriver = new Map(
     (routes ?? []).filter((r) => r.date === today).map((r) => [r.driverId, r.code]),
   );

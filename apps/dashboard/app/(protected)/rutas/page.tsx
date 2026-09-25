@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CreateRouteSchema, type Route, type User, type Vehicle, z } from "@torpreca/shared";
+import { businessDate, CreateRouteSchema, type Route, type User, type Vehicle, z } from "@torpreca/shared";
 import { Route as RouteIcon } from "lucide-react";
 import { useState } from "react";
 import { type Resolver, useForm } from "react-hook-form";
@@ -25,7 +25,7 @@ function FieldError({ children }: { children: React.ReactNode }) {
 }
 
 function todayIsoDate(): string {
-  return new Date().toISOString().slice(0, 10);
+  return businessDate();
 }
 
 // R-<YYYYMMDD>-<secuencia del día> — generado en el cliente a partir de las

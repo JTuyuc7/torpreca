@@ -12,14 +12,23 @@ import 'stop_status_ui.dart';
 /// `GET /mobile/routes` + `GET /mobile/routes/:routeId/stops`. Tapping a stop
 /// opens `StopDetailScreen` (TOR-20) to see its full detail and mark it
 /// completed/delayed.
+///
+/// Refetches (TOR-136) whenever the driver comes back to it — [isActive]
+/// flipping to true when they re-select this tab, or the app resuming from
+/// the background — because `HomeShell` keeps tabs alive in an
+/// `IndexedStack`, so `initState` alone would leave a route assigned after
+/// the first load invisible until they pulled to refresh by hand.
 class StopsScreen extends StatefulWidget {
-  const StopsScreen({super.key});
+  const StopsScreen({super.key, this.isActive = true});
+
+  /// Whether this tab is the one currently shown by `HomeShell`.
+  final bool isActive;
 
   @override
   State<StopsScreen> createState() => _StopsScreenState();
 }
 
-class _StopsScreenState extends State<StopsScreen> {
+class _StopsScreenState extends State<StopsScreen> with WidgetsBindingObserver {
   final RoutesClient _routesClient = RoutesClient();
   final StopsClient _stopsClient = StopsClient();
 
@@ -28,7 +37,25 @@ class _StopsScreenState extends State<StopsScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _stopsFuture = _loadStops();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(StopsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isActive && !oldWidget.isActive) _refresh();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && widget.isActive) _refresh();
   }
 
   Future<List<Stop>> _loadStops() async {

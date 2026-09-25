@@ -40,7 +40,7 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final tabBuilders = <Widget Function()>[
-      () => const StopsScreen(),
+      () => StopsScreen(isActive: _index == 0),
       () => const MapScreen(),
       () => const DailyReportScreen(),
       () => ProfileScreen(authRepository: widget.authRepository),
