@@ -55,12 +55,35 @@ const delayStopEncrypted: RpcHandler = (tables, args) => {
   return updateGuarded(tables, args, { status: "delayed" });
 };
 
+const updateStopEncrypted: RpcHandler = (tables, args) => {
+  expect(args.p_secret_key).toBeTruthy();
+  return updateGuarded(tables, args, {
+    customer_name: args.p_customer_name,
+    address: args.p_address,
+    lat: args.p_lat,
+    lng: args.p_lng,
+    instructions: args.p_instructions,
+  });
+};
+
+const reorderStops: RpcHandler = (tables, args) => {
+  // No secret key on this one — it never touches the encrypted columns.
+  const ids = args.p_stop_ids as string[];
+  ids.forEach((id, i) => {
+    const row = (tables.stops ?? []).find((r) => r.id === id && r.route_id === args.p_route_id);
+    if (row) row.order_index = i + 1;
+  });
+  return [];
+};
+
 const fake = createFakeSupabase({
   rpcHandlers: {
     get_stops_readable: getStopsReadable,
     create_stop_encrypted: createStopEncrypted,
     complete_stop_encrypted: completeStopEncrypted,
     delay_stop_encrypted: delayStopEncrypted,
+    update_stop_encrypted: updateStopEncrypted,
+    reorder_stops: reorderStops,
   },
 });
 mock.module("../../core/db/supabase", () => ({ supabaseAdmin: fake.client }));
@@ -136,5 +159,46 @@ describe("stopsRepository", () => {
     fake.reset({ stops: [{ ...BASE_ROW, status: "completed" }] });
 
     expect(await stopsRepository.delay("s1")).toBeNull();
+  });
+
+  it("update() edits the fields and maps the row; null once the stop is completed", async () => {
+    const { stopsRepository } = await import("./stops.repository");
+    fake.reset({ stops: [{ ...BASE_ROW }, { ...BASE_ROW, id: "s2", status: "completed" }] });
+    const input = {
+      customerName: "Nuevo",
+      address: "Calle 9",
+      lat: 1,
+      lng: 2,
+      instructions: "Timbre",
+    };
+
+    const updated = await stopsRepository.update("s1", input);
+    expect(updated).toMatchObject({
+      id: "s1",
+      customerName: "Nuevo",
+      address: "Calle 9",
+      instructions: "Timbre",
+    });
+    expect(await stopsRepository.update("s2", input)).toBeNull();
+  });
+
+  it("delete() reports whether a row was removed", async () => {
+    const { stopsRepository } = await import("./stops.repository");
+    fake.reset({ stops: [{ ...BASE_ROW }] });
+
+    expect(await stopsRepository.delete("s1")).toBe(true);
+    expect(fake.tables.stops).toHaveLength(0);
+    expect(await stopsRepository.delete("s1")).toBe(false);
+  });
+
+  it("reorder() renumbers the route's stops following the given ids", async () => {
+    const { stopsRepository } = await import("./stops.repository");
+    fake.reset({ stops: [{ ...BASE_ROW }, { ...BASE_ROW, id: "s2", order_index: 2 }] });
+
+    await stopsRepository.reorder("r1", ["s2", "s1"]);
+    expect(fake.tables.stops?.map((r) => [r.id, r.order_index])).toEqual([
+      ["s1", 2],
+      ["s2", 1],
+    ]);
   });
 });

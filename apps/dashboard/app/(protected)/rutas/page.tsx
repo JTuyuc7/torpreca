@@ -19,6 +19,7 @@ import { useTranslation } from "@/lib/i18n/use-translation";
 import { useUsers } from "@/lib/hooks/use-users";
 import { useVehicles } from "@/lib/hooks/use-vehicles";
 import { RouteKmCalculatorDialog } from "./route-km-calculator-dialog";
+import { RouteStopsDialog } from "./route-stops-dialog";
 
 function FieldError({ children }: { children: React.ReactNode }) {
   return <p className="text-xs text-error">{children}</p>;
@@ -394,15 +395,18 @@ export default function RutasPage() {
                           {route.plannedKm ?? "—"} / {route.drivenKm}
                         </td>
                         <td className="py-3">
-                          {route.status === "pending" && (
-                            <button
-                              type="button"
-                              onClick={() => setEditingId(route.id)}
-                              className="flex h-9 items-center rounded-md border border-outline px-3 text-sm font-medium text-text transition-opacity hover:opacity-90 cursor-pointer"
-                            >
-                              {t.common.edit}
-                            </button>
-                          )}
+                          <div className="flex items-center gap-2">
+                            <RouteStopsDialog route={route} />
+                            {route.status === "pending" && (
+                              <button
+                                type="button"
+                                onClick={() => setEditingId(route.id)}
+                                className="flex h-9 items-center rounded-md border border-outline px-3 text-sm font-medium text-text transition-opacity hover:opacity-90 cursor-pointer"
+                              >
+                                {t.common.edit}
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );

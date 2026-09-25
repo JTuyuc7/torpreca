@@ -42,6 +42,23 @@ const completeStopEncrypted: RpcHandler = (tables, args) =>
 const delayStopEncrypted: RpcHandler = (tables, args) =>
   updateGuarded(tables, args, { status: "delayed" });
 
+const updateStopEncrypted: RpcHandler = (tables, args) =>
+  updateGuarded(tables, args, {
+    customer_name: args.p_customer_name,
+    address: args.p_address,
+    lat: args.p_lat,
+    lng: args.p_lng,
+    instructions: args.p_instructions,
+  });
+
+const reorderStops: RpcHandler = (tables, args) => {
+  (args.p_stop_ids as string[]).forEach((id, i) => {
+    const row = (tables.stops ?? []).find((r) => r.id === id && r.route_id === args.p_route_id);
+    if (row) row.order_index = i + 1;
+  });
+  return [];
+};
+
 const fake = createFakeSupabase({
   insertDefaults: { stops: { status: "pending" } },
   rpcHandlers: {
@@ -49,6 +66,8 @@ const fake = createFakeSupabase({
     create_stop_encrypted: createStopEncrypted,
     complete_stop_encrypted: completeStopEncrypted,
     delay_stop_encrypted: delayStopEncrypted,
+    update_stop_encrypted: updateStopEncrypted,
+    reorder_stops: reorderStops,
   },
 });
 mock.module("../../core/db/supabase", () => ({ supabaseAdmin: fake.client }));
@@ -182,6 +201,113 @@ describe("stops HTTP routes", () => {
     );
 
     expect(res.status).toBe(403);
+  });
+
+  describe("stop management (TOR-137)", () => {
+    // z.uuid() on the reorder body needs a real uuid; the seeded stop is "s1".
+    const STOP_ID = "11111111-1111-4111-8111-111111111111";
+    const stopBody = {
+      customerName: "Nuevo Cliente",
+      address: "Calle 2",
+      lat: 14.6,
+      lng: -90.5,
+      instructions: null,
+    };
+
+    // Own IP so these requests don't drain the shared "unknown" rate-limit bucket
+    // (same fix as users.routes.test.ts / favorite-routes.routes.test.ts).
+    const IP = "203.0.113.77";
+
+    function request(method: string, path: string, body?: unknown) {
+      return new Request(`http://x${path}`, {
+        method,
+        headers: {
+          authorization: "Bearer t",
+          "content-type": "application/json",
+          "x-forwarded-for": IP,
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+    }
+
+    beforeEach(() => {
+      fake.setAuthUser({ id: ADMIN_AUTH_ID });
+      // Stops are only editable while their route is still pending.
+      fake.tables.routes![0]!.status = "pending";
+      fake.tables.stops![0]!.id = STOP_ID;
+    });
+
+    it("POST appends a stop after the last one when no order is given", async () => {
+      const router = await buildRouter();
+      const res = await router.handle(request("POST", "/routes/r1/stops", stopBody));
+
+      expect(res.status).toBe(201);
+      expect(await res.json()).toMatchObject({ customerName: "Nuevo Cliente", order: 2 });
+    });
+
+    it("POST on a route that already started returns 409", async () => {
+      fake.tables.routes![0]!.status = "in_progress";
+      const router = await buildRouter();
+      const res = await router.handle(request("POST", "/routes/r1/stops", stopBody));
+      expect(res.status).toBe(409);
+    });
+
+    it("PATCH /stops/:id edits the stop", async () => {
+      const router = await buildRouter();
+      const res = await router.handle(request("PATCH", `/stops/${STOP_ID}`, stopBody));
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({ id: STOP_ID, customerName: "Nuevo Cliente" });
+    });
+
+    it("PATCH /stops/:id rejects an invalid body with 400", async () => {
+      const router = await buildRouter();
+      const res = await router.handle(
+        request("PATCH", `/stops/${STOP_ID}`, { ...stopBody, lat: 999 }),
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it("DELETE /stops/:id removes the stop (204) and 404s afterwards", async () => {
+      const router = await buildRouter();
+      const first = await router.handle(request("DELETE", `/stops/${STOP_ID}`));
+      const second = await router.handle(request("DELETE", `/stops/${STOP_ID}`));
+
+      expect(first.status).toBe(204);
+      expect(second.status).toBe(404);
+    });
+
+    it("PATCH /routes/:routeId/stops/order reorders and returns the stops", async () => {
+      const router = await buildRouter();
+      const res = await router.handle(
+        request("PATCH", "/routes/r1/stops/order", { stopIds: [STOP_ID] }),
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toHaveLength(1);
+    });
+
+    it("PATCH /routes/:routeId/stops/order with a wrong id set returns 400", async () => {
+      const router = await buildRouter();
+      const res = await router.handle(
+        request("PATCH", "/routes/r1/stops/order", { stopIds: [crypto.randomUUID()] }),
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it("editing endpoints are closed to drivers (403)", async () => {
+      fake.setAuthUser({ id: DRIVER_AUTH_ID });
+      const router = await buildRouter();
+
+      expect((await router.handle(request("PATCH", `/stops/${STOP_ID}`, stopBody))).status).toBe(
+        403,
+      );
+      expect((await router.handle(request("DELETE", `/stops/${STOP_ID}`))).status).toBe(403);
+      expect(
+        (await router.handle(request("PATCH", "/routes/r1/stops/order", { stopIds: [STOP_ID] })))
+          .status,
+      ).toBe(403);
+    });
   });
 
   it("PATCH /stops/:id/complete as the owning driver logs stop.completed", async () => {

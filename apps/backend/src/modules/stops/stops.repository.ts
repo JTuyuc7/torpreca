@@ -1,4 +1,4 @@
-import type { CreateStopInput, Stop } from "@torpreca/shared";
+import type { CreateStopInput, Stop, UpdateStopInput } from "@torpreca/shared";
 import { env } from "../../core/config/env";
 import { supabaseAdmin } from "../../core/db/supabase";
 
@@ -31,6 +31,13 @@ export interface StopsRepository {
   listByRoute(routeId: string): Promise<Stop[]>;
   getById(id: string): Promise<Stop | null>;
   create(input: CreateStopInput): Promise<Stop>;
+  // Only succeeds while the stop isn't completed (the guard lives in the RPC's
+  // WHERE clause, like complete/delay below). Null when nothing matched.
+  update(id: string, input: UpdateStopInput): Promise<Stop | null>;
+  // True when a row was deleted.
+  delete(id: string): Promise<boolean>;
+  // `stopIds` must already be validated as the route's full set of stops.
+  reorder(routeId: string, stopIds: string[]): Promise<void>;
   complete(id: string): Promise<Stop | null>;
   delay(id: string): Promise<Stop | null>;
 }
@@ -71,6 +78,36 @@ export const stopsRepository: StopsRepository = {
 
     const row = data as Record<string, unknown>;
     return toStop({ ...row, customer_name: input.customerName, address: input.address });
+  },
+
+  async update(id, input) {
+    const { data, error } = await supabaseAdmin
+      .rpc("update_stop_encrypted", {
+        p_id: id,
+        p_customer_name: input.customerName,
+        p_address: input.address,
+        p_lat: input.lat,
+        p_lng: input.lng,
+        p_instructions: input.instructions,
+        p_secret_key: env.SECRET_KEY,
+      })
+      .maybeSingle();
+    if (error) throw error;
+    return data ? toStop(data as Record<string, unknown>) : null;
+  },
+
+  async delete(id) {
+    const { data, error } = await supabaseAdmin.from("stops").delete().eq("id", id).select("id");
+    if (error) throw error;
+    return data.length > 0;
+  },
+
+  async reorder(routeId, stopIds) {
+    const { error } = await supabaseAdmin.rpc("reorder_stops", {
+      p_route_id: routeId,
+      p_stop_ids: stopIds,
+    });
+    if (error) throw error;
   },
 
   // The guard (only succeeds while not already completed) lives inside the

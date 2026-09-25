@@ -69,6 +69,15 @@ function createFakeStopsRepo(seed: Stop[]): StopsRepository {
     async create() {
       throw new Error("not used in these tests");
     },
+    async update() {
+      throw new Error("not used in these tests");
+    },
+    async delete() {
+      throw new Error("not used in these tests");
+    },
+    async reorder() {
+      throw new Error("not used in these tests");
+    },
     async complete(id) {
       const stop = seed.find((s) => s.id === id);
       if (!stop || stop.status === "completed") return null;
@@ -106,6 +115,9 @@ function createFakeLocationsRepo(): LocationsRepository {
     },
     async listByRoute(routeId) {
       return locations.filter((l) => l.routeId === routeId);
+    },
+    async listByDriverBetween() {
+      throw new Error("not used in these tests");
     },
     async listLatestPerDriver() {
       return locations;

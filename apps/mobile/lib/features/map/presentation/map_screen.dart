@@ -20,6 +20,14 @@ Point get _fallbackCenter => Point(coordinates: Position(-90.5069, 14.6349));
 /// start/stop tracking control from TOR-18, now as a bottom overlay card
 /// instead of the whole screen's content.
 ///
+/// The camera follows the driver while tracking is on: pressing "Iniciar"
+/// (or the tracking service reaching `tracking`) transitions the viewport to
+/// a [FollowPuckViewportState]. Dragging or pinching the map hands control
+/// back to the driver and shows a "Centrar" button to resume following —
+/// without this the camera was only positioned once, when the map was
+/// created, so it stayed put (even on the fallback city center, if location
+/// permission was denied at that moment) while the puck moved away.
+///
 /// Deliberately does not show the driver's assigned route or its stops yet
 /// — that's "Lista de paradas" (TOR-35) and "Detalle de parada" (TOR-20),
 /// separate tickets.
@@ -34,17 +42,67 @@ class _MapScreenState extends State<MapScreen> {
   final TrackingService _trackingService = TrackingService();
 
   Point? _initialCenter;
+  MapboxMap? _mapboxMap;
+
+  /// Null until the first follow request — until then the map keeps the
+  /// one-shot `cameraOptions` it was created with. MapWidget re-applies this
+  /// only when the instance changes (it compares by identity), which is why
+  /// every follow request builds a fresh, non-const state.
+  ViewportState? _viewport;
+  bool _following = false;
+  bool _wasTracking = false;
 
   @override
   void initState() {
     super.initState();
     _resolveInitialPosition();
+    _trackingService.addListener(_onTrackingChanged);
   }
 
   @override
   void dispose() {
+    _trackingService.removeListener(_onTrackingChanged);
     _trackingService.dispose();
     super.dispose();
+  }
+
+  bool get _trackingActive =>
+      _trackingService.status == TrackingStatus.tracking ||
+      _trackingService.status == TrackingStatus.connecting;
+
+  /// Starts following the driver whenever tracking goes from off to on —
+  /// including when the permission prompt of `start()` is what finally
+  /// grants location, which is why the puck is re-enabled here too.
+  void _onTrackingChanged() {
+    final active = _trackingActive;
+    final justStarted = active && !_wasTracking;
+    _wasTracking = active;
+    if (justStarted) _followDriver();
+  }
+
+  void _followDriver() {
+    if (!mounted) return;
+    _mapboxMap?.location.updateSettings(
+      LocationComponentSettings(enabled: true, pulsingEnabled: true),
+    );
+    // Marked @experimental upstream, but mapbox_maps_flutter is vendored
+    // (third_party/, TOR-132), so it can't change under us.
+    // ignore: experimental_member_use
+    setStateWithViewportAnimation(() {
+      _viewport = FollowPuckViewportState(
+        zoom: 16,
+        // Keep the map north-up and flat: the defaults rotate with the phone's
+        // heading and tilt 45°, which is disorienting when standing at a stop.
+        bearing: const FollowPuckViewportStateBearingConstant(0),
+        pitch: 0,
+      );
+      _following = true;
+    });
+  }
+
+  /// A drag or pinch means the driver took the camera back.
+  void _onUserGesture() {
+    if (_following) setState(() => _following = false);
   }
 
   Future<void> _resolveInitialPosition() async {
@@ -99,6 +157,7 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _onMapCreated(MapboxMap mapboxMap) {
+    _mapboxMap = mapboxMap;
     mapboxMap.location.updateSettings(
       LocationComponentSettings(enabled: true, pulsingEnabled: true),
     );
@@ -118,8 +177,22 @@ class _MapScreenState extends State<MapScreen> {
               children: [
                 MapWidget(
                   cameraOptions: CameraOptions(center: initialCenter, zoom: 15),
+                  viewport: _viewport,
                   onMapCreated: _onMapCreated,
+                  onScrollListener: (_) => _onUserGesture(),
+                  onZoomListener: (_) => _onUserGesture(),
                 ),
+                if (!_following)
+                  Positioned(
+                    right: 16,
+                    // Above the tracking card (~72px tall) plus its margin.
+                    bottom: 96,
+                    child: FloatingActionButton.small(
+                      tooltip: 'Centrar en mi ubicación',
+                      onPressed: _followDriver,
+                      child: const Icon(Icons.my_location),
+                    ),
+                  ),
                 Positioned(
                   left: 16,
                   right: 16,
@@ -131,7 +204,8 @@ class _MapScreenState extends State<MapScreen> {
                         listenable: _trackingService,
                         builder: (context, _) {
                           final status = _trackingService.status;
-                          final isActive = status == TrackingStatus.tracking ||
+                          final isActive =
+                              status == TrackingStatus.tracking ||
                               status == TrackingStatus.connecting;
                           final pending = _trackingService.pendingCount;
                           return Row(
