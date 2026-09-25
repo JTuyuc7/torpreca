@@ -53,6 +53,9 @@ function fakeUsersRepo(seed: User[]): UsersRepository {
 
 function fakeLocationsRepo(seed: Location[]): LocationsRepository {
   return {
+    async listByDriverBetween() {
+      throw new Error("not used in these tests");
+    },
     async listLatestPerDriver() {
       return seed;
     },

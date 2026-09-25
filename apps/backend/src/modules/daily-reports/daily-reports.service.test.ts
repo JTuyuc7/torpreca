@@ -43,6 +43,15 @@ function fakeStopsRepo(stops: Stop[]): StopsRepository {
     async create() {
       throw new Error("not used in these tests");
     },
+    async update() {
+      throw new Error("not used in these tests");
+    },
+    async delete() {
+      throw new Error("not used in these tests");
+    },
+    async reorder() {
+      throw new Error("not used in these tests");
+    },
     async complete() {
       throw new Error("not used in these tests");
     },

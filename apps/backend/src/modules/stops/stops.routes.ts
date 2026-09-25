@@ -1,4 +1,4 @@
-import { CreateStopSchema } from "@torpreca/shared";
+import { CreateStopBodySchema, ReorderStopsSchema, UpdateStopSchema } from "@torpreca/shared";
 import { logEvent } from "../../core/audit/log-event";
 import { clientIp } from "../../core/http/client-ip";
 import type { Routable } from "../../core/http/router";
@@ -12,9 +12,6 @@ import { createStopsService } from "./stops.service";
 
 const service = createStopsService(stopsRepository, routesRepository);
 
-// `routeId` comes from the URL, not the client — validate the rest of the body separately.
-const CreateStopBodySchema = CreateStopSchema.omit({ routeId: true });
-
 export function registerStopsRoutes(router: Routable) {
   router.get("/routes/:routeId/stops", auth, rateLimitGeneral, async (ctx) => {
     return Response.json(await service.listByRoute(ctx.params.routeId!, ctx.user!));
@@ -27,9 +24,41 @@ export function registerStopsRoutes(router: Routable) {
     rateLimitGeneral,
     validateBody(CreateStopBodySchema),
     async (ctx) => {
-      const input = { ...(ctx.body as object), routeId: ctx.params.routeId! } as never;
-      const stop = await service.create(input);
+      const stop = await service.create(ctx.params.routeId!, ctx.body as never);
       return Response.json(stop, { status: 201 });
+    },
+  );
+
+  router.patch(
+    "/routes/:routeId/stops/order",
+    auth,
+    requireRole("admin", "supervisor", "super_admin"),
+    rateLimitGeneral,
+    validateBody(ReorderStopsSchema),
+    async (ctx) => {
+      return Response.json(await service.reorder(ctx.params.routeId!, ctx.body as never));
+    },
+  );
+
+  router.patch(
+    "/stops/:id",
+    auth,
+    requireRole("admin", "supervisor", "super_admin"),
+    rateLimitGeneral,
+    validateBody(UpdateStopSchema),
+    async (ctx) => {
+      return Response.json(await service.update(ctx.params.id!, ctx.body as never));
+    },
+  );
+
+  router.delete(
+    "/stops/:id",
+    auth,
+    requireRole("admin", "supervisor", "super_admin"),
+    rateLimitGeneral,
+    async (ctx) => {
+      await service.remove(ctx.params.id!);
+      return new Response(null, { status: 204 });
     },
   );
 

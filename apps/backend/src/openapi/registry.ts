@@ -8,15 +8,17 @@ import {
   AUDIT_EVENTS,
   AuditLogsPageSchema,
   CreateRouteSchema,
-  CreateStopSchema,
+  CreateStopBodySchema,
   CreateUserSchema,
   CreateVehicleSchema,
   DashboardSummarySchema,
   FinishRouteSchema,
+  ReorderStopsSchema,
   ReviewUserSchema,
   RouteSchema,
   StopSchema,
   UpdateRouteSchema,
+  UpdateStopSchema,
   UpdateVehicleSchema,
   USER_STATUSES,
   UserSchema,
@@ -68,7 +70,9 @@ const CreateRoute = registry.register("CreateRoute", CreateRouteSchema);
 const UpdateRoute = registry.register("UpdateRoute", UpdateRouteSchema);
 const FinishRoute = registry.register("FinishRoute", FinishRouteSchema);
 const Stop = registry.register("Stop", StopSchema);
-const CreateStop = registry.register("CreateStop", CreateStopSchema.omit({ routeId: true }));
+const CreateStop = registry.register("CreateStop", CreateStopBodySchema);
+const UpdateStop = registry.register("UpdateStop", UpdateStopSchema);
+const ReorderStops = registry.register("ReorderStops", ReorderStopsSchema);
 
 const IdParam = z.object({ id: z.uuid() });
 const RouteIdParam = z.object({ routeId: z.uuid() });
@@ -329,6 +333,57 @@ path({
     401: unauthorized,
     403: forbidden,
     404: notFound,
+    409: errorResponse("Route is not pending — its stops can no longer be edited"),
+  },
+});
+path({
+  method: "patch",
+  path: "/routes/{routeId}/stops/order",
+  tags: ["Stops"],
+  summary: "Reorder a route's stops (body lists every stop id, in the new order)",
+  request: {
+    params: RouteIdParam,
+    body: { content: { "application/json": { schema: ReorderStops } } },
+  },
+  responses: {
+    200: jsonResponse("Stops in the new order", z.array(Stop)),
+    400: badRequest,
+    401: unauthorized,
+    403: forbidden,
+    404: notFound,
+    409: errorResponse("Route is not pending — its stops can no longer be edited"),
+  },
+});
+path({
+  method: "patch",
+  path: "/stops/{id}",
+  tags: ["Stops"],
+  summary: "Edit a stop (full replace of its editable fields)",
+  request: {
+    params: IdParam,
+    body: { content: { "application/json": { schema: UpdateStop } } },
+  },
+  responses: {
+    200: jsonResponse("Stop updated", Stop),
+    400: badRequest,
+    401: unauthorized,
+    403: forbidden,
+    404: notFound,
+    409: errorResponse("Route is not pending or the stop is already completed"),
+  },
+});
+path({
+  method: "delete",
+  path: "/stops/{id}",
+  tags: ["Stops"],
+  summary: "Delete a stop",
+  request: { params: IdParam },
+  responses: {
+    204: { description: "Stop deleted" },
+    401: unauthorized,
+    403: forbidden,
+    404: notFound,
+    409: errorResponse("Route is not pending — its stops can no longer be edited"),
   },
 });
 path({

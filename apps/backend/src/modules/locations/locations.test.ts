@@ -50,6 +50,9 @@ function createFakeLocationsRepo(seed: Location[] = []): LocationsRepository {
     async listByRoute(routeId) {
       return locations.filter((l) => l.routeId === routeId);
     },
+    async listByDriverBetween() {
+      throw new Error("not used in these tests");
+    },
     async listLatestPerDriver() {
       return locations;
     },
