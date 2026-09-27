@@ -27,7 +27,7 @@ services:
     runtime: docker
     dockerfilePath: ./apps/backend/Dockerfile
     dockerContext: .
-    plan: pro
+    plan: starter
     region: oregon
     branch: main
     autoDeploy: true
@@ -49,7 +49,7 @@ services:
     runtime: docker
     dockerfilePath: ./apps/backend/Dockerfile
     dockerContext: .
-    plan: pro
+    plan: starter
     region: oregon
     branch: release
     autoDeploy: true
@@ -75,7 +75,7 @@ services:
     # see the workspace). Same reasoning as the backend's Docker context.
     buildCommand: pnpm install --frozen-lockfile && pnpm --filter dashboard build
     startCommand: pnpm --filter dashboard start
-    plan: pro
+    plan: starter
     region: oregon
     branch: main
     autoDeploy: true
@@ -97,7 +97,7 @@ services:
     runtime: node
     buildCommand: pnpm install --frozen-lockfile && pnpm --filter dashboard build
     startCommand: pnpm --filter dashboard start
-    plan: pro
+    plan: starter
     region: oregon
     branch: release
     autoDeploy: true
