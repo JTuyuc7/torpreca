@@ -16,9 +16,12 @@ export interface SyncItemResult {
   message?: string;
 }
 
-// Implicit contract with stops.service.ts/routes.service.ts: both use 409
-// exclusively for "this event was already applied" (idempotency). If either
-// service ever adds a 409 with a different meaning, revisit this check too.
+// Implicit contract with stops.service.ts/routes.service.ts: their 409s all
+// mean "the target state no longer allows this event" — already applied
+// (idempotent replay), or the route moved on (a stop update for a route that's
+// no longer in progress, a route closed by an admin). Either way retrying
+// can't ever succeed, so the event is recorded as a conflict and dropped. If
+// either service ever adds a 409 that *is* worth retrying, revisit this check.
 function isIdempotencyConflict(err: unknown): err is AppError {
   return err instanceof AppError && err.status === 409;
 }

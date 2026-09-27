@@ -4,7 +4,9 @@ import '../../auth/data/auth_repository.dart';
 import '../../map/presentation/map_screen.dart';
 import '../../profile/presentation/profile_screen.dart';
 import '../../reports/presentation/daily_report_screen.dart';
+import '../../stops/data/next_stop_controller.dart';
 import '../../stops/presentation/stops_screen.dart';
+import '../../tracking/data/tracking_service.dart';
 
 /// Root shell after login (TOR-29) — an M3 [NavigationBar] with the app's
 /// 4 tabs, landing on Paradas (Sistema de Diseño updated 15 sep 2026: Mapa
@@ -30,6 +32,20 @@ class _HomeShellState extends State<HomeShell> {
   int _index = 0;
   final Set<int> _visited = {0};
 
+  /// One tracking session for the whole app: "Iniciar ruta" (Paradas tab)
+  /// turns it on and the Mapa tab shows/controls that same session.
+  final TrackingService _trackingService = TrackingService();
+
+  /// The running route's next stop: Paradas publishes it, Mapa draws it.
+  final NextStopController _nextStop = NextStopController();
+
+  @override
+  void dispose() {
+    _trackingService.dispose();
+    _nextStop.dispose();
+    super.dispose();
+  }
+
   void _onDestinationSelected(int index) {
     setState(() {
       _index = index;
@@ -40,9 +56,13 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final tabBuilders = <Widget Function()>[
-      () => StopsScreen(isActive: _index == 0),
-      () => const MapScreen(),
-      () => const DailyReportScreen(),
+      () => StopsScreen(
+        isActive: _index == 0,
+        trackingService: _trackingService,
+        nextStopController: _nextStop,
+      ),
+      () => MapScreen(trackingService: _trackingService, nextStop: _nextStop),
+      () => DailyReportScreen(isActive: _index == 2),
       () => ProfileScreen(authRepository: widget.authRepository),
     ];
 
@@ -63,13 +83,21 @@ class _HomeShellState extends State<HomeShell> {
             selectedIcon: Icon(Icons.location_on),
             label: 'Paradas',
           ),
-          NavigationDestination(icon: Icon(Icons.map_outlined), selectedIcon: Icon(Icons.map), label: 'Mapa'),
+          NavigationDestination(
+            icon: Icon(Icons.map_outlined),
+            selectedIcon: Icon(Icons.map),
+            label: 'Mapa',
+          ),
           NavigationDestination(
             icon: Icon(Icons.assignment_outlined),
             selectedIcon: Icon(Icons.assignment),
             label: 'Reporte',
           ),
-          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Perfil'),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Perfil',
+          ),
         ],
       ),
     );

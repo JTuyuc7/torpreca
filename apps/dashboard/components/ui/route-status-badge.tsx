@@ -15,13 +15,23 @@ const STATUS_BADGE_CLASSES: Record<Route["status"], string> = {
 // Extracted from app/(protected)/rutas/page.tsx (TOR-30) when
 // "Detalle de conductor" (TOR-33) became a second screen needing the same
 // route-status coloring for a driver's route history.
-export function RouteStatusBadge({ status }: { status: Route["status"] }) {
+//
+// `overdue` (see isRouteOverdue in @torpreca/shared) replaces the stored
+// status with "Sin completar": a route whose day passed without being
+// finished isn't really "pending" or "in progress" anymore.
+export function RouteStatusBadge({
+  status,
+  overdue = false,
+}: {
+  status: Route["status"];
+  overdue?: boolean;
+}) {
   const { t } = useTranslation();
   return (
     <span
-      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE_CLASSES[status]}`}
+      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${overdue ? "bg-error/15 text-error" : STATUS_BADGE_CLASSES[status]}`}
     >
-      {t.routeStatus[status]}
+      {overdue ? t.routeStatus.overdue : t.routeStatus[status]}
     </span>
   );
 }

@@ -29,6 +29,12 @@ function fakeRoutesRepo(routes: Route[]): RoutesRepository {
     async finish() {
       throw new Error("not used in these tests");
     },
+    async close() {
+      throw new Error("not used in these tests");
+    },
+    async delete() {
+      throw new Error("not used in these tests");
+    },
   };
 }
 
@@ -67,6 +73,9 @@ function fakeDailyReportsRepo(): DailyReportsRepository & { upserted: UpsertDail
     upserted,
     async getByDriverAndDate() {
       return null;
+    },
+    async listByDriver() {
+      return [];
     },
     async upsert(input) {
       upserted.push(input);

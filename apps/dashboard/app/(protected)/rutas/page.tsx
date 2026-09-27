@@ -1,7 +1,15 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { businessDate, CreateRouteSchema, type Route, type User, type Vehicle, z } from "@torpreca/shared";
+import {
+  businessDate,
+  CreateRouteSchema,
+  isRouteOverdue,
+  type Route,
+  type User,
+  type Vehicle,
+  z,
+} from "@torpreca/shared";
 import { Route as RouteIcon } from "lucide-react";
 import { useState } from "react";
 import { type Resolver, useForm } from "react-hook-form";
@@ -18,6 +26,8 @@ import { useRoutes } from "@/lib/hooks/use-routes";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { useUsers } from "@/lib/hooks/use-users";
 import { useVehicles } from "@/lib/hooks/use-vehicles";
+import { DuplicateRouteDialog } from "./duplicate-route-dialog";
+import { generateRouteCode } from "./route-code";
 import { RouteKmCalculatorDialog } from "./route-km-calculator-dialog";
 import { RouteStopsDialog } from "./route-stops-dialog";
 
@@ -27,19 +37,6 @@ function FieldError({ children }: { children: React.ReactNode }) {
 
 function todayIsoDate(): string {
   return businessDate();
-}
-
-// R-<YYYYMMDD>-<secuencia del día> — generado en el cliente a partir de las
-// rutas ya cargadas para esa fecha, no en el backend (no hay una tabla de
-// secuencias ni una constraint UNIQUE sobre `code` todavía). Evita que se
-// escriba código a mano; el caso borde de dos admins creando al mismo
-// segundo una ruta para el mismo día es un riesgo aceptado para el MVP de un
-// solo administrador activo a la vez — si eso cambia, esto necesita moverse
-// al backend.
-function generateRouteCode(date: string, existingForDate: number): string {
-  if (!date) return "";
-  const compact = date.replaceAll("-", "");
-  return `R-${compact}-${String(existingForDate + 1).padStart(2, "0")}`;
 }
 
 // Shared by the create form and each editable row below — `code` isn't part
@@ -301,7 +298,8 @@ function RouteEditRow({
 export default function RutasPage() {
   const { t } = useTranslation();
   usePageTitle(t.rutas.title);
-  const { routes, isLoading, error, refetch, createRoute, updateRoute } = useRoutes();
+  const { routes, isLoading, error, refetch, createRoute, updateRoute, duplicateRoute, closeRoute } =
+    useRoutes();
   const { users } = useUsers();
   const { vehicles } = useVehicles();
 
@@ -315,6 +313,8 @@ export default function RutasPage() {
     id ? (vehicles?.find((v) => v.id === id)?.plate ?? id) : "—";
 
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [confirmCloseId, setConfirmCloseId] = useState<string | null>(null);
+  const today = todayIsoDate();
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
@@ -325,6 +325,7 @@ export default function RutasPage() {
 
       {error && <ErrorBanner message={error} onRetry={() => refetch()} />}
       {updateRoute.isError && <ErrorBanner message={updateRoute.error.message} />}
+      {closeRoute.isError && <ErrorBanner message={closeRoute.error.message} />}
 
       {isLoading && (
         <div className="flex flex-col gap-6" aria-busy="true" aria-label={t.rutas.loadingLabel}>
@@ -379,6 +380,12 @@ export default function RutasPage() {
                       );
                     }
 
+                    // Sin completar: its day passed without being finished —
+                    // read-only, it can only be duplicated (or closed, if it
+                    // was started and left running).
+                    const overdue = isRouteOverdue(route, today);
+                    const closing = closeRoute.isPending && closeRoute.variables === route.id;
+
                     return (
                       <tr
                         key={route.id}
@@ -389,7 +396,7 @@ export default function RutasPage() {
                         <td className="py-3 pr-4">{vehiclePlate(route.vehicleId)}</td>
                         <td className="py-3 pr-4">{route.date}</td>
                         <td className="py-3 pr-4">
-                          <RouteStatusBadge status={route.status} />
+                          <RouteStatusBadge status={route.status} overdue={overdue} />
                         </td>
                         <td className="py-3 pr-4 tabular-nums">
                           {route.plannedKm ?? "—"} / {route.drivenKm}
@@ -397,13 +404,45 @@ export default function RutasPage() {
                         <td className="py-3">
                           <div className="flex items-center gap-2">
                             <RouteStopsDialog route={route} />
-                            {route.status === "pending" && (
+                            {route.status === "pending" && !overdue && (
                               <button
                                 type="button"
                                 onClick={() => setEditingId(route.id)}
                                 className="flex h-9 items-center rounded-md border border-outline px-3 text-sm font-medium text-text transition-opacity hover:opacity-90 cursor-pointer"
                               >
                                 {t.common.edit}
+                              </button>
+                            )}
+                            <DuplicateRouteDialog
+                              route={route}
+                              routes={routes}
+                              drivers={drivers}
+                              vehicles={activeVehicles}
+                              duplicateRoute={duplicateRoute}
+                            />
+                            {overdue && route.status === "in_progress" && (
+                              <button
+                                type="button"
+                                disabled={closing}
+                                onClick={() =>
+                                  confirmCloseId === route.id
+                                    ? closeRoute.mutate(route.id, {
+                                        onSettled: () => setConfirmCloseId(null),
+                                      })
+                                    : setConfirmCloseId(route.id)
+                                }
+                                className={
+                                  confirmCloseId === route.id
+                                    ? "flex h-9 items-center gap-1.5 rounded-md bg-error px-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
+                                    : "flex h-9 items-center rounded-md border border-outline px-3 text-sm font-medium text-text transition-opacity hover:opacity-90 cursor-pointer"
+                                }
+                              >
+                                {closing && <Spinner className="h-3.5 w-3.5" />}
+                                {closing
+                                  ? t.rutas.closing
+                                  : confirmCloseId === route.id
+                                    ? t.rutas.confirmCloseRoute
+                                    : t.rutas.closeRoute}
                               </button>
                             )}
                           </div>
@@ -413,6 +452,9 @@ export default function RutasPage() {
                   })}
                 </tbody>
               </table>
+              {routes.some((r) => isRouteOverdue(r, today)) && (
+                <p className="mt-3 text-xs text-outline">{t.rutas.overdueNotice}</p>
+              )}
             </Section>
           )}
         </div>

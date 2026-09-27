@@ -63,6 +63,7 @@ export const es = {
     completed: "Completada",
     delayed: "Retrasada",
     cancelled: "Cancelada",
+    overdue: "Sin completar",
   },
   panel: {
     title: "Panel principal",
@@ -182,12 +183,32 @@ export const es = {
     tableStatus: "Estado",
     tableKm: "Km (plan/real)",
     tableActions: "Acciones",
+    overdueNotice:
+      "Las rutas sin completar son solo de lectura: duplícalas para reprogramarlas en otra fecha.",
+    closeRoute: "Cerrar",
+    confirmCloseRoute: "¿Cerrar ruta?",
+    closing: "Cerrando...",
+  },
+  duplicateRoute: {
+    trigger: "Duplicar",
+    title: "Duplicar ruta",
+    description:
+      "Se crea una ruta nueva y pendiente con las paradas de abajo, todas como pendientes. Antes de crearla puedes quitar, agregar y reordenar paradas.",
+    stopsTitle: "Paradas de la nueva ruta",
+    loadingStops: "Cargando paradas",
+    noStops: "La nueva ruta se creará sin paradas.",
+    addTitle: "Agregar otra parada",
+    add: "Agregar a la lista",
+    create: "Crear ruta duplicada",
+    creating: "Creando...",
   },
   stops: {
     trigger: "Paradas",
     title: "Paradas de la ruta",
     description: "Agrega, edita y ordena las paradas que verá el conductor.",
     readOnlyNotice: "La ruta ya no está pendiente: sus paradas no se pueden modificar.",
+    overdueReadOnlyNotice:
+      "Esta ruta quedó sin completar: sus paradas son solo de lectura. Duplícala para reprogramarla.",
     loadingLabel: "Cargando paradas",
     emptyTitle: "Esta ruta todavía no tiene paradas.",
     emptyDescription: "Agrega la primera con el formulario de abajo.",

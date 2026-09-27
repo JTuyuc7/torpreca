@@ -16,3 +16,16 @@ const formatter = new Intl.DateTimeFormat("en-CA", {
 export function businessDate(date: Date = new Date()): string {
   return formatter.format(date);
 }
+
+// Fixed offset is safe: Guatemala has no DST.
+const BUSINESS_UTC_OFFSET = "-06:00";
+
+/**
+ * The instant a business day ends — the following local midnight. Used to
+ * cap the kilometers of a route that was closed days after its own date, so
+ * the GPS pings of the days in between aren't counted against it.
+ */
+export function endOfBusinessDay(date: string): Date {
+  const start = new Date(`${date}T00:00:00${BUSINESS_UTC_OFFSET}`);
+  return new Date(start.getTime() + 24 * 60 * 60 * 1000);
+}

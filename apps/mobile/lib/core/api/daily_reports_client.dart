@@ -30,4 +30,28 @@ class DailyReportsClient {
     if (reports.isEmpty) return null;
     return DailyReport.fromJson(reports.first as Map<String, dynamic>);
   }
+
+  /// The driver's reports, newest first (`GET /mobile/daily-reports/history`).
+  /// [before] (exclusive) continues after the last date of a previous page;
+  /// [from]/[to] (inclusive, `yyyy-MM-dd`) narrow it to a date range.
+  Future<List<DailyReport>> history(
+    String accessToken, {
+    int limit = 5,
+    String? before,
+    String? from,
+    String? to,
+  }) async {
+    final query = <String, String>{'limit': '$limit', 'before': ?before, 'from': ?from, 'to': ?to};
+    final res = await requestOrThrow(
+      () => _client.get(
+        Uri.parse('${Env.backendUrl}/api/v1/mobile/daily-reports/history')
+            .replace(queryParameters: query),
+        headers: {'Authorization': 'Bearer $accessToken'},
+      ),
+    );
+
+    return (jsonDecode(res.body) as List<dynamic>)
+        .map((r) => DailyReport.fromJson(r as Map<String, dynamic>))
+        .toList();
+  }
 }

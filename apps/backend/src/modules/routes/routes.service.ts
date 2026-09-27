@@ -1,4 +1,12 @@
-import type { AuthUser, CreateRouteInput, Route, UpdateRouteInput } from "@torpreca/shared";
+import {
+  type AuthUser,
+  type CreateRouteInput,
+  isRouteOverdue,
+  type ListRouteHistoryQuery,
+  type Route,
+  type RouteStatus,
+  type UpdateRouteInput,
+} from "@torpreca/shared";
 import { AppError, ForbiddenError, NotFoundError } from "../../core/errors/app-error";
 import type { RoutesRepository } from "./routes.repository";
 
@@ -6,8 +14,20 @@ import type { RoutesRepository } from "./routes.repository";
 // tests pass in an in-memory one and this runs without touching Supabase.
 export function createRoutesService(repo: RoutesRepository) {
   return {
-    async list(user: AuthUser, date?: string): Promise<Route[]> {
-      return repo.list(user.role === "driver" ? { driverId: user.id, date } : { date });
+    async list(user: AuthUser, date?: string, status?: RouteStatus): Promise<Route[]> {
+      return repo.list(
+        user.role === "driver" ? { driverId: user.id, date, status } : { date, status },
+      );
+    },
+
+    // The driver's finished routes (completed, or closed without finishing),
+    // newest first — what "Rutas anteriores" in the app pages through.
+    async history(user: AuthUser, query: ListRouteHistoryQuery): Promise<Route[]> {
+      return repo.list({
+        driverId: user.id,
+        statuses: ["completed", "cancelled"],
+        ...query,
+      });
     },
 
     async getById(id: string, user: AuthUser): Promise<Route> {
@@ -48,16 +68,37 @@ export function createRoutesService(repo: RoutesRepository) {
       return started;
     },
 
-    async finish(id: string, driverId: string, drivenKm: number): Promise<Route> {
+    async finish(id: string, driverId: string, drivenKm: number, endTime?: string): Promise<Route> {
       const route = await repo.getById(id);
       if (!route) throw new NotFoundError("Route not found");
       if (route.driverId !== driverId) {
         throw new ForbiddenError("This route belongs to another driver");
       }
 
-      const finished = await repo.finish(id, driverId, drivenKm);
+      const finished = await repo.finish(id, driverId, drivenKm, endTime);
       if (!finished) throw new AppError(409, "Route cannot be finished (not in progress)");
       return finished;
+    },
+
+    // A route the driver started and never finished, whose day is over. It
+    // can't just be `finish`ed by anyone else, and it's not really
+    // `completed` either, so it's closed as `cancelled` — by the driver
+    // themselves (their own route only) or by an admin/supervisor. Pending
+    // routes of a past day are not closable: nothing ran, they can only be
+    // duplicated.
+    async close(id: string, actor: AuthUser, drivenKm: number, endTime: string): Promise<Route> {
+      const route = await repo.getById(id);
+      if (!route) throw new NotFoundError("Route not found");
+      if (actor.role === "driver" && route.driverId !== actor.id) {
+        throw new ForbiddenError("This route belongs to another driver");
+      }
+      if (route.status !== "in_progress" || !isRouteOverdue(route)) {
+        throw new AppError(409, "Only an overdue in-progress route can be closed");
+      }
+
+      const closed = await repo.close(id, drivenKm, endTime);
+      if (!closed) throw new AppError(409, "Only an overdue in-progress route can be closed");
+      return closed;
     },
   };
 }

@@ -1,4 +1,4 @@
-import type { Route } from "@torpreca/shared";
+import { businessDate, type Route } from "@torpreca/shared";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { withQueryClient } from "@/lib/test-utils/query-client";
@@ -27,7 +27,8 @@ const route: Route = {
   driverId: "driver-1",
   vehicleId: null,
   createdBy: "admin-1",
-  date: "2026-09-24",
+  // Today: a pending route of a past day is "sin completar", i.e. read-only.
+  date: businessDate(),
   status: "pending",
   plannedKm: 10,
   drivenKm: 0,
@@ -207,6 +208,15 @@ describe("RouteStopsDialog", () => {
 
     expect(await screen.findByText("Tienda La Esquina")).toBeInTheDocument();
     expect(screen.getByText(/ya no está pendiente/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Agregar parada" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Editar:/ })).not.toBeInTheDocument();
+  });
+
+  it("is read-only for a pending route whose day already passed (sin completar)", async () => {
+    await openDialog([makeStop()], { ...route, date: "2020-01-01" });
+
+    expect(await screen.findByText("Tienda La Esquina")).toBeInTheDocument();
+    expect(screen.getByText(/quedó sin completar/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Agregar parada" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Editar:/ })).not.toBeInTheDocument();
   });

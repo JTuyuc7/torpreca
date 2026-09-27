@@ -1,4 +1,5 @@
-import { businessDate } from "@torpreca/shared";
+import { businessDate, ListDailyReportsQuerySchema } from "@torpreca/shared";
+import { ValidationError } from "../../core/errors/app-error";
 import type { Routable } from "../../core/http/router";
 import { auth } from "../../core/middleware/auth";
 import { rateLimitGeneral } from "../../core/middleware/rate-limit";
@@ -37,6 +38,23 @@ export function registerMobileDailyReportsRoutes(router: Routable) {
       const date = new URL(ctx.req.url).searchParams.get("date") ?? todayIsoDate();
       const report = await service.getByDriverAndDate(ctx.user!.id, date);
       return Response.json(report ? [report] : []);
+    },
+  );
+
+  // The driver app's "Historial": their reports newest first, 5 per page by
+  // default, filterable by date range. A separate path from the by-date read
+  // above so that one's "no params = today" default stays untouched.
+  router.get(
+    "/mobile/daily-reports/history",
+    auth,
+    requireRole("driver"),
+    rateLimitGeneral,
+    async (ctx) => {
+      const params = Object.fromEntries(new URL(ctx.req.url).searchParams);
+      const parsed = ListDailyReportsQuerySchema.safeParse(params);
+      if (!parsed.success) throw new ValidationError("Invalid query", parsed.error.issues);
+
+      return Response.json(await service.listByDriver(ctx.user!.id, parsed.data));
     },
   );
 }

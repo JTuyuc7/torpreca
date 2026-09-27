@@ -98,6 +98,14 @@ class TrackingService extends ChangeNotifier {
 
   int get pendingCount => _queueReady ? _queueStore.pendingCount : 0;
 
+  /// Most recent GPS fix read for a ping (every [_pingInterval]), or null
+  /// before the first one / after [stop]. Lets the Paradas screen show the
+  /// distance to the next stop without opening a second GPS stream.
+  Position? _lastPosition;
+  Position? get lastPosition => _lastPosition;
+
+  bool get isActive => _status == TrackingStatus.tracking || _status == TrackingStatus.connecting;
+
   Future<void> start(String accessToken) async {
     if (_status == TrackingStatus.connecting || _status == TrackingStatus.tracking) {
       return;
@@ -202,6 +210,7 @@ class TrackingService extends ChangeNotifier {
     _channelSub = null;
     await _channel?.sink.close();
     _channel = null;
+    _lastPosition = null;
     _setStatus(TrackingStatus.idle);
   }
 
@@ -224,6 +233,15 @@ class TrackingService extends ChangeNotifier {
       _fail('Se perdió la señal de ubicación: $error');
       return;
     }
+
+    // Tracking was stopped while the GPS read was in flight — don't
+    // resurrect a position (or queue a ping) after stop().
+    if (_status != TrackingStatus.tracking) return;
+
+    _lastPosition = position;
+    // Notify now (not only on a status change) so listeners showing the
+    // position — the next-stop distance — refresh on every ping.
+    notifyListeners();
 
     final payload = {
       'routeId': null,
@@ -301,8 +319,7 @@ class TrackingService extends ChangeNotifier {
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
     }
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
+    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
       throw LocationPermissionDeniedException(
         permanently: permission == LocationPermission.deniedForever,
       );

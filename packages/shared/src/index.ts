@@ -25,4 +25,5 @@ export * from "./schemas/vehicle.schema";
 export * from "./schemas/ws-message.schema";
 export * from "./security/hmac";
 export * from "./utils/business-date";
+export * from "./utils/route-overdue";
 export * from "./zod";

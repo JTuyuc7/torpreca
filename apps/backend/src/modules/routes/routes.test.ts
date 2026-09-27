@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { AuthUser, Route } from "@torpreca/shared";
+import { type AuthUser, businessDate, type Route } from "@torpreca/shared";
 import type { RoutesRepository } from "./routes.repository";
 import { createRoutesService } from "./routes.service";
 
@@ -12,6 +12,7 @@ function createFakeRepo(seed: Route[] = []): RoutesRepository {
       return routes.filter((r) => {
         if (filter.driverId && r.driverId !== filter.driverId) return false;
         if (filter.date && r.date !== filter.date) return false;
+        if (filter.status && r.status !== filter.status) return false;
         return true;
       });
     },
@@ -52,15 +53,27 @@ function createFakeRepo(seed: Route[] = []): RoutesRepository {
       route.startTime = new Date().toISOString();
       return route;
     },
-    async finish(id, driverId, drivenKm) {
+    async finish(id, driverId, drivenKm, endTime = new Date().toISOString()) {
       const route = routes.find(
         (r) => r.id === id && r.driverId === driverId && r.status === "in_progress",
       );
       if (!route) return null;
       route.status = "completed";
-      route.endTime = new Date().toISOString();
+      route.endTime = endTime;
       route.drivenKm = drivenKm;
       return route;
+    },
+    async close(id, drivenKm, endTime) {
+      const route = routes.find((r) => r.id === id && r.status === "in_progress");
+      if (!route) return null;
+      route.status = "cancelled";
+      route.endTime = endTime;
+      route.drivenKm = drivenKm;
+      return route;
+    },
+    async delete(id) {
+      const index = routes.findIndex((r) => r.id === id);
+      if (index !== -1) routes.splice(index, 1);
     },
   };
 }
@@ -255,5 +268,111 @@ describe("routes.service", () => {
     await expect(service.finish(route.id, driver.id, 10)).rejects.toThrow(
       "This route belongs to another driver",
     );
+  });
+
+  it("filters list() by status", async () => {
+    const service = createRoutesService(createFakeRepo());
+    const running = await service.create(
+      { code: "R-1", driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: null },
+      admin.id,
+    );
+    await service.create(
+      { code: "R-2", driverId: driver.id, vehicleId: null, date: "2026-08-22", plannedKm: null },
+      admin.id,
+    );
+    await service.start(running.id, driver.id);
+
+    const open = await service.list(driver, undefined, "in_progress");
+    expect(open.map((r) => r.code)).toEqual(["R-1"]);
+  });
+
+  it("finishes a route at the given end time", async () => {
+    const service = createRoutesService(createFakeRepo());
+    const route = await service.create(
+      { code: "R-1", driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: null },
+      admin.id,
+    );
+    await service.start(route.id, driver.id);
+
+    const finished = await service.finish(route.id, driver.id, 5, "2026-08-22T06:00:00.000Z");
+    expect(finished.endTime).toBe("2026-08-22T06:00:00.000Z");
+  });
+
+  describe("close", () => {
+    const endTime = "2026-08-22T06:00:00.000Z";
+
+    async function overdueInProgress(service: ReturnType<typeof createRoutesService>) {
+      const route = await service.create(
+        { code: "R-1", driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: null },
+        admin.id,
+      );
+      await service.start(route.id, driver.id);
+      return route;
+    }
+
+    it("lets an admin close an overdue in-progress route as cancelled", async () => {
+      const service = createRoutesService(createFakeRepo());
+      const route = await overdueInProgress(service);
+
+      const closed = await service.close(route.id, admin, 7.5, endTime);
+      expect(closed.status).toBe("cancelled");
+      expect(closed.drivenKm).toBe(7.5);
+      expect(closed.endTime).toBe(endTime);
+    });
+
+    it("lets the owning driver close their own route", async () => {
+      const service = createRoutesService(createFakeRepo());
+      const route = await overdueInProgress(service);
+
+      const closed = await service.close(route.id, driver, 0, endTime);
+      expect(closed.status).toBe("cancelled");
+    });
+
+    it("rejects a driver closing another driver's route", async () => {
+      const service = createRoutesService(createFakeRepo());
+      const route = await overdueInProgress(service);
+
+      await expect(service.close(route.id, otherDriver, 0, endTime)).rejects.toThrow(
+        "This route belongs to another driver",
+      );
+    });
+
+    it("rejects closing a route of today (not overdue yet)", async () => {
+      const service = createRoutesService(createFakeRepo());
+      const route = await service.create(
+        {
+          code: "R-1",
+          driverId: driver.id,
+          vehicleId: null,
+          date: businessDate(),
+          plannedKm: null,
+        },
+        admin.id,
+      );
+      await service.start(route.id, driver.id);
+
+      await expect(service.close(route.id, admin, 0, endTime)).rejects.toThrow(
+        "Only an overdue in-progress route can be closed",
+      );
+    });
+
+    it("rejects closing an overdue route that never started", async () => {
+      const service = createRoutesService(createFakeRepo());
+      const route = await service.create(
+        { code: "R-1", driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: null },
+        admin.id,
+      );
+
+      await expect(service.close(route.id, admin, 0, endTime)).rejects.toThrow(
+        "Only an overdue in-progress route can be closed",
+      );
+    });
+
+    it("throws NotFoundError for a missing route", async () => {
+      const service = createRoutesService(createFakeRepo());
+      await expect(service.close("no-existe", admin, 0, endTime)).rejects.toThrow(
+        "Route not found",
+      );
+    });
   });
 });

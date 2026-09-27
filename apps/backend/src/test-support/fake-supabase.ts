@@ -6,7 +6,7 @@
 
 export type Row = Record<string, unknown>;
 
-type Filter = { op: "eq" | "neq" | "gte" | "lt"; col: string; val: unknown };
+type Filter = { op: "eq" | "neq" | "gte" | "lt" | "lte" | "in"; col: string; val: unknown };
 
 type PostgrestResult = { data: unknown; error: { message: string } | null; count?: number };
 
@@ -66,8 +66,18 @@ class FakeQueryBuilder implements PromiseLike<PostgrestResult> {
     return this;
   }
 
+  in(col: string, val: unknown[]) {
+    this.filters.push({ op: "in", col, val });
+    return this;
+  }
+
   lt(col: string, val: unknown) {
     this.filters.push({ op: "lt", col, val });
+    return this;
+  }
+
+  lte(col: string, val: unknown) {
+    this.filters.push({ op: "lte", col, val });
     return this;
   }
 
@@ -107,6 +117,10 @@ class FakeQueryBuilder implements PromiseLike<PostgrestResult> {
           return rowVal >= filterVal;
         case "lt":
           return rowVal < filterVal;
+        case "lte":
+          return rowVal <= filterVal;
+        case "in":
+          return (f.val as unknown[]).includes(rowVal);
         default:
           return false;
       }

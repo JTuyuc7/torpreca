@@ -12,9 +12,11 @@ import {
   CreateUserSchema,
   CreateVehicleSchema,
   DashboardSummarySchema,
+  DuplicateRouteSchema,
   FinishRouteSchema,
   ReorderStopsSchema,
   ReviewUserSchema,
+  ROUTE_STATUSES,
   RouteSchema,
   StopSchema,
   UpdateRouteSchema,
@@ -68,6 +70,7 @@ const ReviewUser = registry.register("ReviewUser", ReviewUserSchema);
 const Route = registry.register("Route", RouteSchema);
 const CreateRoute = registry.register("CreateRoute", CreateRouteSchema);
 const UpdateRoute = registry.register("UpdateRoute", UpdateRouteSchema);
+const DuplicateRoute = registry.register("DuplicateRoute", DuplicateRouteSchema);
 const FinishRoute = registry.register("FinishRoute", FinishRouteSchema);
 const Stop = registry.register("Stop", StopSchema);
 const CreateStop = registry.register("CreateStop", CreateStopBodySchema);
@@ -224,8 +227,13 @@ path({
   path: "/routes",
   tags: ["Routes"],
   summary: "List routes visible to the caller",
-  request: { query: z.object({ date: z.iso.date().optional() }) },
-  responses: { 200: jsonResponse("Routes", z.array(Route)), 401: unauthorized },
+  request: {
+    query: z.object({
+      date: z.iso.date().optional(),
+      status: z.enum(ROUTE_STATUSES).optional(),
+    }),
+  },
+  responses: { 200: jsonResponse("Routes", z.array(Route)), 400: badRequest, 401: unauthorized },
 });
 path({
   method: "get",
@@ -301,6 +309,39 @@ path({
     403: forbidden,
     404: notFound,
     409: errorResponse("Route not in a finishable state"),
+  },
+});
+
+path({
+  method: "post",
+  path: "/routes/{id}/duplicate",
+  tags: ["Routes"],
+  summary:
+    "Create a pending route (new date/driver/vehicle) with the given stops, copied from another route",
+  request: {
+    params: IdParam,
+    body: { content: { "application/json": { schema: DuplicateRoute } } },
+  },
+  responses: {
+    201: jsonResponse("Route created with its stops", Route),
+    400: badRequest,
+    401: unauthorized,
+    403: forbidden,
+    404: notFound,
+  },
+});
+path({
+  method: "patch",
+  path: "/routes/{id}/close",
+  tags: ["Routes"],
+  summary: "Close an overdue in-progress route as cancelled (km measured up to the end of its day)",
+  request: { params: IdParam },
+  responses: {
+    200: jsonResponse("Route closed", Route),
+    401: unauthorized,
+    403: forbidden,
+    404: notFound,
+    409: errorResponse("Route is not an overdue in-progress route"),
   },
 });
 

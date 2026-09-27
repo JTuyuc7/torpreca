@@ -20,6 +20,8 @@ function fakeRoutesRepo(seed: Route[]): RoutesRepository {
     update: notUsed,
     start: notUsed,
     finish: notUsed,
+    close: notUsed,
+    delete: notUsed,
   };
 }
 

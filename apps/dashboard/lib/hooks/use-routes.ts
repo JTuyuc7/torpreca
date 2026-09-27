@@ -1,6 +1,17 @@
-import type { CreateRouteInput, Route, UpdateRouteInput } from "@torpreca/shared";
+import type {
+  CreateRouteInput,
+  DuplicateRouteInput,
+  Route,
+  UpdateRouteInput,
+} from "@torpreca/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createRoute, listRoutes, updateRoute } from "@/lib/api/routes-client";
+import {
+  closeRoute,
+  createRoute,
+  duplicateRoute,
+  listRoutes,
+  updateRoute,
+} from "@/lib/api/routes-client";
 
 const routesQueryKey = ["routes"] as const;
 
@@ -56,6 +67,48 @@ export function useRoutes() {
     },
   });
 
+  // "Duplicar": a new pending route (with its stops) modelled on `id`.
+  const duplicateRouteMutation = useMutation({
+    mutationFn: async (vars: { id: string; input: DuplicateRouteInput }) => {
+      const result = await duplicateRoute(vars.id, vars.input);
+      if (!result.ok) {
+        throw new Error(
+          result.status === 400
+            ? "Datos inválidos. Verifica los campos."
+            : result.status === 404
+              ? "La ruta original ya no existe."
+              : "No se pudo duplicar la ruta.",
+        );
+      }
+      return result.route;
+    },
+    onSuccess: (route) => {
+      queryClient.setQueryData<Route[]>(routesQueryKey, (prev) =>
+        prev ? [route, ...prev] : [route],
+      );
+    },
+  });
+
+  // "Cerrar": an overdue in-progress route the driver never finished.
+  const closeRouteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const result = await closeRoute(id);
+      if (!result.ok) {
+        throw new Error(
+          result.status === 409
+            ? "La ruta ya no está en curso o todavía no está vencida."
+            : "No se pudo cerrar la ruta.",
+        );
+      }
+      return result.route;
+    },
+    onSuccess: (route) => {
+      queryClient.setQueryData<Route[]>(routesQueryKey, (prev) =>
+        prev?.map((r) => (r.id === route.id ? route : r)),
+      );
+    },
+  });
+
   return {
     routes: routesQuery.data,
     isLoading: routesQuery.isLoading,
@@ -63,5 +116,7 @@ export function useRoutes() {
     refetch: routesQuery.refetch,
     createRoute: createRouteMutation,
     updateRoute: updateRouteMutation,
+    duplicateRoute: duplicateRouteMutation,
+    closeRoute: closeRouteMutation,
   };
 }

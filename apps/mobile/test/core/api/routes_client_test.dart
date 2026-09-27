@@ -13,7 +13,15 @@ Map<String, dynamic> routeJson({
   String status = 'pending',
   num drivenKm = 0,
   String createdAt = '2026-09-24T10:00:00.000Z',
-}) => {'id': id, 'code': code, 'status': status, 'drivenKm': drivenKm, 'createdAt': createdAt};
+  String date = '2026-09-24',
+}) => {
+  'id': id,
+  'code': code,
+  'date': date,
+  'status': status,
+  'drivenKm': drivenKm,
+  'createdAt': createdAt,
+};
 
 void main() {
   setUpAll(() {
@@ -97,6 +105,94 @@ void main() {
         RoutesClient(client: client).start('token-1', 'route-1'),
         throwsA(isA<ApiException>().having((e) => e.statusCode, 'statusCode', 409)),
       );
+    });
+  });
+
+  group('listInProgress / close', () {
+    test('listInProgress asks for in_progress routes of any date', () async {
+      http.Request? captured;
+      final client = MockClient((request) async {
+        captured = request;
+        return http.Response(
+          jsonEncode([routeJson(status: 'in_progress', date: '2026-09-25')]),
+          200,
+        );
+      });
+
+      final routes = await RoutesClient(client: client).listInProgress('token-1');
+
+      expect(
+        captured!.url.toString(),
+        'http://backend.test/api/v1/mobile/routes?status=in_progress',
+      );
+      expect(captured!.headers['Authorization'], 'Bearer token-1');
+      expect(routes.single.date, '2026-09-25');
+      expect(routes.single.isStale('2026-09-26'), isTrue);
+    });
+
+    test('close PATCHes /close and returns the cancelled route with its km', () async {
+      http.Request? captured;
+      final client = MockClient((request) async {
+        captured = request;
+        return http.Response(jsonEncode(routeJson(status: 'cancelled', drivenKm: 3.5)), 200);
+      });
+
+      final route = await RoutesClient(client: client).close('token-1', 'route-1');
+
+      expect(captured!.method, 'PATCH');
+      expect(captured!.url.toString(), 'http://backend.test/api/v1/mobile/routes/route-1/close');
+      expect(route.status, 'cancelled');
+      expect(route.drivenKm, 3.5);
+    });
+
+    test('closing a route that is not an overdue in-progress one surfaces a 409', () async {
+      final client = MockClient((_) async => http.Response('{}', 409));
+
+      expect(
+        RoutesClient(client: client).close('token-1', 'route-1'),
+        throwsA(isA<ApiException>().having((e) => e.statusCode, 'statusCode', 409)),
+      );
+    });
+  });
+
+  group('history', () {
+    test('asks for 5 finished routes from offset 0 by default and maps them', () async {
+      http.Request? captured;
+      final client = MockClient((request) async {
+        captured = request;
+        return http.Response(
+          jsonEncode([routeJson(status: 'completed', date: '2026-09-25', drivenKm: 8.5)]),
+          200,
+        );
+      });
+
+      final routes = await RoutesClient(client: client).history('token-1');
+
+      expect(captured!.url.path, '/api/v1/mobile/routes/history');
+      expect(captured!.url.queryParameters, {'limit': '5', 'offset': '0'});
+      expect(captured!.headers['Authorization'], 'Bearer token-1');
+      expect(routes.single.date, '2026-09-25');
+      expect(routes.single.isFinished, isTrue);
+      expect(routes.single.drivenKm, 8.5);
+    });
+
+    test('sends the page offset and the date range only when given', () async {
+      http.Request? captured;
+      final client = MockClient((request) async {
+        captured = request;
+        return http.Response('[]', 200);
+      });
+
+      final routes = await RoutesClient(client: client)
+          .history('token-1', limit: 10, offset: 20, from: '2026-09-01', to: '2026-09-15');
+
+      expect(captured!.url.queryParameters, {
+        'limit': '10',
+        'offset': '20',
+        'from': '2026-09-01',
+        'to': '2026-09-15',
+      });
+      expect(routes, isEmpty);
     });
   });
 }

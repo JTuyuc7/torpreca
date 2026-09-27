@@ -1,4 +1,4 @@
-import type { DailyReport } from "@torpreca/shared";
+import type { DailyReport, ListDailyReportsQuery } from "@torpreca/shared";
 import { supabaseAdmin } from "../../core/db/supabase";
 
 function toDailyReport(row: Record<string, unknown>): DailyReport {
@@ -27,6 +27,9 @@ export interface UpsertDailyReportInput {
 
 export interface DailyReportsRepository {
   getByDriverAndDate(driverId: string, date: string): Promise<DailyReport | null>;
+  // The driver's reports, newest first — `before` (exclusive) and `from`/`to`
+  // (inclusive) narrow the dates, `limit` caps the page.
+  listByDriver(driverId: string, query: ListDailyReportsQuery): Promise<DailyReport[]>;
   // Regenerating the same driver+date replaces the existing row (matches the
   // `daily_reports_driver_id_date_key` UNIQUE constraint) — a driver only
   // ever has one report per day, recomputed from scratch each time a route
@@ -44,6 +47,22 @@ export const dailyReportsRepository: DailyReportsRepository = {
       .maybeSingle();
     if (error) throw error;
     return data ? toDailyReport(data) : null;
+  },
+
+  async listByDriver(driverId, { limit, before, from, to }) {
+    let query = supabaseAdmin
+      .from("daily_reports")
+      .select("*")
+      .eq("driver_id", driverId)
+      .order("date", { ascending: false })
+      .range(0, limit - 1);
+    if (before) query = query.lt("date", before);
+    if (from) query = query.gte("date", from);
+    if (to) query = query.lte("date", to);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data.map(toDailyReport);
   },
 
   async upsert(input) {

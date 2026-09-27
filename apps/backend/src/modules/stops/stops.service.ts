@@ -36,6 +36,19 @@ export function createStopsService(repo: StopsRepository, routesRepo: RoutesRepo
     }
   }
 
+  // Completing/delaying a stop is what a driver does *while running* the
+  // route. Before "Iniciar ruta" there's no clock to measure against, and
+  // after it finished (or was closed) the route's numbers are already settled
+  // — a stop marked done on a pending route used to leave routes that looked
+  // finished but had never run.
+  async function assertRouteInProgress(routeId: string) {
+    const route = await routesRepo.getById(routeId);
+    if (!route) throw new NotFoundError("Route not found");
+    if (route.status !== "in_progress") {
+      throw new AppError(409, "Stop cannot be updated (route is not in progress)");
+    }
+  }
+
   return {
     async listByRoute(routeId: string, user: AuthUser): Promise<Stop[]> {
       await assertOwnsParentRoute(routeId, user);
@@ -87,6 +100,7 @@ export function createStopsService(repo: StopsRepository, routesRepo: RoutesRepo
       const stop = await repo.getById(id);
       if (!stop) throw new NotFoundError("Stop not found");
       await assertOwnsParentRoute(stop.routeId, user);
+      await assertRouteInProgress(stop.routeId);
 
       const updated = await repo.complete(id);
       if (!updated) throw new AppError(409, "Stop is already completed");
@@ -97,6 +111,7 @@ export function createStopsService(repo: StopsRepository, routesRepo: RoutesRepo
       const stop = await repo.getById(id);
       if (!stop) throw new NotFoundError("Stop not found");
       await assertOwnsParentRoute(stop.routeId, user);
+      await assertRouteInProgress(stop.routeId);
 
       const updated = await repo.delay(id);
       if (!updated) throw new AppError(409, "Stop is already completed");
