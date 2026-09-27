@@ -46,6 +46,12 @@ function createFakeRoutesRepo(seed: Route[]): RoutesRepository {
       route.startTime = new Date().toISOString();
       return route;
     },
+    async close() {
+      throw new Error("not used in these tests");
+    },
+    async delete() {
+      throw new Error("not used in these tests");
+    },
     async finish(id, driverId, drivenKm) {
       const route = seed.find(
         (r) => r.id === id && r.driverId === driverId && r.status === "in_progress",
@@ -131,6 +137,9 @@ function createFakeDailyReportsRepo(): DailyReportsRepository & { rows: DailyRep
     rows,
     async getByDriverAndDate(driverId, date) {
       return rows.find((r) => r.driverId === driverId && r.date === date) ?? null;
+    },
+    async listByDriver(driverId) {
+      return rows.filter((r) => r.driverId === driverId);
     },
     async upsert(input) {
       const existing = rows.find((r) => r.driverId === input.driverId && r.date === input.date);

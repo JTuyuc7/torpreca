@@ -1,4 +1,4 @@
-import type { DailyReport } from "@torpreca/shared";
+import type { DailyReport, ListDailyReportsQuery } from "@torpreca/shared";
 import type { RoutesRepository } from "../routes/routes.repository";
 import type { StopsRepository } from "../stops/stops.repository";
 import type { DailyReportsRepository } from "./daily-reports.repository";
@@ -24,6 +24,10 @@ export function createDailyReportsService(
   return {
     async getByDriverAndDate(driverId: string, date: string): Promise<DailyReport | null> {
       return repo.getByDriverAndDate(driverId, date);
+    },
+
+    async listByDriver(driverId: string, query: ListDailyReportsQuery): Promise<DailyReport[]> {
+      return repo.listByDriver(driverId, query);
     },
 
     // Recomputes the whole day from scratch across every one of the driver's

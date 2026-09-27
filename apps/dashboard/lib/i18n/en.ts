@@ -62,6 +62,7 @@ export const en: Messages = {
     completed: "Completed",
     delayed: "Delayed",
     cancelled: "Cancelled",
+    overdue: "Not completed",
   },
   panel: {
     title: "Dashboard",
@@ -180,12 +181,32 @@ export const en: Messages = {
     tableStatus: "Status",
     tableKm: "Km (planned/driven)",
     tableActions: "Actions",
+    overdueNotice:
+      "Routes that weren't completed are read-only: duplicate them to reschedule on another date.",
+    closeRoute: "Close",
+    confirmCloseRoute: "Close route?",
+    closing: "Closing...",
+  },
+  duplicateRoute: {
+    trigger: "Duplicate",
+    title: "Duplicate route",
+    description:
+      "Creates a new pending route with the stops below, all set to pending. Before creating it you can remove, add and reorder stops.",
+    stopsTitle: "Stops of the new route",
+    loadingStops: "Loading stops",
+    noStops: "The new route will be created without stops.",
+    addTitle: "Add another stop",
+    add: "Add to list",
+    create: "Create duplicated route",
+    creating: "Creating...",
   },
   stops: {
     trigger: "Stops",
     title: "Route stops",
     description: "Add, edit and reorder the stops the driver will see.",
     readOnlyNotice: "This route is no longer pending: its stops can't be changed.",
+    overdueReadOnlyNotice:
+      "This route wasn't completed: its stops are read-only. Duplicate it to reschedule.",
     loadingLabel: "Loading stops",
     emptyTitle: "This route has no stops yet.",
     emptyDescription: "Add the first one with the form below.",

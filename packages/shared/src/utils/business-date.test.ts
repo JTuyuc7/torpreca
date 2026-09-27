@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { businessDate } from "./business-date";
+import { businessDate, endOfBusinessDay } from "./business-date";
 
 describe("businessDate", () => {
   test("uses the Guatemala calendar day, not UTC, in the evening", () => {
@@ -14,5 +14,15 @@ describe("businessDate", () => {
   test("rolls over at local midnight (06:00Z)", () => {
     expect(businessDate(new Date("2026-09-24T05:59:59Z"))).toBe("2026-09-23");
     expect(businessDate(new Date("2026-09-24T06:00:00Z"))).toBe("2026-09-24");
+  });
+});
+
+describe("endOfBusinessDay", () => {
+  test("is the next local midnight (06:00Z of the following day)", () => {
+    expect(endOfBusinessDay("2026-09-24").toISOString()).toBe("2026-09-25T06:00:00.000Z");
+  });
+
+  test("crosses month and year boundaries", () => {
+    expect(endOfBusinessDay("2026-12-31").toISOString()).toBe("2027-01-01T06:00:00.000Z");
   });
 });

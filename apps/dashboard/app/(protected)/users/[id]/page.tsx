@@ -2,6 +2,7 @@
 
 import "mapbox-gl/dist/mapbox-gl.css";
 
+import { isRouteOverdue } from "@torpreca/shared";
 import { ArrowLeft, MapPin, Route as RouteIcon, UserX } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -156,7 +157,7 @@ export default function DriverDetailPage() {
                     <td className="py-2.5 pr-4 font-medium">{route.code}</td>
                     <td className="py-2.5 pr-4">{route.date}</td>
                     <td className="py-2.5 pr-4">
-                      <RouteStatusBadge status={route.status} />
+                      <RouteStatusBadge status={route.status} overdue={isRouteOverdue(route)} />
                     </td>
                     <td className="py-2.5 pr-4 tabular-nums">
                       {route.plannedKm ?? "—"} / {route.drivenKm}

@@ -1,6 +1,6 @@
 "use client";
 
-import type { Route, Stop } from "@torpreca/shared";
+import { isRouteOverdue, type Route, type Stop } from "@torpreca/shared";
 import { ArrowDown, ArrowUp, MapPin, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { AddressSearch } from "@/components/ui/address-search";
@@ -44,7 +44,10 @@ export function RouteStopsDialog({ route }: { route: Route }) {
   const { stops, isLoading, error, refetch, createStop, updateStop, deleteStop, reorderStops } =
     useStops(route.id, open);
 
-  const readOnly = route.status !== "pending";
+  // A pending route whose day already passed ("sin completar") is read-only
+  // too: it gets duplicated to another date instead of being edited.
+  const overdue = isRouteOverdue(route);
+  const readOnly = route.status !== "pending" || overdue;
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState("");
@@ -139,7 +142,11 @@ export function RouteStopsDialog({ route }: { route: Route }) {
             {t.stops.title} · {route.code}
           </DialogTitle>
           <DialogDescription>
-            {readOnly ? t.stops.readOnlyNotice : t.stops.description}
+            {overdue
+              ? t.stops.overdueReadOnlyNotice
+              : readOnly
+                ? t.stops.readOnlyNotice
+                : t.stops.description}
           </DialogDescription>
         </DialogHeader>
 

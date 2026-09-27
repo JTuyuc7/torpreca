@@ -1,4 +1,9 @@
-import type { CreateRouteInput, Route, UpdateRouteInput } from "@torpreca/shared";
+import type {
+  CreateRouteInput,
+  DuplicateRouteInput,
+  Route,
+  UpdateRouteInput,
+} from "@torpreca/shared";
 
 // Browser-side calls to this app's own /api/routes* BFF route handlers (see
 // lib/backend/signed-fetch.ts) — same centralization pattern as
@@ -45,6 +50,41 @@ export async function updateRoute(id: string, input: UpdateRouteInput): Promise<
       headers: { "content-type": "application/json" },
       body: JSON.stringify(input),
     });
+    if (!res.ok) return { ok: false, status: res.status };
+    const route = (await res.json()) as Route;
+    return { ok: true, route };
+  } catch {
+    return { ok: false, status: 0 };
+  }
+}
+
+export type DuplicateRouteResult = { ok: true; route: Route } | { ok: false; status: number };
+
+// POST /api/routes/:id/duplicate — the new route (with its stops) is built
+// from the body, `id` is only the route it was modelled on.
+export async function duplicateRoute(
+  id: string,
+  input: DuplicateRouteInput,
+): Promise<DuplicateRouteResult> {
+  try {
+    const res = await fetch(`/api/routes/${id}/duplicate`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) return { ok: false, status: res.status };
+    const route = (await res.json()) as Route;
+    return { ok: true, route };
+  } catch {
+    return { ok: false, status: 0 };
+  }
+}
+
+export type CloseRouteResult = { ok: true; route: Route } | { ok: false; status: number };
+
+export async function closeRoute(id: string): Promise<CloseRouteResult> {
+  try {
+    const res = await fetch(`/api/routes/${id}/close`, { method: "PATCH" });
     if (!res.ok) return { ok: false, status: res.status };
     const route = (await res.json()) as Route;
     return { ok: true, route };

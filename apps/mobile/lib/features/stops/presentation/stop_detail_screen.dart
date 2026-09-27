@@ -7,10 +7,10 @@ import 'stop_status_ui.dart';
 
 /// "Detalle de parada" (TOR-20) — full info for one stop plus the actions to
 /// mark it completed or delayed (`PATCH /mobile/stops/:id/complete|delay`).
-/// Pushed from `StopsScreen` when a `ListTile` is tapped; `StopsScreen`
-/// re-fetches the list when this screen is popped (simpler and more robust
-/// than threading a return value through every way back — system gesture,
-/// AppBar button, etc. — for a screen that's cheap to refetch anyway).
+/// Pushed from `StopsScreen` when a `ListTile` is tapped. Whichever way the
+/// driver leaves it (system back gesture, AppBar button), it pops with the
+/// stop as it stands, so `StopsScreen` can patch that one stop into its list
+/// instead of refetching every route.
 class StopDetailScreen extends StatefulWidget {
   const StopDetailScreen({super.key, required this.stop, this.canAct = true});
 
@@ -53,6 +53,18 @@ class _StopDetailScreenState extends State<StopDetailScreen> {
   Widget build(BuildContext context) {
     final isFinal = _stop.status == StopStatus.completed;
 
+    // `canPop: false` + a manual pop is what lets every way back carry the
+    // (possibly updated) stop as the result.
+    return PopScope<Stop>(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) Navigator.of(context).pop(_stop);
+      },
+      child: _buildScaffold(context, isFinal),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context, bool isFinal) {
     return Scaffold(
       appBar: AppBar(title: Text(_stop.customerName)),
       body: ListView(

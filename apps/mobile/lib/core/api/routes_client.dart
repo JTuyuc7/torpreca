@@ -38,6 +38,50 @@ class RoutesClient {
     return routes;
   }
 
+  /// The driver's finished routes (completed, or closed without finishing),
+  /// newest first (`GET /mobile/routes/history`): [limit] per page from
+  /// [offset], optionally within an inclusive [from]/[to] date range
+  /// (`yyyy-MM-dd`).
+  Future<List<DriverRoute>> history(
+    String accessToken, {
+    int limit = 5,
+    int offset = 0,
+    String? from,
+    String? to,
+  }) async {
+    final query = <String, String>{
+      'limit': '$limit',
+      'offset': '$offset',
+      'from': ?from,
+      'to': ?to,
+    };
+    final res = await requestOrThrow(
+      () => _client.get(
+        Uri.parse('$_basePath/history').replace(queryParameters: query),
+        headers: {'Authorization': 'Bearer $accessToken'},
+      ),
+    );
+
+    return (jsonDecode(res.body) as List<dynamic>)
+        .map((r) => DriverRoute.fromJson(r as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// The driver's routes that are started and not finished, of any date —
+  /// how the app finds the ones it left running on a previous day.
+  Future<List<DriverRoute>> listInProgress(String accessToken) async {
+    final res = await requestOrThrow(
+      () => _client.get(
+        Uri.parse('$_basePath?status=in_progress'),
+        headers: {'Authorization': 'Bearer $accessToken'},
+      ),
+    );
+
+    return (jsonDecode(res.body) as List<dynamic>)
+        .map((r) => DriverRoute.fromJson(r as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<DriverRoute> start(String accessToken, String routeId) =>
       _patch(accessToken, '$_basePath/$routeId/start');
 
@@ -45,6 +89,12 @@ class RoutesClient {
   /// app doesn't send any.
   Future<DriverRoute> finish(String accessToken, String routeId) =>
       _patch(accessToken, '$_basePath/$routeId/finish');
+
+  /// "Cerrar sin completar": gives up a route from a past day that was started
+  /// and never finished. The backend keeps only the km driven up to the end of
+  /// that day and marks the route cancelled.
+  Future<DriverRoute> close(String accessToken, String routeId) =>
+      _patch(accessToken, '$_basePath/$routeId/close');
 
   Future<DriverRoute> _patch(String accessToken, String url) async {
     final res = await requestOrThrow(

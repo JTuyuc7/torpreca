@@ -1,4 +1,4 @@
-import type { CreateRouteInput, Route, UpdateRouteInput } from "@torpreca/shared";
+import type { CreateRouteInput, Route, RouteStatus, UpdateRouteInput } from "@torpreca/shared";
 import { supabaseAdmin } from "../../core/db/supabase";
 
 function toRoute(row: Record<string, unknown>): Route {
@@ -22,6 +22,15 @@ function toRoute(row: Record<string, unknown>): Route {
 export interface RouteFilter {
   driverId?: string;
   date?: string;
+  status?: RouteStatus;
+  // Any of these statuses (the history asks for completed + cancelled).
+  statuses?: RouteStatus[];
+  // Inclusive date range.
+  from?: string;
+  to?: string;
+  // Page of the (already ordered) result: `limit` rows starting at `offset`.
+  limit?: number;
+  offset?: number;
 }
 
 export interface RoutesRepository {
@@ -32,14 +41,36 @@ export interface RoutesRepository {
   // pattern as start/finish below.
   update(id: string, patch: UpdateRouteInput): Promise<Route | null>;
   start(id: string, driverId: string): Promise<Route | null>;
-  finish(id: string, driverId: string, drivenKm: number): Promise<Route | null>;
+  // `endTime` defaults to now; a route finished long after its own day passes
+  // the end of that day instead (see routes.routes.ts#measureRoute).
+  finish(id: string, driverId: string, drivenKm: number, endTime?: string): Promise<Route | null>;
+  // Force-closes an `in_progress` route as `cancelled` (never finished by the
+  // driver) — no driver filter, an admin can close any driver's route.
+  close(id: string, drivenKm: number, endTime: string): Promise<Route | null>;
+  // Only used to roll back a half-created duplicate; the stops go with it
+  // (ON DELETE CASCADE).
+  delete(id: string): Promise<void>;
 }
 
 export const routesRepository: RoutesRepository = {
   async list(filter = {}) {
-    let query = supabaseAdmin.from("routes").select("*").order("date", { ascending: false });
+    // Newest first, and within a day the most recently created route first —
+    // without a tiebreaker the order of same-day routes was up to Postgres.
+    let query = supabaseAdmin
+      .from("routes")
+      .select("*")
+      .order("date", { ascending: false })
+      .order("created_at", { ascending: false });
     if (filter.driverId) query = query.eq("driver_id", filter.driverId);
     if (filter.date) query = query.eq("date", filter.date);
+    if (filter.status) query = query.eq("status", filter.status);
+    if (filter.statuses) query = query.in("status", filter.statuses);
+    if (filter.from) query = query.gte("date", filter.from);
+    if (filter.to) query = query.lte("date", filter.to);
+    if (filter.limit !== undefined) {
+      const offset = filter.offset ?? 0;
+      query = query.range(offset, offset + filter.limit - 1);
+    }
 
     const { data, error } = await query;
     if (error) throw error;
@@ -107,10 +138,10 @@ export const routesRepository: RoutesRepository = {
     return data ? toRoute(data) : null;
   },
 
-  async finish(id, driverId, drivenKm) {
+  async finish(id, driverId, drivenKm, endTime = new Date().toISOString()) {
     const { data, error } = await supabaseAdmin
       .from("routes")
-      .update({ status: "completed", end_time: new Date().toISOString(), driven_km: drivenKm })
+      .update({ status: "completed", end_time: endTime, driven_km: drivenKm })
       .eq("id", id)
       .eq("driver_id", driverId)
       .eq("status", "in_progress")
@@ -118,5 +149,22 @@ export const routesRepository: RoutesRepository = {
       .maybeSingle();
     if (error) throw error;
     return data ? toRoute(data) : null;
+  },
+
+  async close(id, drivenKm, endTime) {
+    const { data, error } = await supabaseAdmin
+      .from("routes")
+      .update({ status: "cancelled", end_time: endTime, driven_km: drivenKm })
+      .eq("id", id)
+      .eq("status", "in_progress")
+      .select("*")
+      .maybeSingle();
+    if (error) throw error;
+    return data ? toRoute(data) : null;
+  },
+
+  async delete(id) {
+    const { error } = await supabaseAdmin.from("routes").delete().eq("id", id);
+    if (error) throw error;
   },
 };

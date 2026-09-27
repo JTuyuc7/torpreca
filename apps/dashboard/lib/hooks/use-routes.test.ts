@@ -5,7 +5,11 @@ import { withQueryClient } from "@/lib/test-utils/query-client";
 const listRoutes = vi.fn();
 const createRoute = vi.fn();
 const updateRoute = vi.fn();
+const duplicateRoute = vi.fn();
+const closeRoute = vi.fn();
 vi.mock("@/lib/api/routes-client", () => ({
+  duplicateRoute: (...args: unknown[]) => duplicateRoute(...args),
+  closeRoute: (...args: unknown[]) => closeRoute(...args),
   listRoutes: (...args: unknown[]) => listRoutes(...args),
   createRoute: (...args: unknown[]) => createRoute(...args),
   updateRoute: (...args: unknown[]) => updateRoute(...args),
@@ -33,6 +37,8 @@ beforeEach(() => {
   listRoutes.mockReset();
   createRoute.mockReset();
   updateRoute.mockReset();
+  duplicateRoute.mockReset();
+  closeRoute.mockReset();
 });
 
 function renderUseRoutes() {
@@ -102,6 +108,83 @@ describe("useRoutes", () => {
     await waitFor(() =>
       expect(result.current.updateRoute.error?.message).toBe(
         "La ruta ya no está pendiente y no se puede editar.",
+      ),
+    );
+  });
+
+  it("duplicateRoute prepends the new route to the cached list", async () => {
+    listRoutes.mockResolvedValue({ ok: true, routes: [pendingRoute] });
+    const copy = { ...pendingRoute, id: "r2", date: "2026-09-27" };
+    duplicateRoute.mockResolvedValue({ ok: true, route: copy });
+
+    const { result } = renderUseRoutes();
+    await waitFor(() => expect(result.current.routes).toEqual([pendingRoute]));
+
+    const input = {
+      code: "R-20260927-01",
+      driverId: "driver-1",
+      vehicleId: null,
+      date: "2026-09-27",
+      plannedKm: 10,
+      stops: [],
+    };
+    result.current.duplicateRoute.mutate({ id: pendingRoute.id, input });
+
+    await waitFor(() => expect(result.current.routes).toEqual([copy, pendingRoute]));
+    expect(duplicateRoute).toHaveBeenCalledWith(pendingRoute.id, input);
+  });
+
+  it("duplicateRoute surfaces a 404 as 'the original route no longer exists'", async () => {
+    listRoutes.mockResolvedValue({ ok: true, routes: [pendingRoute] });
+    duplicateRoute.mockResolvedValue({ ok: false, status: 404 });
+
+    const { result } = renderUseRoutes();
+    await waitFor(() => expect(result.current.routes).toEqual([pendingRoute]));
+
+    result.current.duplicateRoute.mutate({
+      id: pendingRoute.id,
+      input: {
+        code: "R-1",
+        driverId: "driver-1",
+        vehicleId: null,
+        date: "2026-09-27",
+        plannedKm: null,
+        stops: [],
+      },
+    });
+
+    await waitFor(() =>
+      expect(result.current.duplicateRoute.error?.message).toBe("La ruta original ya no existe."),
+    );
+  });
+
+  it("closeRoute replaces the route in the cached list with the closed one", async () => {
+    const running = { ...pendingRoute, status: "in_progress" as const };
+    listRoutes.mockResolvedValue({ ok: true, routes: [running] });
+    const closed = { ...running, status: "cancelled" as const, drivenKm: 3.2 };
+    closeRoute.mockResolvedValue({ ok: true, route: closed });
+
+    const { result } = renderUseRoutes();
+    await waitFor(() => expect(result.current.routes).toEqual([running]));
+
+    result.current.closeRoute.mutate(running.id);
+
+    await waitFor(() => expect(result.current.routes).toEqual([closed]));
+    expect(closeRoute).toHaveBeenCalledWith(running.id);
+  });
+
+  it("closeRoute surfaces a 409 as a friendly message", async () => {
+    listRoutes.mockResolvedValue({ ok: true, routes: [pendingRoute] });
+    closeRoute.mockResolvedValue({ ok: false, status: 409 });
+
+    const { result } = renderUseRoutes();
+    await waitFor(() => expect(result.current.routes).toEqual([pendingRoute]));
+
+    result.current.closeRoute.mutate(pendingRoute.id);
+
+    await waitFor(() =>
+      expect(result.current.closeRoute.error?.message).toBe(
+        "La ruta ya no está en curso o todavía no está vencida.",
       ),
     );
   });

@@ -24,6 +24,12 @@ function createFakeRoutesRepo(seed: Route[]): RoutesRepository {
     async finish() {
       throw new Error("not used in these tests");
     },
+    async close() {
+      throw new Error("not used in these tests");
+    },
+    async delete() {
+      throw new Error("not used in these tests");
+    },
   };
 }
 
@@ -275,4 +281,29 @@ describe("stops.service", () => {
     const delayed = await service.delay(stop.id, driver);
     expect(delayed.status).toBe("delayed");
   });
+
+  it.each(["pending", "completed", "cancelled"] as const)(
+    "rejects completing or delaying a stop while its route is %s",
+    async (status) => {
+      const route: Route = { ...baseRoute, status };
+      const stopsRepo = createFakeStopsRepo();
+      const service = createStopsService(stopsRepo, createFakeRoutesRepo([route]));
+      const stop = await stopsRepo.create({
+        routeId: route.id,
+        order: 1,
+        customerName: "Cliente 1",
+        address: "Zona 1",
+        lat: 14.6,
+        lng: -90.5,
+        instructions: null,
+      });
+
+      await expect(service.complete(stop.id, driver)).rejects.toThrow(
+        "Stop cannot be updated (route is not in progress)",
+      );
+      await expect(service.delay(stop.id, driver)).rejects.toThrow(
+        "Stop cannot be updated (route is not in progress)",
+      );
+    },
+  );
 });
