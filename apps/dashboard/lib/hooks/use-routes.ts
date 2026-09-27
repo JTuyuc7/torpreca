@@ -1,7 +1,17 @@
-import type { CreateRouteInput, Route, UpdateRouteInput } from "@torpreca/shared";
+import type {
+  CreateRouteInput,
+  DuplicateRouteInput,
+  Route,
+  UpdateRouteInput,
+} from "@torpreca/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createRoute, listRoutes, updateRoute } from "@/lib/api/routes-client";
-import { getAccessToken } from "@/lib/supabase/access-token";
+import {
+  closeRoute,
+  createRoute,
+  duplicateRoute,
+  listRoutes,
+  updateRoute,
+} from "@/lib/api/routes-client";
 
 const routesQueryKey = ["routes"] as const;
 
@@ -13,8 +23,7 @@ export function useRoutes() {
   const routesQuery = useQuery({
     queryKey: routesQueryKey,
     queryFn: async () => {
-      const token = await getAccessToken();
-      const result = await listRoutes(token);
+      const result = await listRoutes();
       if (!result.ok) throw new Error("No se pudieron cargar las rutas.");
       return result.routes;
     },
@@ -22,8 +31,7 @@ export function useRoutes() {
 
   const createRouteMutation = useMutation({
     mutationFn: async (input: CreateRouteInput) => {
-      const token = await getAccessToken();
-      const result = await createRoute(token, input);
+      const result = await createRoute(input);
       if (!result.ok) {
         throw new Error(
           result.status === 400
@@ -42,13 +50,54 @@ export function useRoutes() {
 
   const updateRouteMutation = useMutation({
     mutationFn: async (vars: { id: string; input: UpdateRouteInput }) => {
-      const token = await getAccessToken();
-      const result = await updateRoute(token, vars.id, vars.input);
+      const result = await updateRoute(vars.id, vars.input);
       if (!result.ok) {
         throw new Error(
           result.status === 409
             ? "La ruta ya no está pendiente y no se puede editar."
             : "No se pudo editar la ruta.",
+        );
+      }
+      return result.route;
+    },
+    onSuccess: (route) => {
+      queryClient.setQueryData<Route[]>(routesQueryKey, (prev) =>
+        prev?.map((r) => (r.id === route.id ? route : r)),
+      );
+    },
+  });
+
+  // "Duplicar": a new pending route (with its stops) modelled on `id`.
+  const duplicateRouteMutation = useMutation({
+    mutationFn: async (vars: { id: string; input: DuplicateRouteInput }) => {
+      const result = await duplicateRoute(vars.id, vars.input);
+      if (!result.ok) {
+        throw new Error(
+          result.status === 400
+            ? "Datos inválidos. Verifica los campos."
+            : result.status === 404
+              ? "La ruta original ya no existe."
+              : "No se pudo duplicar la ruta.",
+        );
+      }
+      return result.route;
+    },
+    onSuccess: (route) => {
+      queryClient.setQueryData<Route[]>(routesQueryKey, (prev) =>
+        prev ? [route, ...prev] : [route],
+      );
+    },
+  });
+
+  // "Cerrar": an overdue in-progress route the driver never finished.
+  const closeRouteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const result = await closeRoute(id);
+      if (!result.ok) {
+        throw new Error(
+          result.status === 409
+            ? "La ruta ya no está en curso o todavía no está vencida."
+            : "No se pudo cerrar la ruta.",
         );
       }
       return result.route;
@@ -67,5 +116,7 @@ export function useRoutes() {
     refetch: routesQuery.refetch,
     createRoute: createRouteMutation,
     updateRoute: updateRouteMutation,
+    duplicateRoute: duplicateRouteMutation,
+    closeRoute: closeRouteMutation,
   };
 }

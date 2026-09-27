@@ -27,19 +27,16 @@ describe("listPendingUsers", () => {
   it("returns ok:true with the parsed users on success", async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify([user]), { status: 200 }));
 
-    const result = await listPendingUsers("tok");
+    const result = await listPendingUsers();
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/users?status=pending",
-      expect.objectContaining({ headers: { authorization: "Bearer tok" } }),
-    );
+    expect(fetchMock).toHaveBeenCalledWith("/api/users?status=pending");
     expect(result).toEqual({ ok: true, users: [user] });
   });
 
   it("returns ok:false with the response status on failure", async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 500 }));
 
-    const result = await listPendingUsers("tok");
+    const result = await listPendingUsers();
 
     expect(result).toEqual({ ok: false, status: 500 });
   });
@@ -47,7 +44,7 @@ describe("listPendingUsers", () => {
   it("returns ok:false with status 0 instead of throwing on a network error", async () => {
     fetchMock.mockRejectedValue(new Error("network down"));
 
-    const result = await listPendingUsers("tok");
+    const result = await listPendingUsers();
 
     expect(result).toEqual({ ok: false, status: 0 });
   });
@@ -59,13 +56,13 @@ describe("reviewUser", () => {
       new Response(JSON.stringify({ ...user, status: "active" }), { status: 200 }),
     );
 
-    const result = await reviewUser("tok", "u2", "approve");
+    const result = await reviewUser("u2", "approve");
 
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/users/u2/review",
       expect.objectContaining({
         method: "PATCH",
-        headers: { authorization: "Bearer tok", "content-type": "application/json" },
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({ decision: "approve" }),
       }),
     );
@@ -79,7 +76,7 @@ describe("reviewUser", () => {
       }),
     );
 
-    await reviewUser("tok", "u2", "approve", "supervisor");
+    await reviewUser("u2", "approve", "supervisor");
 
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/users/u2/review",
@@ -90,7 +87,7 @@ describe("reviewUser", () => {
   it("returns ok:false with the response status on failure", async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 409 }));
 
-    const result = await reviewUser("tok", "u2", "reject");
+    const result = await reviewUser("u2", "reject");
 
     expect(result).toEqual({ ok: false, status: 409 });
   });
@@ -100,19 +97,16 @@ describe("listAllUsers", () => {
   it("requests status=all and returns ok:true with the parsed users", async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify([user]), { status: 200 }));
 
-    const result = await listAllUsers("tok");
+    const result = await listAllUsers();
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/users?status=all",
-      expect.objectContaining({ headers: { authorization: "Bearer tok" } }),
-    );
+    expect(fetchMock).toHaveBeenCalledWith("/api/users?status=all");
     expect(result).toEqual({ ok: true, users: [user] });
   });
 
   it("returns ok:false with the response status on failure", async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 500 }));
 
-    const result = await listAllUsers("tok");
+    const result = await listAllUsers();
 
     expect(result).toEqual({ ok: false, status: 500 });
   });
@@ -122,7 +116,7 @@ describe("createUser", () => {
   it("POSTs the input and returns the created user", async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify(user), { status: 201 }));
 
-    const result = await createUser("tok", {
+    const result = await createUser({
       authUserId: "a2",
       name: "Nuevo Driver",
       email: "nuevo-driver@example.com",
@@ -133,7 +127,7 @@ describe("createUser", () => {
       "/api/users",
       expect.objectContaining({
         method: "POST",
-        headers: { authorization: "Bearer tok", "content-type": "application/json" },
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({
           authUserId: "a2",
           name: "Nuevo Driver",
@@ -148,7 +142,7 @@ describe("createUser", () => {
   it("returns ok:false with the response status on failure", async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 409 }));
 
-    const result = await createUser("tok", {
+    const result = await createUser({
       authUserId: "a2",
       name: "Nuevo Driver",
       email: "nuevo-driver@example.com",
@@ -163,11 +157,11 @@ describe("deactivateUser", () => {
   it("DELETEs the user and returns ok:true", async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
 
-    const result = await deactivateUser("tok", "u2");
+    const result = await deactivateUser("u2");
 
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/users/u2",
-      expect.objectContaining({ method: "DELETE", headers: { authorization: "Bearer tok" } }),
+      expect.objectContaining({ method: "DELETE" }),
     );
     expect(result).toEqual({ ok: true });
   });
@@ -175,7 +169,7 @@ describe("deactivateUser", () => {
   it("returns ok:false with the response status on failure", async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 404 }));
 
-    const result = await deactivateUser("tok", "u2");
+    const result = await deactivateUser("u2");
 
     expect(result).toEqual({ ok: false, status: 404 });
   });

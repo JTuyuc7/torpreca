@@ -14,21 +14,40 @@ import '../../../core/offline/sync_queue_item.dart';
 
 enum TrackingStatus { idle, connecting, tracking, error }
 
+/// Thrown by [TrackingService._ensureLocationPermission] instead of a bare
+/// [StateError] — a `StateError.toString()` prefixes "Bad state:", which
+/// leaked into the UI as raw, undescriptive text. This carries just enough
+/// to build a proper user-facing message in [TrackingService._fail].
+class LocationPermissionDeniedException implements Exception {
+  const LocationPermissionDeniedException({required this.permanently});
+
+  /// True for [LocationPermission.deniedForever] — the OS won't show its
+  /// own permission dialog again, so the only way out is the app's own
+  /// Settings screen (not the device-wide location settings).
+  final bool permanently;
+}
+
 /// Sends periodic GPS pings over `/ws` (apps/backend/src/core/ws/*) while
 /// the app is in the foreground. No route assignment exists yet, so
 /// `routeId` is always sent as `null` — matches `CreateLocationSchema` in
 /// packages/shared, which still requires the key.
 ///
 /// Offline-first (PG1 requirement): if the socket isn't connected when a
-/// ping is due (never connected, or dropped mid-session), the ping is
-/// queued locally via [OfflineQueueStore] with `synced: false` instead of
-/// being dropped. `status` stays `tracking` through a connection loss —
-/// only a fatal error (GPS permission/services, or the initial connect)
-/// moves it to `error`. Every time the socket connects (including the
-/// first time), the queue is drained via `POST /mobile/sync` — there's no
-/// background/periodic retry beyond that, so a queue built up during a long
-/// offline stretch clears out the next time the user restarts tracking
-/// with a connection available.
+/// ping is due (never connected, dropped mid-session, or still
+/// reconnecting), the ping is queued locally via [OfflineQueueStore] with
+/// `synced: false` instead of being dropped. `status` stays `tracking`
+/// through a connection loss — only a fatal error (GPS permission/services,
+/// or the initial connect) moves it to `error`.
+///
+/// A dropped socket triggers [_scheduleReconnect] automatically — retried
+/// with exponential backoff ([_reconnectBaseDelay] up to [_reconnectMaxDelay])
+/// for as long as `status` stays `tracking`, no user action needed. Found
+/// necessary once the dashboard's driver table (TOR-31) started treating a
+/// stale-for-30s ping as "offline": without an automatic reconnect, a
+/// connection drop that used to just mean "queue quietly, catch up whenever
+/// the driver next restarts tracking" instead made that driver look
+/// permanently offline on the dashboard, even mid-session. Every successful
+/// (re)connect drains the offline queue via `POST /mobile/sync`.
 ///
 /// Background tracking (app minimized/closed) is a separate ticket — this
 /// only tracks while a screen holding this service stays mounted.
@@ -44,6 +63,8 @@ class TrackingService extends ChangeNotifier {
        _uuid = uuid ?? const Uuid();
 
   static const _pingInterval = Duration(seconds: 8);
+  static const _reconnectBaseDelay = Duration(seconds: 3);
+  static const _reconnectMaxDelay = Duration(seconds: 30);
 
   final WsTicketClient _ticketClient;
   final SyncClient _syncClient;
@@ -55,6 +76,12 @@ class TrackingService extends ChangeNotifier {
   WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _channelSub;
   Timer? _pingTimer;
+
+  // Kept for _attemptReconnect — start()'s own accessToken argument is long
+  // gone by the time a drop happens minutes into a session.
+  String? _accessToken;
+  Timer? _reconnectTimer;
+  int _reconnectAttempt = 0;
 
   TrackingStatus _status = TrackingStatus.idle;
   TrackingStatus get status => _status;
@@ -71,10 +98,20 @@ class TrackingService extends ChangeNotifier {
 
   int get pendingCount => _queueReady ? _queueStore.pendingCount : 0;
 
+  /// Most recent GPS fix read for a ping (every [_pingInterval]), or null
+  /// before the first one / after [stop]. Lets the Paradas screen show the
+  /// distance to the next stop without opening a second GPS stream.
+  Position? _lastPosition;
+  Position? get lastPosition => _lastPosition;
+
+  bool get isActive => _status == TrackingStatus.tracking || _status == TrackingStatus.connecting;
+
   Future<void> start(String accessToken) async {
     if (_status == TrackingStatus.connecting || _status == TrackingStatus.tracking) {
       return;
     }
+    _accessToken = accessToken;
+    _reconnectAttempt = 0;
     _setStatus(TrackingStatus.connecting);
 
     try {
@@ -86,10 +123,19 @@ class TrackingService extends ChangeNotifier {
       _setStatus(TrackingStatus.tracking);
       unawaited(_sendPing());
       unawaited(_drainOfflineQueue(accessToken));
-    } on LocationServiceDisabledException catch (error) {
-      _fail(error.toString(), locationServicesDisabled: true);
+    } on LocationServiceDisabledException catch (_) {
+      _fail(
+        'El GPS del dispositivo está desactivado. Actívalo para iniciar el rastreo.',
+        locationServicesDisabled: true,
+      );
+    } on LocationPermissionDeniedException catch (error) {
+      _fail(
+        error.permanently
+            ? 'El permiso de ubicación fue denegado permanentemente. Actívalo manualmente en Ajustes de la app.'
+            : 'Se necesita el permiso de ubicación para iniciar el rastreo.',
+      );
     } catch (error) {
-      _fail(error.toString());
+      _fail('No se pudo iniciar el rastreo: $error');
     }
   }
 
@@ -109,24 +155,62 @@ class TrackingService extends ChangeNotifier {
 
   /// The socket dropped mid-session (network loss, backend restart, etc).
   /// Deliberately does *not* call [_fail] — tracking stays "active" and
-  /// subsequent pings fall back to the offline queue in [_sendPing] until
-  /// the user restarts tracking. No auto-reconnect here (out of scope for
-  /// this ticket — see the class doc comment).
+  /// subsequent pings fall back to the offline queue in [_sendPing] while a
+  /// reconnect is pending. See the class doc comment for why an automatic
+  /// reconnect (not just falling back to the offline queue forever) matters.
   void _handleConnectionLost() {
     if (_channel == null) return;
     _channelSub?.cancel();
     _channelSub = null;
     _channel = null;
     notifyListeners();
+    _scheduleReconnect();
+  }
+
+  // Guarded by `_reconnectTimer != null` so a burst of onError+onDone from
+  // the same drop (or an overlapping manual retry path) never schedules more
+  // than one pending attempt at a time.
+  void _scheduleReconnect() {
+    if (_status != TrackingStatus.tracking || _reconnectTimer != null) return;
+    final delaySeconds = (_reconnectBaseDelay.inSeconds * (1 << _reconnectAttempt)).clamp(
+      _reconnectBaseDelay.inSeconds,
+      _reconnectMaxDelay.inSeconds,
+    );
+    _reconnectTimer = Timer(Duration(seconds: delaySeconds), _attemptReconnect);
+  }
+
+  Future<void> _attemptReconnect() async {
+    _reconnectTimer = null;
+    // Stopped, or already reconnected some other way, while this attempt
+    // was queued — nothing to do.
+    if (_status != TrackingStatus.tracking || _channel != null) return;
+
+    final accessToken = _accessToken;
+    if (accessToken == null) return;
+
+    try {
+      await _connectSocket(accessToken);
+      _reconnectAttempt = 0;
+      notifyListeners();
+      unawaited(_drainOfflineQueue(accessToken));
+    } catch (_) {
+      _reconnectAttempt++;
+      _scheduleReconnect();
+    }
   }
 
   Future<void> stop() async {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _reconnectAttempt = 0;
+    _accessToken = null;
     _pingTimer?.cancel();
     _pingTimer = null;
     await _channelSub?.cancel();
     _channelSub = null;
     await _channel?.sink.close();
     _channel = null;
+    _lastPosition = null;
     _setStatus(TrackingStatus.idle);
   }
 
@@ -136,16 +220,28 @@ class TrackingService extends ChangeNotifier {
       position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
       );
-    } on LocationServiceDisabledException catch (error) {
+    } on LocationServiceDisabledException catch (_) {
       // A GPS read failure is fatal (permission revoked, services turned
       // off mid-session) — unlike a dropped socket, there's nothing to
       // queue, so this does stop tracking.
-      _fail(error.toString(), locationServicesDisabled: true);
+      _fail(
+        'El GPS del dispositivo se desactivó durante el rastreo. Actívalo para continuar.',
+        locationServicesDisabled: true,
+      );
       return;
     } catch (error) {
-      _fail(error.toString());
+      _fail('Se perdió la señal de ubicación: $error');
       return;
     }
+
+    // Tracking was stopped while the GPS read was in flight — don't
+    // resurrect a position (or queue a ping) after stop().
+    if (_status != TrackingStatus.tracking) return;
+
+    _lastPosition = position;
+    // Notify now (not only on a status change) so listeners showing the
+    // position — the next-stop distance — refresh on every ping.
+    notifyListeners();
 
     final payload = {
       'routeId': null,
@@ -223,9 +319,10 @@ class TrackingService extends ChangeNotifier {
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
     }
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
-      throw StateError('Location permission denied');
+    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+      throw LocationPermissionDeniedException(
+        permanently: permission == LocationPermission.deniedForever,
+      );
     }
 
     if (!await Geolocator.isLocationServiceEnabled()) {
@@ -237,6 +334,9 @@ class TrackingService extends ChangeNotifier {
   }
 
   void _fail(String message, {bool locationServicesDisabled = false}) {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _accessToken = null;
     _pingTimer?.cancel();
     _pingTimer = null;
     _channelSub?.cancel();

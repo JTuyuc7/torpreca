@@ -6,7 +6,6 @@ import {
   listAllVehicles,
   updateVehicle,
 } from "@/lib/api/vehicles-client";
-import { getAccessToken } from "@/lib/supabase/access-token";
 
 const vehiclesQueryKey = ["vehicles"] as const;
 
@@ -20,8 +19,7 @@ export function useVehicles() {
   const vehiclesQuery = useQuery({
     queryKey: vehiclesQueryKey,
     queryFn: async () => {
-      const token = await getAccessToken();
-      const result = await listAllVehicles(token);
+      const result = await listAllVehicles();
       if (!result.ok) throw new Error("No se pudieron cargar los vehículos.");
       return result.vehicles;
     },
@@ -29,8 +27,7 @@ export function useVehicles() {
 
   const createVehicleMutation = useMutation({
     mutationFn: async (input: CreateVehicleInput) => {
-      const token = await getAccessToken();
-      const result = await createVehicle(token, input);
+      const result = await createVehicle(input);
       if (!result.ok) {
         throw new Error(
           result.status === 409
@@ -49,8 +46,7 @@ export function useVehicles() {
 
   const updateVehicleMutation = useMutation({
     mutationFn: async (vars: { id: string; input: UpdateVehicleInput }) => {
-      const token = await getAccessToken();
-      const result = await updateVehicle(token, vars.id, vars.input);
+      const result = await updateVehicle(vars.id, vars.input);
       if (!result.ok) {
         throw new Error(
           result.status === 409
@@ -69,8 +65,7 @@ export function useVehicles() {
 
   const deactivateVehicleMutation = useMutation({
     mutationFn: async (id: string) => {
-      const token = await getAccessToken();
-      const result = await deactivateVehicle(token, id);
+      const result = await deactivateVehicle(id);
       if (!result.ok) throw new Error("No se pudo desactivar el vehículo.");
       return id;
     },

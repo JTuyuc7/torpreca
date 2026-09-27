@@ -5,6 +5,8 @@ import { auth } from "../../core/middleware/auth";
 import { rateLimitGeneral } from "../../core/middleware/rate-limit";
 import { requireRole } from "../../core/middleware/role";
 import { validateBody } from "../../core/middleware/validate-zod";
+import { dailyReportsRepository } from "../daily-reports/daily-reports.repository";
+import { createDailyReportsService } from "../daily-reports/daily-reports.service";
 import { locationsRepository } from "../locations/locations.repository";
 import { createLocationsService } from "../locations/locations.service";
 import { routesRepository } from "../routes/routes.repository";
@@ -17,11 +19,17 @@ import { createSyncQueueService } from "./sync-queue.service";
 const locationsService = createLocationsService(locationsRepository, routesRepository);
 const stopsService = createStopsService(stopsRepository, routesRepository);
 const routesService = createRoutesService(routesRepository);
+const dailyReportsService = createDailyReportsService(
+  dailyReportsRepository,
+  routesRepository,
+  stopsRepository,
+);
 const service = createSyncQueueService(
   syncQueueRepository,
   locationsService,
   stopsService,
   routesService,
+  dailyReportsService,
 );
 
 export function registerSyncQueueRoutes(router: Routable) {

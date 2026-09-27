@@ -33,3 +33,32 @@ export const CreateStopSchema = StopSchema.pick({
 });
 
 export type CreateStopInput = z.infer<typeof CreateStopSchema>;
+
+// The editable part of a stop (TOR-137). Used as-is for `PATCH /stops/:id`
+// (full replace — instructions is nullable, so a partial patch couldn't tell
+// "leave alone" from "clear it") and, with an optional `order`, as the body
+// of `POST /routes/:routeId/stops` (routeId comes from the URL). When `order`
+// is omitted the backend appends the stop after the route's last one.
+export const UpdateStopSchema = StopSchema.pick({
+  customerName: true,
+  address: true,
+  lat: true,
+  lng: true,
+  instructions: true,
+});
+
+export type UpdateStopInput = z.infer<typeof UpdateStopSchema>;
+
+export const CreateStopBodySchema = UpdateStopSchema.extend({
+  order: StopSchema.shape.order.optional(),
+});
+
+export type CreateStopBodyInput = z.infer<typeof CreateStopBodySchema>;
+
+// Full new order of a route's stops: every stop id of the route, exactly
+// once, in the desired order.
+export const ReorderStopsSchema = z.object({
+  stopIds: z.array(z.uuid()).min(1),
+});
+
+export type ReorderStopsInput = z.infer<typeof ReorderStopsSchema>;

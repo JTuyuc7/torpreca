@@ -19,6 +19,9 @@ function toLocation(row: Record<string, unknown>): Location {
 export interface LocationsRepository {
   create(input: CreateLocationInput, driverId: string): Promise<Location>;
   listByRoute(routeId: string): Promise<Location[]>;
+  // Pings are recorded with routeId = null by the driver app, so a route's
+  // distance is measured by driver + time window instead (TOR-138).
+  listByDriverBetween(driverId: string, fromIso: string, toIso: string): Promise<Location[]>;
   listLatestPerDriver(): Promise<Location[]>;
 }
 
@@ -48,6 +51,18 @@ export const locationsRepository: LocationsRepository = {
       .from("locations")
       .select("*")
       .eq("route_id", routeId)
+      .order("recorded_at", { ascending: true });
+    if (error) throw error;
+    return data.map(toLocation);
+  },
+
+  async listByDriverBetween(driverId, fromIso, toIso) {
+    const { data, error } = await supabaseAdmin
+      .from("locations")
+      .select("*")
+      .eq("driver_id", driverId)
+      .gte("recorded_at", fromIso)
+      .lt("recorded_at", toIso)
       .order("recorded_at", { ascending: true });
     if (error) throw error;
     return data.map(toLocation);

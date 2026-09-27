@@ -5,16 +5,22 @@ import {
   type RouteConfig,
 } from "@asteasolutions/zod-to-openapi";
 import {
+  AUDIT_EVENTS,
+  AuditLogsPageSchema,
   CreateRouteSchema,
-  CreateStopSchema,
+  CreateStopBodySchema,
   CreateUserSchema,
   CreateVehicleSchema,
   DashboardSummarySchema,
+  DuplicateRouteSchema,
   FinishRouteSchema,
+  ReorderStopsSchema,
   ReviewUserSchema,
+  ROUTE_STATUSES,
   RouteSchema,
   StopSchema,
   UpdateRouteSchema,
+  UpdateStopSchema,
   UpdateVehicleSchema,
   USER_STATUSES,
   UserSchema,
@@ -64,9 +70,12 @@ const ReviewUser = registry.register("ReviewUser", ReviewUserSchema);
 const Route = registry.register("Route", RouteSchema);
 const CreateRoute = registry.register("CreateRoute", CreateRouteSchema);
 const UpdateRoute = registry.register("UpdateRoute", UpdateRouteSchema);
+const DuplicateRoute = registry.register("DuplicateRoute", DuplicateRouteSchema);
 const FinishRoute = registry.register("FinishRoute", FinishRouteSchema);
 const Stop = registry.register("Stop", StopSchema);
-const CreateStop = registry.register("CreateStop", CreateStopSchema.omit({ routeId: true }));
+const CreateStop = registry.register("CreateStop", CreateStopBodySchema);
+const UpdateStop = registry.register("UpdateStop", UpdateStopSchema);
+const ReorderStops = registry.register("ReorderStops", ReorderStopsSchema);
 
 const IdParam = z.object({ id: z.uuid() });
 const RouteIdParam = z.object({ routeId: z.uuid() });
@@ -218,8 +227,13 @@ path({
   path: "/routes",
   tags: ["Routes"],
   summary: "List routes visible to the caller",
-  request: { query: z.object({ date: z.iso.date().optional() }) },
-  responses: { 200: jsonResponse("Routes", z.array(Route)), 401: unauthorized },
+  request: {
+    query: z.object({
+      date: z.iso.date().optional(),
+      status: z.enum(ROUTE_STATUSES).optional(),
+    }),
+  },
+  responses: { 200: jsonResponse("Routes", z.array(Route)), 400: badRequest, 401: unauthorized },
 });
 path({
   method: "get",
@@ -298,6 +312,39 @@ path({
   },
 });
 
+path({
+  method: "post",
+  path: "/routes/{id}/duplicate",
+  tags: ["Routes"],
+  summary:
+    "Create a pending route (new date/driver/vehicle) with the given stops, copied from another route",
+  request: {
+    params: IdParam,
+    body: { content: { "application/json": { schema: DuplicateRoute } } },
+  },
+  responses: {
+    201: jsonResponse("Route created with its stops", Route),
+    400: badRequest,
+    401: unauthorized,
+    403: forbidden,
+    404: notFound,
+  },
+});
+path({
+  method: "patch",
+  path: "/routes/{id}/close",
+  tags: ["Routes"],
+  summary: "Close an overdue in-progress route as cancelled (km measured up to the end of its day)",
+  request: { params: IdParam },
+  responses: {
+    200: jsonResponse("Route closed", Route),
+    401: unauthorized,
+    403: forbidden,
+    404: notFound,
+    409: errorResponse("Route is not an overdue in-progress route"),
+  },
+});
+
 // --- stops ---
 path({
   method: "get",
@@ -327,6 +374,57 @@ path({
     401: unauthorized,
     403: forbidden,
     404: notFound,
+    409: errorResponse("Route is not pending — its stops can no longer be edited"),
+  },
+});
+path({
+  method: "patch",
+  path: "/routes/{routeId}/stops/order",
+  tags: ["Stops"],
+  summary: "Reorder a route's stops (body lists every stop id, in the new order)",
+  request: {
+    params: RouteIdParam,
+    body: { content: { "application/json": { schema: ReorderStops } } },
+  },
+  responses: {
+    200: jsonResponse("Stops in the new order", z.array(Stop)),
+    400: badRequest,
+    401: unauthorized,
+    403: forbidden,
+    404: notFound,
+    409: errorResponse("Route is not pending — its stops can no longer be edited"),
+  },
+});
+path({
+  method: "patch",
+  path: "/stops/{id}",
+  tags: ["Stops"],
+  summary: "Edit a stop (full replace of its editable fields)",
+  request: {
+    params: IdParam,
+    body: { content: { "application/json": { schema: UpdateStop } } },
+  },
+  responses: {
+    200: jsonResponse("Stop updated", Stop),
+    400: badRequest,
+    401: unauthorized,
+    403: forbidden,
+    404: notFound,
+    409: errorResponse("Route is not pending or the stop is already completed"),
+  },
+});
+path({
+  method: "delete",
+  path: "/stops/{id}",
+  tags: ["Stops"],
+  summary: "Delete a stop",
+  request: { params: IdParam },
+  responses: {
+    204: { description: "Stop deleted" },
+    401: unauthorized,
+    403: forbidden,
+    404: notFound,
+    409: errorResponse("Route is not pending — its stops can no longer be edited"),
   },
 });
 path({
@@ -367,6 +465,34 @@ path({
   summary: "Fleet-wide counts for the dashboard home screen",
   responses: {
     200: jsonResponse("Summary", DashboardSummary),
+    401: unauthorized,
+    403: forbidden,
+  },
+});
+
+// --- audit-logs ---
+const AuditLogsPage = registry.register("AuditLogsPage", AuditLogsPageSchema);
+const AuditLogsQuery = z.object({
+  action: z.enum(AUDIT_EVENTS).optional().describe("Filter by event type"),
+  userId: z.uuid().optional().describe("Filter by the user the event is attributed to"),
+  date: z.iso.date().optional().describe("Filter to events created on this calendar day (UTC)"),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .optional()
+    .describe("Page size, default 20, max 100"),
+  offset: z.coerce.number().int().min(0).optional().describe("Rows to skip, default 0"),
+});
+path({
+  method: "get",
+  path: "/audit-logs",
+  tags: ["Audit Logs"],
+  summary: "Paginated audit_logs rows, newest first — super_admin only",
+  request: { query: AuditLogsQuery },
+  responses: {
+    200: jsonResponse("AuditLogsPage", AuditLogsPage),
     401: unauthorized,
     403: forbidden,
   },

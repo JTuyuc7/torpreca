@@ -17,6 +17,9 @@ on:
     types: [opened, synchronize, reopened]
     branches: [release]
 
+permissions:
+  contents: read
+
 jobs:
   approve:
     runs-on: ubuntu-latest

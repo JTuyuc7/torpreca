@@ -1,11 +1,12 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CreateVehicleSchema, VEHICLE_CATEGORIES, type Vehicle, type VehicleCategory, z } from "@torpreca/shared";
-import { Plus } from "lucide-react";
+import { CreateVehicleSchema, VEHICLE_CATEGORIES, type Vehicle, z } from "@torpreca/shared";
+import { Plus, Truck } from "lucide-react";
 import { useState } from "react";
 import { type Resolver, useForm } from "react-hook-form";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { FieldHint } from "@/components/ui/field-hint";
 import { Input } from "@/components/ui/input";
@@ -15,13 +16,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import { useVehicles } from "@/lib/hooks/use-vehicles";
-
-const CATEGORY_LABELS: Record<VehicleCategory, string> = {
-  motorcycle: "Moto",
-  light_vehicle: "Vehículo liviano",
-  truck: "Camión",
-};
 
 // `capacity` is re-declared with a preprocess step instead of reusing
 // CreateVehicleSchema.capacity as-is, paired with `valueAsNumber: true` on
@@ -61,13 +57,14 @@ function FieldError({ children }: { children: React.ReactNode }) {
 }
 
 function ActiveBadge({ active }: { active: boolean }) {
+  const { t } = useTranslation();
   return (
     <span
       className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-        active ? "bg-primary text-white" : "bg-outline/15 text-outline"
+        active ? "bg-primary text-on-primary" : "bg-outline/15 text-outline"
       }`}
     >
-      {active ? "Activo" : "Inactivo"}
+      {active ? t.vehiculos.active : t.vehiculos.inactive}
     </span>
   );
 }
@@ -83,33 +80,34 @@ function VehicleFormFields({
   register: ReturnType<typeof useForm<VehicleFormValues>>["register"];
   errors: ReturnType<typeof useForm<VehicleFormValues>>["formState"]["errors"];
 }) {
+  const { t } = useTranslation();
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <div className="flex flex-col gap-1">
         <span className="flex items-center gap-1">
           <label htmlFor="plate" className="text-xs text-outline">
-            Placa
+            {t.vehiculos.plateLabel}
           </label>
-          <FieldHint text="Placa de circulación del vehículo, tal como aparece en la tarjeta de circulación." />
+          <FieldHint text={t.vehiculos.plateHint} />
         </span>
-        <Input id="plate" {...register("plate")} placeholder="P-123ABC" />
-        {errors.plate && <FieldError>Requerida.</FieldError>}
+        <Input id="plate" {...register("plate")} placeholder={t.vehiculos.platePlaceholder} />
+        {errors.plate && <FieldError>{t.common.required}</FieldError>}
       </div>
       <div className="flex flex-col gap-1">
         <label htmlFor="model" className="text-xs text-outline">
-          Modelo
+          {t.vehiculos.modelLabel}
         </label>
-        <Input id="model" {...register("model")} placeholder="Ej. NPR, Hilux" />
-        {errors.model && <FieldError>Requerido.</FieldError>}
+        <Input id="model" {...register("model")} placeholder={t.vehiculos.modelPlaceholder} />
+        {errors.model && <FieldError>{t.vehiculos.modelRequired}</FieldError>}
       </div>
       <div className="flex flex-col gap-1">
         <label htmlFor="category" className="text-xs text-outline">
-          Categoría
+          {t.vehiculos.categoryLabel}
         </label>
         <Select id="category" {...register("category")}>
           {VEHICLE_CATEGORIES.map((c) => (
             <option key={c} value={c}>
-              {CATEGORY_LABELS[c]}
+              {t.vehiculos.categories[c]}
             </option>
           ))}
         </Select>
@@ -117,26 +115,26 @@ function VehicleFormFields({
       <div className="flex flex-col gap-1">
         <span className="flex items-center gap-1">
           <label htmlFor="capacity" className="text-xs text-outline">
-            Capacidad
+            {t.vehiculos.capacityLabel}
           </label>
-          <FieldHint text="Unidades que puede transportar (ej. cajas o pasajeros). Déjalo vacío si no aplica." align="right" />
+          <FieldHint text={t.vehiculos.capacityHint} align="right" />
         </span>
         <Input id="capacity" type="number" min={1} {...register("capacity", { valueAsNumber: true })} />
-        {errors.capacity && <FieldError>Debe ser mayor a 0.</FieldError>}
+        {errors.capacity && <FieldError>{t.vehiculos.capacityInvalid}</FieldError>}
       </div>
       <div className="flex flex-col gap-1 sm:col-span-2">
         <span className="flex items-center gap-1">
           <label htmlFor="notes" className="text-xs text-outline">
-            Notas
+            {t.vehiculos.notesLabel}
           </label>
-          <FieldHint text="Observaciones internas: mantenimiento pendiente, estado, restricciones, etc. Opcional." />
+          <FieldHint text={t.vehiculos.notesHint} />
         </span>
         <Textarea
           id="notes"
           rows={3}
           {...register("notes")}
           className="w-full resize-y"
-          placeholder="Ej. revisión de frenos pendiente"
+          placeholder={t.vehiculos.notesPlaceholder}
         />
       </div>
     </div>
@@ -152,6 +150,7 @@ function CreateVehicleDialog({
   onOpenChange: (open: boolean) => void;
   createVehicle: ReturnType<typeof useVehicles>["createVehicle"];
 }) {
+  const { t } = useTranslation();
   const {
     register,
     handleSubmit,
@@ -182,11 +181,8 @@ function CreateVehicleDialog({
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Agregar vehículo</DialogTitle>
-          <DialogDescription>
-            Registra una nueva unidad de la flota. Placa y modelo son obligatorios; capacidad y notas son
-            opcionales.
-          </DialogDescription>
+          <DialogTitle>{t.vehiculos.addDialogTitle}</DialogTitle>
+          <DialogDescription>{t.vehiculos.addDialogDescription}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-3">
           <VehicleFormFields register={register} errors={errors} />
@@ -197,15 +193,15 @@ function CreateVehicleDialog({
               onClick={() => onOpenChange(false)}
               className="flex h-9 items-center rounded-md border border-outline px-3 text-sm font-medium text-text transition-opacity hover:opacity-90 cursor-pointer"
             >
-              Cancelar
+              {t.common.cancel}
             </button>
             <button
               type="submit"
               disabled={!isValid || createVehicle.isPending}
-              className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
+              className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-on-primary transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
             >
               {createVehicle.isPending && <Spinner className="h-3.5 w-3.5" />}
-              {createVehicle.isPending ? "Guardando..." : "Guardar vehículo"}
+              {createVehicle.isPending ? t.vehiculos.saving : t.vehiculos.saveVehicle}
             </button>
           </DialogFooter>
         </form>
@@ -225,6 +221,7 @@ function VehicleEditDialog({
   updateVehicle: ReturnType<typeof useVehicles>["updateVehicle"];
   deactivateVehicle: ReturnType<typeof useVehicles>["deactivateVehicle"];
 }) {
+  const { t } = useTranslation();
   // Remounted per vehicle (parent keys this component by vehicle.id), so
   // this local state always starts fresh — no effect needed to reset it
   // when a different vehicle is opened for editing.
@@ -274,8 +271,10 @@ function VehicleEditDialog({
         {mode === "edit" ? (
           <>
             <DialogHeader>
-              <DialogTitle>Editar vehículo</DialogTitle>
-              <DialogDescription>Placa {vehicle.plate}.</DialogDescription>
+              <DialogTitle>{t.vehiculos.editDialogTitle}</DialogTitle>
+              <DialogDescription>
+                {t.vehiculos.editDialogPlate} {vehicle.plate}.
+              </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-3">
               <VehicleFormFields register={register} errors={errors} />
@@ -288,7 +287,7 @@ function VehicleEditDialog({
                     vehicle.active ? "border-error text-error" : "border-outline text-text"
                   }`}
                 >
-                  {vehicle.active ? "Desactivar" : "Reactivar"}
+                  {vehicle.active ? t.vehiculos.deactivate : t.vehiculos.reactivate}
                 </button>
                 <button
                   type="button"
@@ -296,15 +295,15 @@ function VehicleEditDialog({
                   onClick={() => onOpenChange(false)}
                   className="flex h-9 items-center rounded-md border border-outline px-3 text-sm font-medium text-text transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
                 >
-                  Cancelar
+                  {t.common.cancel}
                 </button>
                 <button
                   type="submit"
                   disabled={!isValid || isSaving}
-                  className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
+                  className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-on-primary transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
                 >
                   {isSaving && <Spinner className="h-3.5 w-3.5" />}
-                  Guardar
+                  {t.common.save}
                 </button>
               </DialogFooter>
             </form>
@@ -312,18 +311,20 @@ function VehicleEditDialog({
         ) : (
           <>
             <DialogHeader>
-              <DialogTitle>{vehicle.active ? "Desactivar vehículo" : "Reactivar vehículo"}</DialogTitle>
+              <DialogTitle>
+                {vehicle.active ? t.vehiculos.deactivateConfirmTitle : t.vehiculos.reactivateConfirmTitle}
+              </DialogTitle>
             </DialogHeader>
             <p className="text-sm text-text">
               {vehicle.active ? (
                 <>
-                  ¿Confirmas que quieres desactivar <strong>{vehicle.plate}</strong>? Dejará de estar
-                  disponible para asignar a rutas nuevas.
+                  {t.vehiculos.deactivateConfirmBody} <strong>{vehicle.plate}</strong>
+                  {t.vehiculos.deactivateConfirmBodySuffix}
                 </>
               ) : (
                 <>
-                  ¿Confirmas que quieres reactivar <strong>{vehicle.plate}</strong>? Volverá a estar
-                  disponible para asignar a rutas.
+                  {t.vehiculos.reactivateConfirmBody} <strong>{vehicle.plate}</strong>
+                  {t.vehiculos.reactivateConfirmBodySuffix}
                 </>
               )}
             </p>
@@ -334,7 +335,7 @@ function VehicleEditDialog({
                 onClick={() => setMode("edit")}
                 className="flex h-9 items-center rounded-md border border-outline px-3 text-sm font-medium text-text transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
               >
-                Cancelar
+                {t.common.cancel}
               </button>
               <button
                 type="button"
@@ -350,7 +351,7 @@ function VehicleEditDialog({
                 }`}
               >
                 {isToggling && <Spinner className="h-3.5 w-3.5" />}
-                {vehicle.active ? "Sí, desactivar" : "Sí, reactivar"}
+                {vehicle.active ? t.vehiculos.confirmDeactivate : t.vehiculos.confirmReactivate}
               </button>
             </DialogFooter>
           </>
@@ -361,7 +362,8 @@ function VehicleEditDialog({
 }
 
 export default function VehiculosPage() {
-  usePageTitle("Gestión de vehículos");
+  const { t } = useTranslation();
+  usePageTitle(t.vehiculos.title);
   const { vehicles, isLoading, error, refetch, createVehicle, updateVehicle, deactivateVehicle } =
     useVehicles();
 
@@ -372,16 +374,16 @@ export default function VehiculosPage() {
     <div className="flex flex-1 flex-col gap-6 p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl text-text">Gestión de vehículos</h1>
-          <p className="text-sm text-outline">Flota disponible para asignar a rutas.</p>
+          <h1 className="text-xl text-text">{t.vehiculos.title}</h1>
+          <p className="text-sm text-outline">{t.vehiculos.subtitle}</p>
         </div>
         <button
           type="button"
           onClick={() => setCreateOpen(true)}
-          className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-white transition-opacity hover:opacity-90 cursor-pointer"
+          className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-on-primary transition-opacity hover:opacity-90 cursor-pointer"
         >
           <Plus size={15} />
-          Agregar vehículo
+          {t.vehiculos.addVehicle}
         </button>
       </div>
 
@@ -390,7 +392,7 @@ export default function VehiculosPage() {
       {deactivateVehicle.isError && <ErrorBanner message={deactivateVehicle.error.message} />}
 
       {isLoading && (
-        <div className="flex flex-col gap-6" aria-busy="true" aria-label="Cargando vehículos">
+        <div className="flex flex-col gap-6" aria-busy="true" aria-label={t.vehiculos.loadingLabel}>
           <Skeleton className="h-40 w-full" />
         </div>
       )}
@@ -398,22 +400,27 @@ export default function VehiculosPage() {
       {vehicles !== undefined && (
         <div className="flex flex-col gap-6 animate-fade-in">
           {vehicles.length === 0 && (
-            <p className="text-sm text-outline">No hay vehículos registrados.</p>
+            <EmptyState
+              icon={Truck}
+              title={t.vehiculos.noVehiclesTitle}
+              description={t.vehiculos.noVehiclesDescription}
+              action={{ label: t.vehiculos.addFirstVehicle, onClick: () => setCreateOpen(true) }}
+            />
           )}
 
           {vehicles.length > 0 && (
-            <Section title="Todos los vehículos">
+            <Section title={t.vehiculos.allVehiclesTitle}>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead>
                     <tr className="border-b border-outline/30 text-xs text-outline">
-                      <th className="py-2 pr-4">Placa</th>
-                      <th className="py-2 pr-4">Modelo</th>
-                      <th className="py-2 pr-4">Categoría</th>
-                      <th className="py-2 pr-4">Capacidad</th>
-                      <th className="py-2 pr-4">Notas</th>
-                      <th className="py-2 pr-4">Estado</th>
-                      <th className="py-2">Acciones</th>
+                      <th className="py-2 pr-4">{t.vehiculos.tablePlate}</th>
+                      <th className="py-2 pr-4">{t.vehiculos.tableModel}</th>
+                      <th className="py-2 pr-4">{t.vehiculos.tableCategory}</th>
+                      <th className="py-2 pr-4">{t.vehiculos.tableCapacity}</th>
+                      <th className="py-2 pr-4">{t.vehiculos.tableNotes}</th>
+                      <th className="py-2 pr-4">{t.vehiculos.tableStatus}</th>
+                      <th className="py-2">{t.vehiculos.tableActions}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -424,7 +431,7 @@ export default function VehiculosPage() {
                       >
                         <td className="py-3 pr-4 font-medium">{vehicle.plate}</td>
                         <td className="py-3 pr-4">{vehicle.model}</td>
-                        <td className="py-3 pr-4">{CATEGORY_LABELS[vehicle.category]}</td>
+                        <td className="py-3 pr-4">{t.vehiculos.categories[vehicle.category]}</td>
                         <td className="py-3 pr-4">{vehicle.capacity ?? "—"}</td>
                         <td
                           className="max-w-[12rem] truncate py-3 pr-4 text-outline"
@@ -441,7 +448,7 @@ export default function VehiculosPage() {
                             onClick={() => setEditingVehicle(vehicle)}
                             className="flex h-9 items-center rounded-md border border-outline px-3 text-sm font-medium text-text transition-opacity hover:opacity-90 cursor-pointer"
                           >
-                            Editar
+                            {t.common.edit}
                           </button>
                         </td>
                       </tr>

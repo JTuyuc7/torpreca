@@ -42,6 +42,21 @@ vi.mock("@/lib/hooks/use-users", () => ({
   useUsers: () => useUsers(),
 }));
 
+// AddressSearch wraps Mapbox's SearchBox web component, which relies on
+// browser Shadow DOM/CSSOM APIs jsdom doesn't implement — stand in with a
+// button that fires onSelect directly, same pattern as the map mock above.
+vi.mock("@/components/ui/address-search", () => ({
+  AddressSearch: ({
+    onSelect,
+  }: {
+    onSelect: (coordinates: { lng: number; lat: number }, name: string) => void;
+  }) => (
+    <button type="button" onClick={() => onSelect({ lng: -90.51, lat: 14.63 }, "Zona 1")}>
+      mock-address-search
+    </button>
+  ),
+}));
+
 import HomePage from "./page";
 
 const summary = {
@@ -186,5 +201,16 @@ describe("HomePage", () => {
 
     fireEvent.click(item);
     expect(flyTo).not.toHaveBeenCalled();
+  });
+
+  it("flies to a searched address and drops a marker there", () => {
+    render(<HomePage />);
+
+    fireEvent.click(screen.getByText("mock-address-search"));
+
+    expect(flyTo).toHaveBeenCalledWith(expect.objectContaining({ center: [-90.51, 14.63] }));
+    const markers = screen.getAllByTestId("marker");
+    expect(markers[0]).toHaveAttribute("data-lng", "-90.51");
+    expect(markers[0]).toHaveAttribute("data-lat", "14.63");
   });
 });

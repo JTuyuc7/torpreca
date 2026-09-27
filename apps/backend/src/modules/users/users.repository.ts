@@ -1,6 +1,7 @@
-import type { CreateUserInput, Role, User, UserStatus } from "@torpreca/shared";
+import type { CreateUserInput, InviteUserInput, Role, User, UserStatus } from "@torpreca/shared";
 import { env } from "../../core/config/env";
 import { supabaseAdmin } from "../../core/db/supabase";
+import { AppError } from "../../core/errors/app-error";
 
 // The only layer that touches supabase-js for this entity. Reads go through the
 // `get_users_readable` RPC (decrypts `name`); writes go through `create_user_encrypted`
@@ -34,7 +35,14 @@ export interface UsersRepository {
   getById(id: string): Promise<User | null>;
   getByAuthUserId(authUserId: string): Promise<User | null>;
   create(input: CreateUserInput, status?: UserStatus): Promise<User>;
+  // TOR-125: creates the Supabase Auth account (via inviteUserByEmail — no
+  // password ever passes through this backend) and the `users` profile row
+  // in one call, landing "active" immediately like the manual authUserId
+  // path above (the person still has to click the invite email and set a
+  // password before they can actually sign in).
+  invite(input: InviteUserInput): Promise<User>;
   deactivate(id: string, deactivatedBy: string): Promise<void>;
+  updateRole(id: string, role: Role): Promise<void>;
   review(
     id: string,
     decision: "approve" | "reject",
@@ -90,6 +98,26 @@ export const usersRepository: UsersRepository = {
     return toUser({ ...row, name: input.name, email: input.email });
   },
 
+  async invite(input) {
+    const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(input.email, {
+      data: { name: input.name },
+    });
+    if (error) {
+      // Supabase's exact wording varies by version ("User already
+      // registered" / "already been registered") — check loosely rather
+      // than pin an exact string that could drift.
+      if (/already/i.test(error.message)) {
+        throw new AppError(409, "A user with this email is already registered.");
+      }
+      throw error;
+    }
+
+    return this.create(
+      { authUserId: data.user!.id, name: input.name, email: input.email, role: input.role },
+      "active",
+    );
+  },
+
   async deactivate(id, deactivatedBy) {
     const { error } = await supabaseAdmin
       .from("users")
@@ -99,6 +127,11 @@ export const usersRepository: UsersRepository = {
         deactivated_by: deactivatedBy,
       })
       .eq("id", id);
+    if (error) throw error;
+  },
+
+  async updateRole(id, role) {
+    const { error } = await supabaseAdmin.from("users").update({ role }).eq("id", id);
     if (error) throw error;
   },
 

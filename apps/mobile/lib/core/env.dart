@@ -10,6 +10,7 @@ class Env {
   static String get supabaseUrl => _require('SUPABASE_URL');
   static String get supabaseAnonKey => _require('SUPABASE_ANON_KEY');
   static String get backendUrl => _require('BACKEND_URL');
+  static String get mapboxToken => _require('MAPBOX_TOKEN');
 
   /// `BACKEND_URL` with the scheme swapped for the WebSocket equivalent
   /// (http→ws, https→wss) — same host/port, used to open `/ws`.

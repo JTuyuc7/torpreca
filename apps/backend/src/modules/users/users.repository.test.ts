@@ -70,6 +70,39 @@ describe("usersRepository", () => {
     expect(user.status).toBe("pending");
   });
 
+  it("invite() calls inviteUserByEmail then create_user_encrypted with that auth user id", async () => {
+    const { usersRepository } = await import("./users.repository");
+
+    const user = await usersRepository.invite({
+      name: "Nueva Supervisora",
+      email: "supervisora@torpreca.gt",
+      role: "supervisor",
+    });
+
+    expect(user).toMatchObject({
+      name: "Nueva Supervisora",
+      email: "supervisora@torpreca.gt",
+      role: "supervisor",
+      status: "active",
+    });
+    expect(fake.authAdmin.invitedUsers).toHaveLength(1);
+    expect(fake.authAdmin.invitedUsers[0]).toMatchObject({ email: "supervisora@torpreca.gt" });
+    expect(user.authUserId).toBe(fake.authAdmin.invitedUsers[0]!.id);
+  });
+
+  it("invite() maps an already-registered email to a 409 AppError", async () => {
+    const { usersRepository } = await import("./users.repository");
+    fake.authAdmin.inviteUserError = { message: "User already registered" };
+
+    await expect(
+      usersRepository.invite({
+        name: "Duplicado",
+        email: "existente@torpreca.gt",
+        role: "admin",
+      }),
+    ).rejects.toThrow("A user with this email is already registered.");
+  });
+
   it("list() reads through get_users_readable, defaulting to status=active", async () => {
     const { usersRepository } = await import("./users.repository");
     fake.reset({
@@ -138,6 +171,30 @@ describe("usersRepository", () => {
       status: "deactivated",
       deactivated_by: "admin-1",
     });
+  });
+
+  it("updateRole() changes only the role via a plain update", async () => {
+    const { usersRepository } = await import("./users.repository");
+    fake.reset({
+      users: [
+        {
+          id: "1",
+          auth_user_id: "a1",
+          name: "Juan",
+          role: "driver",
+          status: "active",
+          deactivated_at: null,
+          deactivated_by: null,
+          reviewed_at: null,
+          reviewed_by: null,
+          created_at: "t",
+          updated_at: "t",
+        },
+      ],
+    });
+
+    await usersRepository.updateRole("1", "supervisor");
+    expect(fake.tables.users?.[0]).toMatchObject({ role: "supervisor", status: "active" });
   });
 
   it("review('approve') sets status=active + reviewedAt/reviewedBy", async () => {

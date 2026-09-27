@@ -23,6 +23,12 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    // Off by default on this AGP version — needed for the per-flavor
+    // app_name resValue() calls below (TOR-111).
+    buildFeatures {
+        resValues = true
+    }
+
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.torpreca.mobile"
@@ -56,6 +62,27 @@ android {
             } else {
                 signingConfigs.getByName("debug")
             }
+        }
+    }
+
+    // TOR-111 — dev/staging/production environments. "production" is
+    // untouched from defaultConfig above (same applicationId + release
+    // signing already live on Play Store); "staging" gets a distinct
+    // applicationId (Android treats it as a separate app) so both can be
+    // installed on the same device at once instead of one overwriting the
+    // other. app_name is overridden per flavor (AndroidManifest.xml reads
+    // @string/app_name) so the two are easy to tell apart in the launcher.
+    flavorDimensions += "environment"
+    productFlavors {
+        create("staging") {
+            dimension = "environment"
+            applicationIdSuffix = ".staging"
+            versionNameSuffix = "-staging"
+            resValue("string", "app_name", "Torpreca Staging")
+        }
+        create("production") {
+            dimension = "environment"
+            resValue("string", "app_name", "Torpreca")
         }
     }
 }

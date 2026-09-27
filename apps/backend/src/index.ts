@@ -11,19 +11,26 @@ import {
   type TrackingWs,
 } from "./core/ws/tracking-handlers";
 import { resolveUpgradeData, type TrackingSocketData } from "./core/ws/upgrade";
+import { registerAuditLogsRoutes } from "./modules/audit-logs/audit-logs.routes";
 import { registerAuthRoutes } from "./modules/auth/auth.routes";
 import { registerMobileAuthRoutes } from "./modules/auth/mobile-auth.routes";
+import { registerMobileDailyReportsRoutes } from "./modules/daily-reports/daily-reports.routes";
 import { registerDashboardRoutes } from "./modules/dashboard/dashboard.routes";
+import { registerFavoriteRoutesRoutes } from "./modules/favorite-routes/favorite-routes.routes";
 import { locationsRepository } from "./modules/locations/locations.repository";
 import { registerLocationsRoutes } from "./modules/locations/locations.routes";
 import { createLocationsService } from "./modules/locations/locations.service";
 import { routesRepository } from "./modules/routes/routes.repository";
-import { registerRoutesRoutes } from "./modules/routes/routes.routes";
-import { registerStopsRoutes } from "./modules/stops/stops.routes";
+import { registerMobileRoutesRoutes, registerRoutesRoutes } from "./modules/routes/routes.routes";
+import { registerMobileStopsRoutes, registerStopsRoutes } from "./modules/stops/stops.routes";
 import {
   registerMobileSyncQueueRoutes,
   registerSyncQueueRoutes,
 } from "./modules/sync-queue/sync-queue.routes";
+import {
+  registerMobileUserPreferencesRoutes,
+  registerUserPreferencesRoutes,
+} from "./modules/user-preferences/user-preferences.routes";
 import { registerUsersRoutes } from "./modules/users/users.routes";
 import { registerVehiclesRoutes } from "./modules/vehicles/vehicles.routes";
 import {
@@ -42,14 +49,21 @@ registerAuthRoutes(v1);
 registerMobileAuthRoutes(v1);
 registerVehiclesRoutes(v1);
 registerUsersRoutes(v1);
+registerFavoriteRoutesRoutes(v1);
 registerRoutesRoutes(v1);
+registerMobileRoutesRoutes(v1);
 registerStopsRoutes(v1);
+registerMobileStopsRoutes(v1);
 registerLocationsRoutes(v1);
 registerDashboardRoutes(v1);
 registerWsTicketsRoutes(v1);
 registerMobileWsTicketsRoutes(v1);
 registerSyncQueueRoutes(v1);
 registerMobileSyncQueueRoutes(v1);
+registerMobileDailyReportsRoutes(v1);
+registerAuditLogsRoutes(v1);
+registerUserPreferencesRoutes(v1);
+registerMobileUserPreferencesRoutes(v1);
 
 // Unversioned infra routes — not signed, not tied to an API version.
 router.get("/health", () => Response.json({ ok: true }));

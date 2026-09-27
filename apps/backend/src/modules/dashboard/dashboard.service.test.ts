@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { Location, Route, User, Vehicle } from "@torpreca/shared";
+import { businessDate, type Location, type Route, type User, type Vehicle } from "@torpreca/shared";
 import type { LocationsRepository } from "../locations/locations.repository";
 import type { RoutesRepository } from "../routes/routes.repository";
 import type { UsersRepository } from "../users/users.repository";
@@ -20,6 +20,8 @@ function fakeRoutesRepo(seed: Route[]): RoutesRepository {
     update: notUsed,
     start: notUsed,
     finish: notUsed,
+    close: notUsed,
+    delete: notUsed,
   };
 }
 
@@ -44,13 +46,18 @@ function fakeUsersRepo(seed: User[]): UsersRepository {
     getById: notUsed,
     getByAuthUserId: notUsed,
     create: notUsed,
+    invite: notUsed,
     deactivate: notUsed,
+    updateRole: notUsed,
     review: notUsed,
   };
 }
 
 function fakeLocationsRepo(seed: Location[]): LocationsRepository {
   return {
+    async listByDriverBetween() {
+      throw new Error("not used in these tests");
+    },
     async listLatestPerDriver() {
       return seed;
     },
@@ -129,7 +136,7 @@ function location(overrides: Partial<Location>): Location {
 
 describe("dashboardService.getSummary", () => {
   it("counts in-progress routes and today's pending routes separately", async () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = businessDate();
     const service = createDashboardService({
       routes: fakeRoutesRepo([
         route({ status: "in_progress", date: today }),

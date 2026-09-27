@@ -5,6 +5,8 @@
   "private": true,
   "scripts": {
     "dev": "bun --watch src/index.ts",
+    "staging": "bun --env-file=.env.staging --watch src/index.ts",
+    "production": "bun --env-file=.env.production --watch src/index.ts",
     "start": "bun src/index.ts",
     "test": "bun test",
     "test:coverage": "bun test --coverage"

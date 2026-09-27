@@ -28,3 +28,14 @@ export const CreateAuditLogSchema = AuditLogSchema.pick({
 });
 
 export type CreateAuditLogInput = z.infer<typeof CreateAuditLogSchema>;
+
+// GET /audit-logs (TOR-135) — server-side paginated + filtered, so the
+// dashboard's Logs screen doesn't have to fetch the whole table just to
+// show 20-30 rows. `total` reflects every row matching the filters, not
+// just this page — needed to render "page X of Y".
+export const AuditLogsPageSchema = z.object({
+  logs: z.array(AuditLogSchema),
+  total: z.number().int().nonnegative(),
+});
+
+export type AuditLogsPage = z.infer<typeof AuditLogsPageSchema>;

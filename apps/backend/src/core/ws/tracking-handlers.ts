@@ -1,5 +1,6 @@
 import type { AuthUser, CreateLocationInput, Location } from "@torpreca/shared";
 import { WsInboundMessageSchema } from "@torpreca/shared";
+import { registerConnection, unregisterConnection } from "./connection-registry";
 import type { TrackingSocketData } from "./upgrade";
 
 const TRACKING_TOPIC = "tracking";
@@ -12,6 +13,7 @@ export interface TrackingWs {
   send(data: string): void;
   subscribe(topic: string): void;
   unsubscribe(topic: string): void;
+  close(code?: number, reason?: string): void;
 }
 
 export interface TrackingHandlerDeps {
@@ -27,6 +29,7 @@ function sendError(ws: TrackingWs, message: string) {
 
 export function handleOpen(ws: TrackingWs) {
   ws.subscribe(TRACKING_TOPIC);
+  registerConnection(ws);
 }
 
 export async function handleMessage(
@@ -63,4 +66,5 @@ export async function handleMessage(
 
 export function handleClose(ws: TrackingWs) {
   ws.unsubscribe(TRACKING_TOPIC);
+  unregisterConnection(ws);
 }

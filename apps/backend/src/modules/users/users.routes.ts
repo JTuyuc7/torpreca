@@ -1,4 +1,11 @@
-import { CreateUserSchema, ReviewUserSchema, type Role, USER_STATUSES } from "@torpreca/shared";
+import {
+  CreateUserSchema,
+  InviteUserSchema,
+  ReviewUserSchema,
+  type Role,
+  UpdateUserRoleSchema,
+  USER_STATUSES,
+} from "@torpreca/shared";
 import { logEvent } from "../../core/audit/log-event";
 import { clientIp } from "../../core/http/client-ip";
 import type { Routable } from "../../core/http/router";
@@ -49,10 +56,10 @@ export function registerUsersRoutes(router: Routable) {
     // super_admin only: this is how admin/supervisor accounts get created
     // (linking an already-existing Supabase Auth user to a `users` profile)
     // — an "admin" granting another admin/supervisor account would be
-    // self-service privilege escalation without oversight. Backlogged
-    // (session 08 sep 2026): a real invite flow via the Supabase Admin API
-    // would remove the need for a super_admin to manually copy-paste an
-    // authUserId here at all.
+    // self-service privilege escalation without oversight. Superseded as the
+    // dashboard's default path by POST /users/invite (TOR-125) below, which
+    // doesn't require a Supabase Auth user to already exist; kept for the
+    // edge case where one already does.
     requireRole("super_admin"),
     rateLimitGeneral,
     validateBody(CreateUserSchema),
@@ -67,6 +74,30 @@ export function registerUsersRoutes(router: Routable) {
         entityId: user.id,
         ip: clientIp(ctx),
         metadata: null,
+      });
+
+      return Response.json(user, { status: 201 });
+    },
+  );
+
+  router.post(
+    "/users/invite",
+    auth,
+    // super_admin only, same reasoning as POST /users above.
+    requireRole("super_admin"),
+    rateLimitGeneral,
+    validateBody(InviteUserSchema),
+    async (ctx) => {
+      const user = await service.invite(ctx.body as never);
+
+      await logEvent({
+        userId: ctx.user!.id,
+        role: ctx.user!.role,
+        action: "user.created",
+        entity: "users",
+        entityId: user.id,
+        ip: clientIp(ctx),
+        metadata: { via: "invite" },
       });
 
       return Response.json(user, { status: 201 });
@@ -93,6 +124,22 @@ export function registerUsersRoutes(router: Routable) {
         metadata: null,
       });
 
+      return Response.json(user);
+    },
+  );
+
+  router.patch(
+    "/users/:id/role",
+    auth,
+    // super_admin only, same as manual creation (POST /users) — an
+    // admin/supervisor promoting someone to admin would be self-service
+    // privilege escalation.
+    requireRole("super_admin"),
+    rateLimitGeneral,
+    validateBody(UpdateUserRoleSchema),
+    async (ctx) => {
+      const { role } = ctx.body as { role: Role };
+      const user = await service.updateRole(ctx.params.id!, role);
       return Response.json(user);
     },
   );

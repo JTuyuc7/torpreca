@@ -1,68 +1,42 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CreateRouteSchema, type Route, type User, type Vehicle, z } from "@torpreca/shared";
+import {
+  businessDate,
+  CreateRouteSchema,
+  isRouteOverdue,
+  type Route,
+  type User,
+  type Vehicle,
+  z,
+} from "@torpreca/shared";
+import { Route as RouteIcon } from "lucide-react";
 import { useState } from "react";
 import { type Resolver, useForm } from "react-hook-form";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { Input } from "@/components/ui/input";
+import { RouteStatusBadge } from "@/components/ui/route-status-badge";
 import { Section } from "@/components/ui/section";
 import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
 import { useRoutes } from "@/lib/hooks/use-routes";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import { useUsers } from "@/lib/hooks/use-users";
 import { useVehicles } from "@/lib/hooks/use-vehicles";
-
-const STATUS_LABELS: Record<Route["status"], string> = {
-  pending: "Pendiente",
-  in_progress: "En curso",
-  completed: "Completada",
-  delayed: "Retrasada",
-  cancelled: "Cancelada",
-};
-
-// Only the tokens the design system actually defines (outline/primary/error)
-// — no new colors invented for this: neutral for pending, primary for the
-// two "moving forward" states, error for the two "went wrong" states.
-const STATUS_BADGE_CLASSES: Record<Route["status"], string> = {
-  pending: "bg-outline/15 text-outline",
-  in_progress: "bg-primary/15 text-primary",
-  completed: "bg-primary text-white",
-  delayed: "bg-error/15 text-error",
-  cancelled: "bg-error text-white",
-};
-
-function StatusBadge({ status }: { status: Route["status"] }) {
-  return (
-    <span
-      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE_CLASSES[status]}`}
-    >
-      {STATUS_LABELS[status]}
-    </span>
-  );
-}
+import { DuplicateRouteDialog } from "./duplicate-route-dialog";
+import { generateRouteCode } from "./route-code";
+import { RouteKmCalculatorDialog } from "./route-km-calculator-dialog";
+import { RouteStopsDialog } from "./route-stops-dialog";
 
 function FieldError({ children }: { children: React.ReactNode }) {
   return <p className="text-xs text-error">{children}</p>;
 }
 
 function todayIsoDate(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-// R-<YYYYMMDD>-<secuencia del día> — generado en el cliente a partir de las
-// rutas ya cargadas para esa fecha, no en el backend (no hay una tabla de
-// secuencias ni una constraint UNIQUE sobre `code` todavía). Evita que se
-// escriba código a mano; el caso borde de dos admins creando al mismo
-// segundo una ruta para el mismo día es un riesgo aceptado para el MVP de un
-// solo administrador activo a la vez — si eso cambia, esto necesita moverse
-// al backend.
-function generateRouteCode(date: string, existingForDate: number): string {
-  if (!date) return "";
-  const compact = date.replaceAll("-", "");
-  return `R-${compact}-${String(existingForDate + 1).padStart(2, "0")}`;
+  return businessDate();
 }
 
 // Shared by the create form and each editable row below — `code` isn't part
@@ -102,11 +76,13 @@ function CreateRouteForm({
   routes: Route[];
   createRoute: ReturnType<typeof useRoutes>["createRoute"];
 }) {
+  const { t } = useTranslation();
   const {
     register,
     handleSubmit,
     watch,
     reset,
+    setValue,
     formState: { errors, isValid },
   } = useForm<RouteFormValues>({
     resolver: routeResolver,
@@ -128,11 +104,11 @@ function CreateRouteForm({
   }
 
   return (
-    <Section title="Crear ruta" description="Asigna un conductor y, opcionalmente, un vehículo.">
+    <Section title={t.rutas.createTitle} description={t.rutas.createDescription}>
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1">
           <label htmlFor="code" className="text-xs text-outline">
-            Código (autogenerado)
+            {t.rutas.codeLabel}
           </label>
           <Input
             id="code"
@@ -143,18 +119,18 @@ function CreateRouteForm({
         </div>
         <div className="flex flex-col gap-1">
           <label htmlFor="date" className="text-xs text-outline">
-            Fecha
+            {t.rutas.dateLabel}
           </label>
           <Input id="date" type="date" {...register("date")} />
-          {errors.date && <FieldError>Selecciona una fecha.</FieldError>}
+          {errors.date && <FieldError>{t.rutas.dateRequired}</FieldError>}
         </div>
         <div className="flex flex-col gap-1">
           <label htmlFor="driverId" className="text-xs text-outline">
-            Conductor
+            {t.rutas.driverLabel}
           </label>
           <Select id="driverId" {...register("driverId")}>
             <option value="" disabled>
-              Selecciona
+              {t.rutas.selectPlaceholder}
             </option>
             {drivers.map((d) => (
               <option key={d.id} value={d.id}>
@@ -162,17 +138,17 @@ function CreateRouteForm({
               </option>
             ))}
           </Select>
-          {errors.driverId && <FieldError>Selecciona un conductor.</FieldError>}
+          {errors.driverId && <FieldError>{t.rutas.driverRequired}</FieldError>}
         </div>
         <div className="flex flex-col gap-1">
           <label htmlFor="vehicleId" className="text-xs text-outline">
-            Vehículo
+            {t.rutas.vehicleLabel}
           </label>
           <Select
             id="vehicleId"
             {...register("vehicleId", { setValueAs: (v) => (v === "" ? null : v) })}
           >
-            <option value="">Sin vehículo</option>
+            <option value="">{t.rutas.noVehicle}</option>
             {vehicles.map((v) => (
               <option key={v.id} value={v.id}>
                 {v.plate}
@@ -182,24 +158,29 @@ function CreateRouteForm({
         </div>
         <div className="flex flex-col gap-1">
           <label htmlFor="plannedKm" className="text-xs text-outline">
-            Km planeados
+            {t.rutas.plannedKmLabel}
           </label>
-          <Input
-            id="plannedKm"
-            type="number"
-            min={0}
-            {...register("plannedKm", { valueAsNumber: true })}
-            className="w-28"
-          />
-          {errors.plannedKm && <FieldError>Debe ser 0 o mayor.</FieldError>}
+          <div className="flex items-center gap-2">
+            <Input
+              id="plannedKm"
+              type="number"
+              min={0}
+              {...register("plannedKm", { valueAsNumber: true })}
+              className="w-28"
+            />
+            <RouteKmCalculatorDialog
+              onApply={(km) => setValue("plannedKm", km, { shouldValidate: true })}
+            />
+          </div>
+          {errors.plannedKm && <FieldError>{t.rutas.plannedKmInvalid}</FieldError>}
         </div>
         <button
           type="submit"
           disabled={!isValid || createRoute.isPending}
-          className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
+          className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-on-primary transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
         >
           {createRoute.isPending && <Spinner className="h-3.5 w-3.5" />}
-          {createRoute.isPending ? "Creando..." : "Crear ruta"}
+          {createRoute.isPending ? t.rutas.creating : t.rutas.createRoute}
         </button>
         {createRoute.isError && <FieldError>{createRoute.error.message}</FieldError>}
       </form>
@@ -220,9 +201,11 @@ function RouteEditRow({
   updateRoute: ReturnType<typeof useRoutes>["updateRoute"];
   onCancel: () => void;
 }) {
+  const { t } = useTranslation();
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors, isValid },
   } = useForm<RouteFormValues>({
     resolver: routeResolver,
@@ -258,7 +241,7 @@ function RouteEditRow({
       </td>
       <td className="py-3 pr-4">
         <Select {...register("vehicleId", { setValueAs: (v) => (v === "" ? null : v) })}>
-          <option value="">Sin vehículo</option>
+          <option value="">{t.rutas.noVehicle}</option>
           {vehicles.map((v) => (
             <option key={v.id} value={v.id}>
               {v.plate}
@@ -268,19 +251,24 @@ function RouteEditRow({
       </td>
       <td className="py-3 pr-4">
         <Input type="date" {...register("date")} />
-        {errors.date && <FieldError>Requerida</FieldError>}
+        {errors.date && <FieldError>{t.rutas.dateRequiredShort}</FieldError>}
       </td>
       <td className="py-3 pr-4">
-        <StatusBadge status={route.status} />
+        <RouteStatusBadge status={route.status} />
       </td>
       <td className="py-3 pr-4">
-        <Input
-          type="number"
-          min={0}
-          {...register("plannedKm", { valueAsNumber: true })}
-          className="w-24"
-        />
-        {errors.plannedKm && <FieldError>≥ 0</FieldError>}
+        <div className="flex items-center gap-2">
+          <Input
+            type="number"
+            min={0}
+            {...register("plannedKm", { valueAsNumber: true })}
+            className="w-24"
+          />
+          <RouteKmCalculatorDialog
+            onApply={(km) => setValue("plannedKm", km, { shouldValidate: true })}
+          />
+        </div>
+        {errors.plannedKm && <FieldError>{t.rutas.plannedKmInvalidShort}</FieldError>}
       </td>
       <td className="py-3">
         <div className="flex items-center gap-2">
@@ -288,10 +276,10 @@ function RouteEditRow({
             type="button"
             disabled={!isValid || isSaving}
             onClick={handleSubmit(onSubmit)}
-            className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
+            className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-on-primary transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
           >
             {isSaving && <Spinner className="h-3.5 w-3.5" />}
-            Guardar
+            {t.common.save}
           </button>
           <button
             type="button"
@@ -299,7 +287,7 @@ function RouteEditRow({
             onClick={onCancel}
             className="flex h-9 items-center rounded-md border border-outline px-3 text-sm font-medium text-text transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
           >
-            Cancelar
+            {t.common.cancel}
           </button>
         </div>
       </td>
@@ -308,8 +296,10 @@ function RouteEditRow({
 }
 
 export default function RutasPage() {
-  usePageTitle("Gestión de rutas");
-  const { routes, isLoading, error, refetch, createRoute, updateRoute } = useRoutes();
+  const { t } = useTranslation();
+  usePageTitle(t.rutas.title);
+  const { routes, isLoading, error, refetch, createRoute, updateRoute, duplicateRoute, closeRoute } =
+    useRoutes();
   const { users } = useUsers();
   const { vehicles } = useVehicles();
 
@@ -323,19 +313,22 @@ export default function RutasPage() {
     id ? (vehicles?.find((v) => v.id === id)?.plate ?? id) : "—";
 
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [confirmCloseId, setConfirmCloseId] = useState<string | null>(null);
+  const today = todayIsoDate();
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
       <div>
-        <h1 className="text-xl text-text">Gestión de rutas</h1>
-        <p className="text-sm text-outline">Crear, asignar y editar rutas de reparto.</p>
+        <h1 className="text-xl text-text">{t.rutas.title}</h1>
+        <p className="text-sm text-outline">{t.rutas.subtitle}</p>
       </div>
 
       {error && <ErrorBanner message={error} onRetry={() => refetch()} />}
       {updateRoute.isError && <ErrorBanner message={updateRoute.error.message} />}
+      {closeRoute.isError && <ErrorBanner message={closeRoute.error.message} />}
 
       {isLoading && (
-        <div className="flex flex-col gap-6" aria-busy="true" aria-label="Cargando rutas">
+        <div className="flex flex-col gap-6" aria-busy="true" aria-label={t.rutas.loadingLabel}>
           <Skeleton className="h-28 w-full" />
           <Skeleton className="h-40 w-full" />
         </div>
@@ -350,20 +343,26 @@ export default function RutasPage() {
             createRoute={createRoute}
           />
 
-          {routes.length === 0 && <p className="text-sm text-outline">No hay rutas registradas.</p>}
+          {routes.length === 0 && (
+            <EmptyState
+              icon={RouteIcon}
+              title={t.rutas.noRoutesTitle}
+              description={t.rutas.noRoutesDescription}
+            />
+          )}
 
           {routes.length > 0 && (
-            <Section title="Todas las rutas">
+            <Section title={t.rutas.allRoutesTitle}>
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-outline/30 text-xs text-outline">
-                    <th className="py-2 pr-4">Código</th>
-                    <th className="py-2 pr-4">Conductor</th>
-                    <th className="py-2 pr-4">Vehículo</th>
-                    <th className="py-2 pr-4">Fecha</th>
-                    <th className="py-2 pr-4">Estado</th>
-                    <th className="py-2 pr-4">Km (plan/real)</th>
-                    <th className="py-2">Acciones</th>
+                    <th className="py-2 pr-4">{t.rutas.tableCode}</th>
+                    <th className="py-2 pr-4">{t.rutas.tableDriver}</th>
+                    <th className="py-2 pr-4">{t.rutas.tableVehicle}</th>
+                    <th className="py-2 pr-4">{t.rutas.tableDate}</th>
+                    <th className="py-2 pr-4">{t.rutas.tableStatus}</th>
+                    <th className="py-2 pr-4">{t.rutas.tableKm}</th>
+                    <th className="py-2">{t.rutas.tableActions}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -381,6 +380,12 @@ export default function RutasPage() {
                       );
                     }
 
+                    // Sin completar: its day passed without being finished —
+                    // read-only, it can only be duplicated (or closed, if it
+                    // was started and left running).
+                    const overdue = isRouteOverdue(route, today);
+                    const closing = closeRoute.isPending && closeRoute.variables === route.id;
+
                     return (
                       <tr
                         key={route.id}
@@ -391,27 +396,65 @@ export default function RutasPage() {
                         <td className="py-3 pr-4">{vehiclePlate(route.vehicleId)}</td>
                         <td className="py-3 pr-4">{route.date}</td>
                         <td className="py-3 pr-4">
-                          <StatusBadge status={route.status} />
+                          <RouteStatusBadge status={route.status} overdue={overdue} />
                         </td>
                         <td className="py-3 pr-4 tabular-nums">
                           {route.plannedKm ?? "—"} / {route.drivenKm}
                         </td>
                         <td className="py-3">
-                          {route.status === "pending" && (
-                            <button
-                              type="button"
-                              onClick={() => setEditingId(route.id)}
-                              className="flex h-9 items-center rounded-md border border-outline px-3 text-sm font-medium text-text transition-opacity hover:opacity-90 cursor-pointer"
-                            >
-                              Editar
-                            </button>
-                          )}
+                          <div className="flex items-center gap-2">
+                            <RouteStopsDialog route={route} />
+                            {route.status === "pending" && !overdue && (
+                              <button
+                                type="button"
+                                onClick={() => setEditingId(route.id)}
+                                className="flex h-9 items-center rounded-md border border-outline px-3 text-sm font-medium text-text transition-opacity hover:opacity-90 cursor-pointer"
+                              >
+                                {t.common.edit}
+                              </button>
+                            )}
+                            <DuplicateRouteDialog
+                              route={route}
+                              routes={routes}
+                              drivers={drivers}
+                              vehicles={activeVehicles}
+                              duplicateRoute={duplicateRoute}
+                            />
+                            {overdue && route.status === "in_progress" && (
+                              <button
+                                type="button"
+                                disabled={closing}
+                                onClick={() =>
+                                  confirmCloseId === route.id
+                                    ? closeRoute.mutate(route.id, {
+                                        onSettled: () => setConfirmCloseId(null),
+                                      })
+                                    : setConfirmCloseId(route.id)
+                                }
+                                className={
+                                  confirmCloseId === route.id
+                                    ? "flex h-9 items-center gap-1.5 rounded-md bg-error px-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
+                                    : "flex h-9 items-center rounded-md border border-outline px-3 text-sm font-medium text-text transition-opacity hover:opacity-90 cursor-pointer"
+                                }
+                              >
+                                {closing && <Spinner className="h-3.5 w-3.5" />}
+                                {closing
+                                  ? t.rutas.closing
+                                  : confirmCloseId === route.id
+                                    ? t.rutas.confirmCloseRoute
+                                    : t.rutas.closeRoute}
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
+              {routes.some((r) => isRouteOverdue(r, today)) && (
+                <p className="mt-3 text-xs text-outline">{t.rutas.overdueNotice}</p>
+              )}
             </Section>
           )}
         </div>

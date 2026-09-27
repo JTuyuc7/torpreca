@@ -1,9 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { withQueryClient } from "@/lib/test-utils/query-client";
-
-vi.mock("@/lib/supabase/access-token", () => ({ getAccessToken: vi.fn(async () => "tok") }));
-
 import VehiculosPage from "./page";
 
 const fetchMock = vi.fn();
@@ -62,10 +59,7 @@ describe("VehiculosPage", () => {
     await waitFor(() =>
       expect(screen.getByText("No hay vehículos registrados.")).toBeInTheDocument(),
     );
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/vehicles?all=true",
-      expect.objectContaining({ headers: { authorization: "Bearer tok" } }),
-    );
+    expect(fetchMock).toHaveBeenCalledWith("/api/vehicles?all=true");
   });
 
   it("lists vehicles including inactive ones, with an Estado badge", async () => {

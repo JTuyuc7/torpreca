@@ -1,0 +1,60 @@
+import { businessDate, ListDailyReportsQuerySchema } from "@torpreca/shared";
+import { ValidationError } from "../../core/errors/app-error";
+import type { Routable } from "../../core/http/router";
+import { auth } from "../../core/middleware/auth";
+import { rateLimitGeneral } from "../../core/middleware/rate-limit";
+import { requireRole } from "../../core/middleware/role";
+import { routesRepository } from "../routes/routes.repository";
+import { stopsRepository } from "../stops/stops.repository";
+import { dailyReportsRepository } from "./daily-reports.repository";
+import { createDailyReportsService } from "./daily-reports.service";
+
+const service = createDailyReportsService(
+  dailyReportsRepository,
+  routesRepository,
+  stopsRepository,
+);
+
+function todayIsoDate(): string {
+  return businessDate();
+}
+
+// Unsigned /mobile route only, same reasoning as routes/stops — Flutter can't
+// hold REQUEST_SIGNING_SECRET. Nothing outside the mobile app reads a
+// driver's own daily report yet (a dashboard-facing "Reportes históricos" is
+// a separate, later ticket), so there's no signed /daily-reports counterpart
+// to mirror today.
+export function registerMobileDailyReportsRoutes(router: Routable) {
+  // Array response (0 or 1 items), not a single object/404 — mirrors
+  // GET /mobile/routes?date=: "no report generated yet for this date" is a
+  // normal, common state (e.g. before the driver finishes their first route
+  // of the day), not an error.
+  router.get(
+    "/mobile/daily-reports",
+    auth,
+    requireRole("driver"),
+    rateLimitGeneral,
+    async (ctx) => {
+      const date = new URL(ctx.req.url).searchParams.get("date") ?? todayIsoDate();
+      const report = await service.getByDriverAndDate(ctx.user!.id, date);
+      return Response.json(report ? [report] : []);
+    },
+  );
+
+  // The driver app's "Historial": their reports newest first, 5 per page by
+  // default, filterable by date range. A separate path from the by-date read
+  // above so that one's "no params = today" default stays untouched.
+  router.get(
+    "/mobile/daily-reports/history",
+    auth,
+    requireRole("driver"),
+    rateLimitGeneral,
+    async (ctx) => {
+      const params = Object.fromEntries(new URL(ctx.req.url).searchParams);
+      const parsed = ListDailyReportsQuerySchema.safeParse(params);
+      if (!parsed.success) throw new ValidationError("Invalid query", parsed.error.issues);
+
+      return Response.json(await service.listByDriver(ctx.user!.id, parsed.data));
+    },
+  );
+}

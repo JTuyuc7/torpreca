@@ -1,8 +1,22 @@
+import { businessDate } from "@torpreca/shared";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { withQueryClient } from "@/lib/test-utils/query-client";
 
-vi.mock("@/lib/supabase/access-token", () => ({ getAccessToken: vi.fn(async () => "tok") }));
+// The duplicate dialog embeds AddressSearch, which wraps Mapbox's SearchBox web
+// component (Shadow DOM, not implemented by jsdom) — same stand-in as
+// route-stops-dialog.test.tsx.
+vi.mock("@/components/ui/address-search", () => ({
+  AddressSearch: ({
+    onSelect,
+  }: {
+    onSelect: (coordinates: { lng: number; lat: number }, name: string) => void;
+  }) => (
+    <button type="button" onClick={() => onSelect({ lng: -90.51, lat: 14.63 }, "Zona 1, Guatemala")}>
+      mock-address-search
+    </button>
+  ),
+}));
 
 import RutasPage from "./page";
 
@@ -39,7 +53,8 @@ const pendingRoute = {
   driverId: "11111111-1111-4111-8111-111111111111",
   vehicleId: null,
   createdBy: "admin-1",
-  date: "2026-09-10",
+  // Today: a pending route of a past day is "sin completar" (read-only).
+  date: businessDate(),
   status: "pending",
   plannedKm: 10,
   drivenKm: 0,
@@ -170,5 +185,160 @@ describe("RutasPage", () => {
     expect(patchCall?.[0]).toBe("/api/routes/r1");
     const body = JSON.parse((patchCall?.[1] as RequestInit).body as string);
     expect(body.plannedKm).toBe(40);
+  });
+
+  describe("routes that weren't completed (sin completar)", () => {
+    const overduePending = { ...pendingRoute, id: "r3", code: "R-20200101-01", date: "2020-01-01" };
+    const overdueRunning = {
+      ...overduePending,
+      id: "r4",
+      code: "R-20200101-02",
+      status: "in_progress",
+      startTime: "2020-01-01T10:00:00.000Z",
+    };
+
+    it("marks them 'Sin completar', hides 'Editar' and offers 'Duplicar'", async () => {
+      mockFetchRoutes([overduePending]);
+
+      renderPage();
+
+      await waitFor(() => expect(screen.getByText("Sin completar")).toBeInTheDocument());
+      expect(screen.queryByText("Pendiente")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Editar" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Duplicar" })).toBeInTheDocument();
+      expect(screen.getByText(/solo de lectura/)).toBeInTheDocument();
+      // Nothing was started, so there is nothing to close.
+      expect(screen.queryByRole("button", { name: "Cerrar" })).not.toBeInTheDocument();
+    });
+
+    it("keeps today's pending route editable and not overdue", async () => {
+      mockFetchRoutes([pendingRoute]);
+
+      renderPage();
+
+      await waitFor(() => expect(screen.getByText("Pendiente")).toBeInTheDocument());
+      expect(screen.getByRole("button", { name: "Editar" })).toBeInTheDocument();
+      expect(screen.queryByText("Sin completar")).not.toBeInTheDocument();
+    });
+
+    it("closing an overdue in-progress route asks for confirmation, then PATCHes /close", async () => {
+      mockFetchRoutes([overdueRunning]);
+
+      renderPage();
+      const closeButton = await screen.findByRole("button", { name: "Cerrar" });
+
+      fireEvent.click(closeButton);
+      expect(fetchMock.mock.calls.some(([, init]) => init?.method === "PATCH")).toBe(false);
+
+      fetchMock.mockImplementationOnce(() =>
+        Promise.resolve(jsonResponse({ ...overdueRunning, status: "cancelled", drivenKm: 3.2 })),
+      );
+      fireEvent.click(screen.getByRole("button", { name: "¿Cerrar ruta?" }));
+
+      await waitFor(() => {
+        const call = fetchMock.mock.calls.find(([, init]) => init?.method === "PATCH");
+        expect(call?.[0]).toBe("/api/routes/r4/close");
+      });
+      // Once closed it's no longer running: the close button goes away.
+      await waitFor(() =>
+        expect(screen.queryByRole("button", { name: /Cerrar/ })).not.toBeInTheDocument(),
+      );
+    });
+
+    it("duplicating pre-loads the source stops and POSTs the new route with them", async () => {
+      const sourceStops = [
+        {
+          id: "s1",
+          routeId: "r3",
+          order: 1,
+          customerName: "Tienda La Esquina",
+          address: "6a Avenida 12-34, Zona 1",
+          lat: 14.63,
+          lng: -90.51,
+          instructions: null,
+          status: "completed",
+          estimatedTime: null,
+          completedTime: "2020-01-01T12:00:00.000Z",
+          createdAt: "2020-01-01T00:00:00.000Z",
+          updatedAt: "2020-01-01T00:00:00.000Z",
+        },
+        {
+          id: "s2",
+          routeId: "r3",
+          order: 2,
+          customerName: "Panadería Sol",
+          address: "Calzada Roosevelt 5-67",
+          lat: 14.62,
+          lng: -90.55,
+          instructions: "Puerta azul",
+          status: "delayed",
+          estimatedTime: null,
+          completedTime: null,
+          createdAt: "2020-01-01T00:00:00.000Z",
+          updatedAt: "2020-01-01T00:00:00.000Z",
+        },
+      ];
+      fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+        if (url === "/api/routes/r3/stops") return Promise.resolve(jsonResponse(sourceStops));
+        if (url === "/api/routes/r3/duplicate" && init?.method === "POST") {
+          return Promise.resolve(
+            jsonResponse({ ...pendingRoute, id: "r5", code: "R-new", plannedKm: 10 }, 201),
+          );
+        }
+        if (url.startsWith("/api/routes")) return Promise.resolve(jsonResponse([overduePending]));
+        if (url.startsWith("/api/users")) return Promise.resolve(jsonResponse([driver]));
+        if (url.startsWith("/api/vehicles")) return Promise.resolve(jsonResponse([vehicle]));
+        throw new Error(`unexpected fetch: ${url}`);
+      });
+
+      renderPage();
+      fireEvent.click(await screen.findByRole("button", { name: "Duplicar" }));
+
+      // Both stops are loaded into the editable list; drop the first one.
+      expect(await screen.findByText("Panadería Sol")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Eliminar: Tienda La Esquina" }));
+      expect(screen.queryByText("Tienda La Esquina")).not.toBeInTheDocument();
+
+      // ...and add a brand-new one through the same form the stops dialog uses.
+      fireEvent.change(screen.getByLabelText("Cliente"), { target: { value: "Nuevo Cliente" } });
+      fireEvent.click(screen.getByRole("button", { name: "mock-address-search" }));
+      fireEvent.click(screen.getByRole("button", { name: "Agregar a la lista" }));
+      expect(await screen.findByText("Nuevo Cliente")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "Crear ruta duplicada" }));
+
+      await waitFor(() => {
+        const call = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
+        expect(call?.[0]).toBe("/api/routes/r3/duplicate");
+      });
+      const call = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
+      const body = JSON.parse((call?.[1] as RequestInit).body as string);
+      expect(body).toMatchObject({
+        date: businessDate(),
+        driverId: driver.id,
+        vehicleId: null,
+        plannedKm: 10,
+        stops: [
+          {
+            customerName: "Panadería Sol",
+            address: "Calzada Roosevelt 5-67",
+            lat: 14.62,
+            lng: -90.55,
+            instructions: "Puerta azul",
+          },
+          {
+            customerName: "Nuevo Cliente",
+            address: "Zona 1, Guatemala",
+            lat: 14.63,
+            lng: -90.51,
+            instructions: null,
+          },
+        ],
+      });
+      // The stops go over as plain data — no state, no ids: the copy starts over.
+      expect(body.stops[0]).not.toHaveProperty("status");
+      expect(body.stops[0]).not.toHaveProperty("id");
+      expect(body.code).toMatch(/^R-\d{8}-01$/);
+    });
   });
 });

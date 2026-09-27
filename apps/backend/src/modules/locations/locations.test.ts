@@ -24,6 +24,12 @@ function createFakeRoutesRepo(seed: Route[]): RoutesRepository {
     async finish() {
       throw new Error("not used in these tests");
     },
+    async close() {
+      throw new Error("not used in these tests");
+    },
+    async delete() {
+      throw new Error("not used in these tests");
+    },
   };
 }
 
@@ -49,6 +55,9 @@ function createFakeLocationsRepo(seed: Location[] = []): LocationsRepository {
     },
     async listByRoute(routeId) {
       return locations.filter((l) => l.routeId === routeId);
+    },
+    async listByDriverBetween() {
+      throw new Error("not used in these tests");
     },
     async listLatestPerDriver() {
       return locations;

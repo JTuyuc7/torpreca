@@ -43,6 +43,7 @@ function createFakeWs(): TrackingWs & {
     unsubscribe: (topic: string) => {
       unsubscribed.push(topic);
     },
+    close: () => {},
     sent,
     subscribed,
     unsubscribed,

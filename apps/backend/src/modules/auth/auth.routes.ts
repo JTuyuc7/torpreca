@@ -8,11 +8,14 @@ import { requireRole } from "../../core/middleware/role";
 import { validateBody } from "../../core/middleware/validate-zod";
 
 // No auth-repository / auth-service here on purpose: this module never
-// authenticates anyone — Supabase Auth does that client-side with the anon
-// key. These endpoints only (a) confirm a just-issued token belongs to a
-// dashboard-eligible role (reusing the existing `auth` + `requireRole`
-// middlewares) and (b) write the corresponding audit_logs row, since the
-// browser only holds the anon key and can't write there directly.
+// authenticates anyone — Supabase Auth does that, called with the anon key
+// from the dashboard's own server-side Route Handlers (TOR-124 moved this
+// out of the browser entirely, into httpOnly-cookie-backed Route Handlers —
+// see apps/dashboard/app/api/auth/login/route.ts). These endpoints only
+// (a) confirm a just-issued token belongs to a dashboard-eligible role
+// (reusing the existing `auth` + `requireRole` middlewares) and (b) write
+// the corresponding audit_logs row, since the caller only holds the anon
+// key and can't write there directly.
 export function registerAuthRoutes(router: Routable) {
   router.post(
     "/auth/session",

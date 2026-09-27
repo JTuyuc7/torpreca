@@ -1,7 +1,13 @@
-import type { CreateUserInput, Role, User } from "@torpreca/shared";
+import type { CreateUserInput, InviteUserInput, Role, User } from "@torpreca/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createUser, deactivateUser, listAllUsers, reviewUser } from "@/lib/api/users-client";
-import { getAccessToken } from "@/lib/supabase/access-token";
+import {
+  createUser,
+  deactivateUser,
+  inviteUser,
+  listAllUsers,
+  reviewUser,
+  updateUserRole,
+} from "@/lib/api/users-client";
 
 const usersQueryKey = ["users"] as const;
 
@@ -14,8 +20,7 @@ export function useUsers() {
   const usersQuery = useQuery({
     queryKey: usersQueryKey,
     queryFn: async () => {
-      const token = await getAccessToken();
-      const result = await listAllUsers(token);
+      const result = await listAllUsers();
       if (!result.ok) throw new Error("No se pudieron cargar los usuarios.");
       return result.users;
     },
@@ -23,8 +28,7 @@ export function useUsers() {
 
   const createUserMutation = useMutation({
     mutationFn: async (input: CreateUserInput) => {
-      const token = await getAccessToken();
-      const result = await createUser(token, input);
+      const result = await createUser(input);
       if (!result.ok) {
         throw new Error(
           result.status === 409
@@ -39,10 +43,26 @@ export function useUsers() {
     },
   });
 
+  const inviteUserMutation = useMutation({
+    mutationFn: async (input: InviteUserInput) => {
+      const result = await inviteUser(input);
+      if (!result.ok) {
+        throw new Error(
+          result.status === 409
+            ? "Ya existe un usuario con ese correo."
+            : "No se pudo enviar la invitación. Intenta de nuevo.",
+        );
+      }
+      return result.user;
+    },
+    onSuccess: (user) => {
+      queryClient.setQueryData<User[]>(usersQueryKey, (prev) => (prev ? [user, ...prev] : [user]));
+    },
+  });
+
   const deactivateUserMutation = useMutation({
     mutationFn: async (id: string) => {
-      const token = await getAccessToken();
-      const result = await deactivateUser(token, id);
+      const result = await deactivateUser(id);
       if (!result.ok) throw new Error("No se pudo desactivar el usuario.");
       return id;
     },
@@ -53,10 +73,22 @@ export function useUsers() {
     },
   });
 
+  const updateUserRoleMutation = useMutation({
+    mutationFn: async (vars: { id: string; role: Role }) => {
+      const result = await updateUserRole(vars.id, vars.role);
+      if (!result.ok) throw new Error("No se pudo actualizar el rol. Intenta de nuevo.");
+      return result.user;
+    },
+    onSuccess: (user) => {
+      queryClient.setQueryData<User[]>(usersQueryKey, (prev) =>
+        prev?.map((u) => (u.id === user.id ? user : u)),
+      );
+    },
+  });
+
   const reviewUserMutation = useMutation({
     mutationFn: async (vars: { id: string; decision: "approve" | "reject"; role?: Role }) => {
-      const token = await getAccessToken();
-      const result = await reviewUser(token, vars.id, vars.decision, vars.role);
+      const result = await reviewUser(vars.id, vars.decision, vars.role);
       if (!result.ok) throw new Error("No se pudo completar la revisión. Intenta de nuevo.");
       return result.user;
     },
@@ -70,10 +102,17 @@ export function useUsers() {
   return {
     users: usersQuery.data,
     isLoading: usersQuery.isLoading,
+    // Distinct from isLoading (true only for the very first, cache-less
+    // fetch) — this covers a manual "Actualizar" refetch of data that's
+    // already on screen, so the button can show its own spinner instead of
+    // the page falling back to the full skeleton state.
+    isRefetching: usersQuery.isFetching && !usersQuery.isLoading,
     error: usersQuery.error?.message ?? null,
     refetch: usersQuery.refetch,
     createUser: createUserMutation,
+    inviteUser: inviteUserMutation,
     deactivateUser: deactivateUserMutation,
+    updateUserRole: updateUserRoleMutation,
     reviewUser: reviewUserMutation,
   };
 }

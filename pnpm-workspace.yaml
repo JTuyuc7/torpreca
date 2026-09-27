@@ -1,7 +1,6 @@
-# pnpm workspace scoped to the pnpm-managed side of the monorepo (dashboard +
-# the shared package it needs) — apps/backend uses bun's own workspace
-# (root package.json's "workspaces" field, bun.lock), not pnpm; apps/landing
-# isn't a workspace member yet, still plain create-next-app boilerplate.
+# pnpm workspace scoped to the pnpm-managed side of the monorepo (dashboard,
+# landing, and the shared package they need) — apps/backend uses bun's own
+# workspace (root package.json's "workspaces" field, bun.lock), not pnpm.
 #
 # packages/shared has its own runtime dependencies (zod,
 # @asteasolutions/zod-to-openapi — packages/shared/package.json) that need to
@@ -17,6 +16,8 @@
 # install packages/shared's own dependencies correctly, every time.
 packages:
   - apps/dashboard
+  - apps/landing
   - packages/shared
 overrides:
   next@>=16.0.0 <16.3.3: '>=16.3.3'
+  js-yaml@>=4.0.0 <4.3.2: '>=4.3.2'

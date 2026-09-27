@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { getDashboardSummary } from "@/lib/api/dashboard-client";
-import { getAccessToken } from "@/lib/supabase/access-token";
 
 // Polled, not pushed over the WebSocket — the "tracking" topic only carries
 // location pings (see core/ws/tracking-handlers.ts on the backend), and
@@ -12,8 +11,7 @@ export function useDashboardSummary() {
   const query = useQuery({
     queryKey: ["dashboard-summary"],
     queryFn: async () => {
-      const token = await getAccessToken();
-      const result = await getDashboardSummary(token);
+      const result = await getDashboardSummary();
       if (!result.ok) throw new Error("No se pudieron cargar las métricas.");
       return result.summary;
     },

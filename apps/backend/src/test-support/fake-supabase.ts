@@ -1,32 +1,36 @@
 // Minimal in-memory stand-in for the slice of supabase-js this backend uses
-// (`.from().select/insert/update().eq/neq().order().single/maybeSingle()`,
+// (`.from().select/insert/update/delete().eq/neq().order().single/maybeSingle()`,
 // `.rpc()`, `.auth.getUser()`). Swapped in for `supabaseAdmin` via
 // `mock.module("../../core/db/supabase", ...)` so repository and HTTP tests
 // run without a real Supabase project. See TOR-75 plan.
 
 export type Row = Record<string, unknown>;
 
-type Filter = { op: "eq" | "neq"; col: string; val: unknown };
+type Filter = { op: "eq" | "neq" | "gte" | "lt" | "lte" | "in"; col: string; val: unknown };
 
-type PostgrestResult = { data: unknown; error: { message: string } | null };
+type PostgrestResult = { data: unknown; error: { message: string } | null; count?: number };
 
 export type RpcHandler = (tables: Record<string, Row[]>, args: Record<string, unknown>) => Row[];
 
 class FakeQueryBuilder implements PromiseLike<PostgrestResult> {
-  private op: "select" | "insert" | "update" = "select";
+  private op: "select" | "insert" | "update" | "delete" = "select";
   private insertPayload: Row | null = null;
   private updatePayload: Row | null = null;
   private filters: Filter[] = [];
   private orderCol: string | null = null;
   private orderAsc = true;
   private terminal: "single" | "maybeSingle" | null = null;
+  private wantCount = false;
+  private rangeFrom: number | null = null;
+  private rangeTo: number | null = null;
 
   constructor(
     private readonly source: Row[],
     private readonly insertDefaults: Row = {},
   ) {}
 
-  select(_columns?: string) {
+  select(_columns?: string, opts?: { count?: "exact" | "planned" | "estimated" }) {
+    if (opts?.count) this.wantCount = true;
     return this;
   }
 
@@ -42,6 +46,11 @@ class FakeQueryBuilder implements PromiseLike<PostgrestResult> {
     return this;
   }
 
+  delete() {
+    this.op = "delete";
+    return this;
+  }
+
   eq(col: string, val: unknown) {
     this.filters.push({ op: "eq", col, val });
     return this;
@@ -49,6 +58,33 @@ class FakeQueryBuilder implements PromiseLike<PostgrestResult> {
 
   neq(col: string, val: unknown) {
     this.filters.push({ op: "neq", col, val });
+    return this;
+  }
+
+  gte(col: string, val: unknown) {
+    this.filters.push({ op: "gte", col, val });
+    return this;
+  }
+
+  in(col: string, val: unknown[]) {
+    this.filters.push({ op: "in", col, val });
+    return this;
+  }
+
+  lt(col: string, val: unknown) {
+    this.filters.push({ op: "lt", col, val });
+    return this;
+  }
+
+  lte(col: string, val: unknown) {
+    this.filters.push({ op: "lte", col, val });
+    return this;
+  }
+
+  // Inclusive on both ends, same as supabase-js's .range(from, to).
+  range(from: number, to: number) {
+    this.rangeFrom = from;
+    this.rangeTo = to;
     return this;
   }
 
@@ -69,7 +105,26 @@ class FakeQueryBuilder implements PromiseLike<PostgrestResult> {
   }
 
   private matches(row: Row): boolean {
-    return this.filters.every((f) => (f.op === "eq" ? row[f.col] === f.val : row[f.col] !== f.val));
+    return this.filters.every((f) => {
+      const rowVal = row[f.col] as string | number;
+      const filterVal = f.val as string | number;
+      switch (f.op) {
+        case "eq":
+          return rowVal === filterVal;
+        case "neq":
+          return rowVal !== filterVal;
+        case "gte":
+          return rowVal >= filterVal;
+        case "lt":
+          return rowVal < filterVal;
+        case "lte":
+          return rowVal <= filterVal;
+        case "in":
+          return (f.val as unknown[]).includes(rowVal);
+        default:
+          return false;
+      }
+    });
   }
 
   private applyOrder(rows: Row[]): Row[] {
@@ -107,11 +162,28 @@ class FakeQueryBuilder implements PromiseLike<PostgrestResult> {
       return this.wrap(matched);
     }
 
-    const matched = this.applyOrder(this.source.filter((row) => this.matches(row)));
-    return this.wrap(matched);
+    if (this.op === "delete") {
+      const matched = this.source.filter((row) => this.matches(row));
+      // Mutate `source` in place (splice), not reassign — it's the same
+      // array reference held in `tables[table]`, so a fresh array here
+      // wouldn't be visible outside this call.
+      for (const row of matched) {
+        const idx = this.source.indexOf(row);
+        if (idx !== -1) this.source.splice(idx, 1);
+      }
+      return this.wrap(matched);
+    }
+
+    const filtered = this.applyOrder(this.source.filter((row) => this.matches(row)));
+    const total = filtered.length;
+    const paged =
+      this.rangeFrom != null
+        ? filtered.slice(this.rangeFrom, (this.rangeTo ?? filtered.length - 1) + 1)
+        : filtered;
+    return this.wrap(paged, this.wantCount ? total : undefined);
   }
 
-  private wrap(rows: Row[]): PostgrestResult {
+  private wrap(rows: Row[], count?: number): PostgrestResult {
     if (this.terminal === "single") {
       if (rows.length !== 1) {
         return { data: null, error: { message: "fake-supabase: expected exactly one row" } };
@@ -124,7 +196,7 @@ class FakeQueryBuilder implements PromiseLike<PostgrestResult> {
       }
       return { data: rows[0] ?? null, error: null };
     }
-    return { data: rows, error: null };
+    return { data: rows, error: null, ...(count !== undefined ? { count } : {}) };
   }
 
   // biome-ignore lint/suspicious/noThenProperty: mirrors supabase-js's PostgrestBuilder (itself thenable) — repositories `await` a query directly without a terminal .single()/.maybeSingle() call.
@@ -154,6 +226,10 @@ export interface FakeSupabaseClient {
       createUser(
         attrs: Record<string, unknown>,
       ): Promise<{ data: { user: FakeAuthUser | null }; error: { message: string } | null }>;
+      inviteUserByEmail(
+        email: string,
+        options?: Record<string, unknown>,
+      ): Promise<{ data: { user: FakeAuthUser | null }; error: { message: string } | null }>;
     };
     resend(attrs: Record<string, unknown>): Promise<{ error: { message: string } | null }>;
   };
@@ -170,6 +246,8 @@ export interface FakeSupabase {
     createdUsers: FakeAuthUser[];
     createUserError: { message: string } | null;
     resendCalls: Record<string, unknown>[];
+    invitedUsers: FakeAuthUser[];
+    inviteUserError: { message: string } | null;
   };
 }
 
@@ -185,6 +263,8 @@ export function createFakeSupabase(
     createdUsers: [],
     createUserError: null,
     resendCalls: [],
+    invitedUsers: [],
+    inviteUserError: null,
   };
 
   const client: FakeSupabaseClient = {
@@ -216,6 +296,19 @@ export function createFakeSupabase(
           authAdmin.createdUsers.push(user);
           return { data: { user }, error: null };
         },
+        async inviteUserByEmail(email, options = {}) {
+          if (authAdmin.inviteUserError) {
+            return { data: { user: null }, error: authAdmin.inviteUserError };
+          }
+          const user: FakeAuthUser = {
+            id: crypto.randomUUID(),
+            email,
+            email_confirmed_at: null,
+            user_metadata: (options.data as Record<string, unknown>) ?? {},
+          };
+          authAdmin.invitedUsers.push(user);
+          return { data: { user }, error: null };
+        },
       },
       async resend(attrs) {
         authAdmin.resendCalls.push(attrs);
@@ -236,6 +329,8 @@ export function createFakeSupabase(
       authAdmin.createdUsers = [];
       authAdmin.createUserError = null;
       authAdmin.resendCalls = [];
+      authAdmin.invitedUsers = [];
+      authAdmin.inviteUserError = null;
     },
     setAuthUser(user, error = null) {
       authUser = user;

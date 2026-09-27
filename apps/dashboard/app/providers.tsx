@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
+import { PreferencesProvider } from "@/lib/preferences/preferences-context";
 
 // One QueryClient per browser tab, created lazily inside useState so it
 // survives re-renders but isn't shared across requests on the server (Next's
@@ -10,5 +11,9 @@ import { useState } from "react";
 // state between unrelated requests there).
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient());
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <PreferencesProvider>{children}</PreferencesProvider>
+    </QueryClientProvider>
+  );
 }
