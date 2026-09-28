@@ -46,6 +46,22 @@ export const en: Messages = {
     errorInvalidCredentials: "Invalid credentials.",
     reasonSignedOutElsewhere: "Your session was closed (here or in another tab). Sign in again.",
     reasonInactivity: "Your session expired due to inactivity. Sign in again.",
+    reasonConfirmFailed: "That confirmation link is invalid or expired. Request a new one.",
+  },
+  setPassword: {
+    title: "Create your password",
+    subtitle: "Your email is confirmed. Set a password to access the admin panel.",
+    passwordLabel: "Password",
+    confirmPasswordLabel: "Confirm your password",
+    showPassword: "Show password",
+    hidePassword: "Hide password",
+    submitting: "Saving...",
+    submit: "Save and continue",
+    errorGeneric: "Couldn't save the password. Try again.",
+  },
+  confirmed: {
+    title: "Email confirmed",
+    description: "Your account is active. Open the Torpreca app to sign in.",
   },
   sessionExpired: {
     title: "Your session expired",

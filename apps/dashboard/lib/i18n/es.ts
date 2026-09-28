@@ -47,6 +47,22 @@ export const es = {
     errorInvalidCredentials: "Credenciales inválidas.",
     reasonSignedOutElsewhere: "Tu sesión se cerró (aquí o en otra pestaña). Inicia sesión de nuevo.",
     reasonInactivity: "Tu sesión expiró por inactividad. Inicia sesión de nuevo.",
+    reasonConfirmFailed: "El link de confirmación no es válido o ya expiró. Solicita uno nuevo.",
+  },
+  setPassword: {
+    title: "Crea tu contraseña",
+    subtitle: "Tu correo fue confirmado. Define una contraseña para acceder al panel.",
+    passwordLabel: "Contraseña",
+    confirmPasswordLabel: "Confirma tu contraseña",
+    showPassword: "Mostrar contraseña",
+    hidePassword: "Ocultar contraseña",
+    submitting: "Guardando...",
+    submit: "Guardar y continuar",
+    errorGeneric: "No se pudo guardar la contraseña. Intenta de nuevo.",
+  },
+  confirmed: {
+    title: "Correo confirmado",
+    description: "Tu cuenta ya está activa. Abre la app de Torpreca para iniciar sesión.",
   },
   sessionExpired: {
     title: "Tu sesión expiró",
