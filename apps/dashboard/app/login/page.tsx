@@ -26,6 +26,7 @@ function SessionNotice() {
   const reasonMessages: Record<string, string> = {
     "signed-out-elsewhere": t.login.reasonSignedOutElsewhere,
     inactivity: t.login.reasonInactivity,
+    "confirm-failed": t.login.reasonConfirmFailed,
   };
   const message = reasonMessages[params.get("reason") ?? ""];
   if (!message) return null;
