@@ -2,6 +2,9 @@ import type { EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
+const appUrl = process.env.APP_URL;
+if (!appUrl) throw new Error("Missing APP_URL");
+
 // GET /auth/confirm — where an invite/signup confirmation email points
 // (Supabase's default `{{ .ConfirmationURL }}` hits Supabase's own hosted
 // /verify endpoint first, which appends the session to the redirect as a
@@ -11,8 +14,14 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 // SSR-friendly pattern — see the confirmation email template note in the
 // dashboard's env/deploy docs), so verifyOtp can run server-side and land
 // the session in the same httpOnly cookie every other route uses.
+//
+// Redirects always build off `appUrl` (env, one value per Render service),
+// never off this request's own Host header — `new URL(request.url).origin`
+// reflects whatever Host a caller sends, and NextResponse.redirect requires
+// an absolute URL, so trusting it would let a spoofed Host header send
+// someone off this domain after a real, valid token_hash confirmation.
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
 
@@ -29,9 +38,9 @@ export async function GET(request: Request) {
       // that role anyway (CLAUDE.md role table), so it just shows a
       // confirmation message pointing them back to the app.
       const next = type === "invite" ? "/auth/set-password" : "/auth/confirmed";
-      return NextResponse.redirect(`${origin}${next}`);
+      return NextResponse.redirect(`${appUrl}${next}`);
     }
   }
 
-  return NextResponse.redirect(`${origin}/login?reason=confirm-failed`);
+  return NextResponse.redirect(`${appUrl}/login?reason=confirm-failed`);
 }
