@@ -46,3 +46,12 @@ class NextStopController extends ValueNotifier<NextStopInfo?> {
 /// "350 m" below a kilometer (rounded to 10 m), "1.2 km" above.
 String formatDistanceMeters(double meters) =>
     meters < 1000 ? '${(meters / 10).round() * 10} m' : '${(meters / 1000).toStringAsFixed(1)} km';
+
+/// "8 min" below an hour, "1 h 5 min" above (never "0 min" — a route under
+/// 30s still reads as "1 min", which is what a driver expects to see).
+String formatDurationSeconds(double seconds) {
+  final totalMinutes = (seconds / 60).round().clamp(1, 1 << 30);
+  final hours = totalMinutes ~/ 60;
+  final minutes = totalMinutes % 60;
+  return hours > 0 ? '$hours h $minutes min' : '$minutes min';
+}

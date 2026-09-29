@@ -156,7 +156,16 @@ class _StopsScreenState extends State<StopsScreen> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && widget.isActive) _refresh();
+    if (state != AppLifecycleState.resumed || !widget.isActive) return;
+    _refresh();
+    // The only way out of a disabled-GPS error is the device's own Settings
+    // ("Abrir ajustes" below) — returning from there re-resumes this screen,
+    // so that's the natural point to retry instead of leaving the driver
+    // stuck on a stale error until they tap the button again themselves.
+    if (widget.trackingService.status == TrackingStatus.error &&
+        widget.trackingService.isLocationServicesDisabled) {
+      unawaited(_ensureTracking());
+    }
   }
 
   String? get _accessToken => Supabase.instance.client.auth.currentSession?.accessToken;
@@ -804,7 +813,16 @@ class _NextStopPanel extends StatelessWidget {
               style: muted,
             ),
           ),
-          TextButton(onPressed: onEnableTracking, child: const Text('Activar')),
+          TextButton(
+            // A disabled Location toggle isn't fixable by retrying start()
+            // — it fails the same way again since the OS setting hasn't
+            // changed. Send the driver to Settings instead, like the Mapa
+            // tab's equivalent button.
+            onPressed: tracking.isLocationServicesDisabled
+                ? () => Geolocator.openLocationSettings()
+                : onEnableTracking,
+            child: Text(tracking.isLocationServicesDisabled ? 'Abrir ajustes' : 'Activar'),
+          ),
         ],
       );
     } else if (meters == null) {
