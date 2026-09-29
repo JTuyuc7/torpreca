@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart' as geo;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/api/directions_client.dart';
 import '../../stops/data/next_stop_controller.dart';
 import '../../tracking/data/tracking_service.dart';
 
@@ -30,10 +31,12 @@ Point get _fallbackCenter => Point(coordinates: Position(-90.5069, 14.6349));
 /// permission was denied at that moment) while the puck moved away.
 ///
 /// While a route runs, the next stop is drawn on the map — a dot with the
-/// customer's name and a straight line from the driver to it — and a card
-/// below says how far it is, with a button to frame both on screen. The
-/// stop comes from `StopsScreen` through [nextStop]. The full list of stops
-/// stays in "Lista de paradas" (TOR-35) / "Detalle de parada" (TOR-20).
+/// customer's name and a line from the driver to it, following roads via
+/// Mapbox Directions (TOR-141) once a route resolves, straight otherwise —
+/// and a card below says the road distance/ETA, with a button to frame both
+/// on screen. The stop comes from `StopsScreen` through [nextStop]. The full
+/// list of stops stays in "Lista de paradas" (TOR-35) / "Detalle de parada"
+/// (TOR-20).
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key, required this.trackingService, required this.nextStop});
 
@@ -73,6 +76,19 @@ class _MapScreenState extends State<MapScreen> {
   /// they run one after another — a ping-driven line update can't interleave
   /// with a stop change.
   Future<void> _drawQueue = Future.value();
+
+  // Road route to the next stop (TOR-141: Mapbox Directions), refetched as
+  // the driver moves — see `_maybeFetchRoute`. Null falls back to the
+  // straight line, both on first draw (before the first fetch resolves) and
+  // if Mapbox's API ever errors out.
+  final DirectionsClient _directionsClient = DirectionsClient();
+  DirectionsRoute? _routedLine;
+  NextStopInfo? _routedLineStop;
+  geo.Position? _routedLineOrigin;
+  DateTime? _lastDirectionsFetchAt;
+
+  static const _directionsMinInterval = Duration(seconds: 20);
+  static const _directionsMinMoveMeters = 40;
 
   // Theme colors as ARGB ints, refreshed on every build (annotations take
   // ints, and drawing happens outside of build).
@@ -144,27 +160,90 @@ class _MapScreenState extends State<MapScreen> {
     await _drawLine();
   }
 
-  /// A straight line from the driver's last fix to the next stop — "no tiene
-  /// que ser perfecto": it shows the direction, not the road (road routing
-  /// would need the Directions API).
+  /// The line from the driver's last fix to the next stop — follows roads
+  /// (Mapbox Directions) once a route resolves for this exact stop, and is a
+  /// straight line otherwise: before the first fetch completes, or if it
+  /// fails (no connectivity, Mapbox outage) — "no tiene que ser perfecto",
+  /// direction still beats nothing.
   Future<void> _drawLine() async {
     final lines = _lineManager;
     if (lines == null) return;
 
-    await lines.deleteAll();
     final next = _next;
     final me = _trackingService.lastPosition;
-    if (next == null || me == null) return;
+    if (next == null || me == null) {
+      _routedLine = null;
+      _routedLineStop = null;
+      _routedLineOrigin = null;
+      await lines.deleteAll();
+      return;
+    }
+
+    await _maybeFetchRoute(next, me);
+
+    await lines.deleteAll();
+    final routed = _routedLine;
+    final coordinates = routed != null && _routedLineStop == next
+        ? routed.coordinates.map((c) => Position(c[0], c[1])).toList()
+        : [Position(me.longitude, me.latitude), Position(next.lng, next.lat)];
     await lines.create(
       PolylineAnnotationOptions(
-        geometry: LineString(
-          coordinates: [Position(me.longitude, me.latitude), Position(next.lng, next.lat)],
-        ),
+        geometry: LineString(coordinates: coordinates),
         lineColor: _accent,
         lineWidth: 4,
         lineOpacity: 0.7,
       ),
     );
+  }
+
+  /// Refetches the road route when the stop changed, or when enough time has
+  /// passed and the driver has moved far enough since the last fetch —
+  /// pings arrive every 8s ([TrackingService]) and re-requesting Directions
+  /// on every one would hammer the API for a route that barely changes.
+  Future<void> _maybeFetchRoute(NextStopInfo next, geo.Position me) async {
+    final sameStop = _routedLineStop == next;
+    final origin = _routedLineOrigin;
+    final movedEnough =
+        origin == null ||
+        geo.Geolocator.distanceBetween(
+              origin.latitude,
+              origin.longitude,
+              me.latitude,
+              me.longitude,
+            ) >=
+            _directionsMinMoveMeters;
+    final lastFetch = _lastDirectionsFetchAt;
+    final dueForRefresh =
+        lastFetch == null || DateTime.now().difference(lastFetch) >= _directionsMinInterval;
+
+    if (sameStop && !(movedEnough && dueForRefresh)) return;
+
+    _lastDirectionsFetchAt = DateTime.now();
+    try {
+      final route = await _directionsClient.route(
+        fromLat: me.latitude,
+        fromLng: me.longitude,
+        toLat: next.lat,
+        toLng: next.lng,
+      );
+      // The next stop (or tracking) may have moved on while this was in
+      // flight — a stale route for a stop the driver isn't heading to
+      // anymore would be worse than the straight-line fallback.
+      if (!mounted || _next != next) return;
+      // Plain field writes, no `setState`: the polyline is redrawn
+      // imperatively by `_drawLine` right after this returns, and the
+      // distance/ETA card already rebuilds on every ping via its own
+      // `ListenableBuilder(listenable: _trackingService)`, reading these
+      // fields live. A `setState` here would rebuild `MapWidget` itself with
+      // a new `CameraOptions` instance, which the plugin treats as a fresh
+      // camera and snaps back to `_initialCenter` — undoing "Ver" mid-route.
+      _routedLine = route;
+      _routedLineStop = next;
+      _routedLineOrigin = me;
+    } catch (_) {
+      // Keep whatever was drawn before — `_drawLine` falls back to the
+      // straight line on its own when `_routedLineStop` doesn't match.
+    }
   }
 
   /// Frames the driver and the next stop together (or just the stop, while
@@ -363,6 +442,13 @@ class _MapScreenState extends State<MapScreen> {
                           builder: (context, _) {
                             final me = _trackingService.lastPosition;
                             if (me == null) return Text(next.address);
+                            final routed = _routedLine;
+                            if (routed != null && _routedLineStop == next) {
+                              return Text(
+                                'A ${formatDistanceMeters(routed.distanceMeters)} · '
+                                '${formatDurationSeconds(routed.durationSeconds)}',
+                              );
+                            }
                             final meters = geo.Geolocator.distanceBetween(
                               me.latitude,
                               me.longitude,

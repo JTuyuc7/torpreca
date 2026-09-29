@@ -49,4 +49,20 @@ void main() {
       expect(formatDistanceMeters(37940), '37.9 km');
     });
   });
+
+  group('formatDurationSeconds', () {
+    test('rounds to whole minutes under an hour', () {
+      expect(formatDurationSeconds(90), '2 min');
+      expect(formatDurationSeconds(300), '5 min');
+    });
+
+    test('never shows 0 min', () {
+      expect(formatDurationSeconds(10), '1 min');
+    });
+
+    test('switches to hours and minutes from 60 min', () {
+      expect(formatDurationSeconds(3600), '1 h 0 min');
+      expect(formatDurationSeconds(5400), '1 h 30 min');
+    });
+  });
 }
