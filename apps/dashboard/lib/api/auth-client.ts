@@ -47,6 +47,19 @@ export async function verifySession(): Promise<AuthResult> {
   }
 }
 
+export async function setPassword(password: string, confirmPassword: string): Promise<AuthResult> {
+  try {
+    const res = await fetch("/api/auth/set-password", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ password, confirmPassword }),
+    });
+    return await parseAuthResponse(res);
+  } catch {
+    return { ok: false, status: 0 };
+  }
+}
+
 export async function logout(): Promise<void> {
   await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
 }

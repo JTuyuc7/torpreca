@@ -37,6 +37,7 @@ any of these is missing or malformed:
 | `NEXT_PUBLIC_BACKEND_URL` | plain, public | Points at `torpreca-backend-staging`/`-production`'s URL for that same environment |
 | `NEXT_PUBLIC_MAPBOX_TOKEN` | plain, public | Same public (`pk.`) token in both environments — it's scoped per app (dashboard vs mobile, see TOR-70), not per environment, so staging and production share this value |
 | `REQUEST_SIGNING_SECRET` | **Secret** | Server-only (read in `lib/backend/signed-fetch.ts`, never exposed to the browser) — must be byte-identical to the backend's value in the same environment, see below |
+| `APP_URL` | plain | Server-only — this service's own public URL (`https://torpreca-dashboard-staging.onrender.com` / `-production`). Read in `app/auth/confirm/route.ts` to build the post-email-confirmation redirect instead of trusting the request's Host header. Different value per environment |
 
 ## Keeping `REQUEST_SIGNING_SECRET` in sync (highest-risk step, no automated guard)
 
