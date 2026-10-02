@@ -19,6 +19,13 @@ import { type NextRequest, NextResponse } from "next/server";
 // before it expires. getSession() alone wouldn't do that.
 const PUBLIC_PATHS = ["/login"];
 
+// TOR-121: reached from an email link by someone who has no session yet
+// (/auth/confirm is what creates it), so the unauthenticated redirect must
+// not apply. Unlike PUBLIC_PATHS they also skip the "already signed in ->
+// /" bounce: a signed-in admin opening a stale link should still see the
+// result, not get silently sent to the panel.
+const EMAIL_LINK_PATHS = ["/auth/confirm", "/auth/confirmed"];
+
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -50,6 +57,10 @@ export async function proxy(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  if (EMAIL_LINK_PATHS.includes(request.nextUrl.pathname)) {
+    return response;
+  }
 
   const isPublicPath = PUBLIC_PATHS.includes(request.nextUrl.pathname);
 
