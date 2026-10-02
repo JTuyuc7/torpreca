@@ -41,7 +41,7 @@ describe("proxy", () => {
 
     // TOR-121: the invite/signup email link lands here with no session yet —
     // bouncing it to /login meant verifyOtp never ran.
-    it.each(["/auth/confirm", "/auth/confirmed"])("lets %s through without a session", async (path) => {
+    it.each(["/auth/confirm", "/auth/confirm/continue", "/auth/confirmed"])("lets %s through without a session", async (path) => {
       expect(redirectedTo(await proxy(request(`${path}?token_hash=abc&type=invite`)))).toBeNull();
     });
   });
@@ -57,7 +57,7 @@ describe("proxy", () => {
       expect(redirectedTo(await proxy(request("/users")))).toBeNull();
     });
 
-    it.each(["/auth/confirm", "/auth/confirmed"])("does not bounce %s to the panel", async (path) => {
+    it.each(["/auth/confirm", "/auth/confirm/continue", "/auth/confirmed"])("does not bounce %s to the panel", async (path) => {
       expect(redirectedTo(await proxy(request(path)))).toBeNull();
     });
   });
