@@ -60,6 +60,11 @@ export const es = {
     submit: "Guardar y continuar",
     errorGeneric: "No se pudo guardar la contraseña. Intenta de nuevo.",
   },
+  confirmContinue: {
+    title: "Confirma tu correo",
+    description: "Presiona el botón para confirmar tu correo y continuar.",
+    button: "Continuar",
+  },
   confirmed: {
     title: "Correo confirmado",
     description: "Tu cuenta ya está activa. Abre la app de Torpreca para iniciar sesión.",

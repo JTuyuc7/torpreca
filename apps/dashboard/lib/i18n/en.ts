@@ -59,6 +59,11 @@ export const en: Messages = {
     submit: "Save and continue",
     errorGeneric: "Couldn't save the password. Try again.",
   },
+  confirmContinue: {
+    title: "Confirm your email",
+    description: "Press the button to confirm your email and continue.",
+    button: "Continue",
+  },
   confirmed: {
     title: "Email confirmed",
     description: "Your account is active. Open the Torpreca app to sign in.",

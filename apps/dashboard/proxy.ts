@@ -24,7 +24,7 @@ const PUBLIC_PATHS = ["/login"];
 // not apply. Unlike PUBLIC_PATHS they also skip the "already signed in ->
 // /" bounce: a signed-in admin opening a stale link should still see the
 // result, not get silently sent to the panel.
-const EMAIL_LINK_PATHS = ["/auth/confirm", "/auth/confirmed"];
+const EMAIL_LINK_PATHS = ["/auth/confirm", "/auth/confirm/continue", "/auth/confirmed"];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
