@@ -53,6 +53,7 @@ dependencies:
   # (compileSdk 33 -> 36) that no Gradle-side override can apply.
   mapbox_maps_flutter:
     path: third_party/mapbox_maps_flutter
+  package_info_plus: ^10.2.2
 
 dev_dependencies:
   flutter_test:
