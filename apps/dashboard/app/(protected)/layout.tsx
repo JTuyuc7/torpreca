@@ -185,6 +185,9 @@ function Sidebar({
             </button>
           </div>
         )}
+        {!collapsed && process.env.NEXT_PUBLIC_APP_VERSION && (
+          <span className="text-[10px] text-white/50">v{process.env.NEXT_PUBLIC_APP_VERSION}</span>
+        )}
       </div>
     </aside>
   );

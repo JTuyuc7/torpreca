@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/api/preferences_client.dart';
@@ -23,6 +24,15 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final PreferencesClient _preferencesClient = PreferencesClient();
   bool _savingTheme = false;
+  String? _version;
+
+  @override
+  void initState() {
+    super.initState();
+    PackageInfo.fromPlatform().then((info) {
+      if (mounted) setState(() => _version = 'v${info.version} (${info.buildNumber})');
+    });
+  }
 
   Future<void> _onThemeChanged(ThemeMode mode) async {
     final accessToken = Supabase.instance.client.auth.currentSession?.accessToken;
@@ -85,8 +95,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
             valueListenable: ThemeController.mode,
             builder: (context, mode, _) => SegmentedButton<ThemeMode>(
               segments: const [
-                ButtonSegment(value: ThemeMode.light, label: Text('Claro'), icon: Icon(Icons.light_mode)),
-                ButtonSegment(value: ThemeMode.dark, label: Text('Oscuro'), icon: Icon(Icons.dark_mode)),
+                ButtonSegment(
+                  value: ThemeMode.light,
+                  label: Text('Claro'),
+                  icon: Icon(Icons.light_mode),
+                ),
+                ButtonSegment(
+                  value: ThemeMode.dark,
+                  label: Text('Oscuro'),
+                  icon: Icon(Icons.dark_mode),
+                ),
                 ButtonSegment(
                   value: ThemeMode.system,
                   label: Text('Sistema'),
@@ -105,6 +123,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             icon: const Icon(Icons.logout),
             label: const Text('Cerrar sesión'),
           ),
+          if (_version != null) ...[
+            const SizedBox(height: 24),
+            Center(child: Text(_version!, style: Theme.of(context).textTheme.bodySmall)),
+          ],
         ],
       ),
     );
