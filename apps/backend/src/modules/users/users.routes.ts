@@ -112,7 +112,7 @@ export function registerUsersRoutes(router: Routable) {
     validateBody(ReviewUserSchema),
     async (ctx) => {
       const { decision, role } = ctx.body as { decision: "approve" | "reject"; role?: Role };
-      const user = await service.review(ctx.params.id!, decision, ctx.user!.id, role);
+      const user = await service.review(ctx.params.id!, decision, ctx.user!, role);
 
       await logEvent({
         userId: ctx.user!.id,
@@ -150,7 +150,7 @@ export function registerUsersRoutes(router: Routable) {
     requireRole("admin", "super_admin"),
     rateLimitGeneral,
     async (ctx) => {
-      await service.deactivate(ctx.params.id!, ctx.user!.id);
+      await service.deactivate(ctx.params.id!, ctx.user!);
 
       await logEvent({
         userId: ctx.user!.id,

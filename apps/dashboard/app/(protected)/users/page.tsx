@@ -2,7 +2,9 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
+  assignableRolesOnApproval,
   businessDate,
+  canDeactivateUser,
   type InviteUserInput,
   InviteUserSchema,
   INVITABLE_ROLES,
@@ -59,7 +61,11 @@ export default function UsersPage() {
   // admin/supervisor account is privilege escalation, so it shouldn't be
   // self-service for a regular admin. Hiding the form for anyone else avoids
   // a dead-end 403.
-  const isSuperAdmin = useAuthUser()?.role === "super_admin";
+  const authUser = useAuthUser();
+  const isSuperAdmin = authUser?.role === "super_admin";
+  // Same rule the backend enforces on approval — each reviewer only sees the
+  // roles they're allowed to grant (a supervisor can only approve drivers).
+  const approvableRoles = authUser ? assignableRolesOnApproval(authUser.role) : [];
   // Shown once after a successful invite — there's no new row to point at
   // the way createUser's old flow had (the person hasn't set a password
   // yet), so this is the confirmation that something happened.
@@ -166,7 +172,7 @@ export default function UsersPage() {
                             }
                             disabled={isReviewing}
                           >
-                            {PROMOTABLE_ROLES.map((r) => (
+                            {approvableRoles.map((r) => (
                               <option key={r} value={r}>
                                 {r}
                               </option>
@@ -306,22 +312,33 @@ export default function UsersPage() {
                       // offering it on an already-deactivated account.
                       const canChangeRole =
                         isSuperAdmin && user.role !== "super_admin" && user.status !== "deactivated";
-                      const canDeactivate = user.status !== "deactivated";
+                      const isSelf = user.id === authUser?.id;
+                      const canDeactivate =
+                        user.status !== "deactivated" &&
+                        authUser !== null &&
+                        canDeactivateUser(authUser, user);
                       const isUpdatingRole =
                         updateUserRole.isPending && updateUserRole.variables?.id === user.id;
                       return (
                         <tr key={user.id} className="border-b border-outline/10 text-text">
                           <td className="py-2.5 pr-4">
-                            {user.role === "driver" ? (
-                              <Link
-                                href={`/users/${user.id}`}
-                                className="font-medium text-primary hover:underline"
-                              >
-                                {user.name}
-                              </Link>
-                            ) : (
-                              <p className="font-medium">{user.name}</p>
-                            )}
+                            <div className="flex items-center gap-2">
+                              {user.role === "driver" ? (
+                                <Link
+                                  href={`/users/${user.id}`}
+                                  className="font-medium text-primary hover:underline"
+                                >
+                                  {user.name}
+                                </Link>
+                              ) : (
+                                <p className="font-medium">{user.name}</p>
+                              )}
+                              {isSelf && (
+                                <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-medium text-on-primary">
+                                  {t.users.you}
+                                </span>
+                              )}
+                            </div>
                             <p className="text-xs text-outline">{user.email}</p>
                           </td>
                           <td className="py-2.5 pr-4">{user.role}</td>
