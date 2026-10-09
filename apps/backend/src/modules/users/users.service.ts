@@ -1,7 +1,18 @@
-import type { CreateUserInput, InviteUserInput, Role, User, UserStatus } from "@torpreca/shared";
-import { AppError, NotFoundError } from "../../core/errors/app-error";
+import {
+  assignableRolesOnApproval,
+  type CreateUserInput,
+  canDeactivateUser,
+  type InviteUserInput,
+  type Role,
+  type User,
+  type UserStatus,
+} from "@torpreca/shared";
+import { AppError, ForbiddenError, NotFoundError } from "../../core/errors/app-error";
 import { closeConnectionsForUser } from "../../core/ws/connection-registry";
 import type { UsersRepository } from "./users.repository";
+
+// Who is performing the action — the authenticated user's id and role.
+type Actor = { id: string; role: Role };
 
 // Takes the repository as a dependency instead of importing the real one:
 // tests pass in an in-memory one and this runs without touching Supabase.
@@ -34,9 +45,15 @@ export function createUsersService(repo: UsersRepository) {
       return repo.invite(input);
     },
 
-    async deactivate(id: string, deactivatedBy: string): Promise<void> {
-      await this.getById(id);
-      await repo.deactivate(id, deactivatedBy);
+    // The actor's role is checked against the target's here (not just in the
+    // route's requireRole) so an admin can't deactivate an admin/super_admin
+    // and nobody can deactivate themselves — see canDeactivateUser.
+    async deactivate(id: string, actor: Actor): Promise<void> {
+      const target = await this.getById(id);
+      if (!canDeactivateUser(actor, target)) {
+        throw new ForbiddenError("You cannot deactivate this user");
+      }
+      await repo.deactivate(id, actor.id);
       closeConnectionsForUser(id);
     },
 
@@ -53,14 +70,21 @@ export function createUsersService(repo: UsersRepository) {
     async review(
       id: string,
       decision: "approve" | "reject",
-      reviewedBy: string,
+      reviewer: Actor,
       role?: Role,
     ): Promise<User> {
       const user = await this.getById(id);
       if (user.status !== "pending") {
         throw new AppError(409, `User is not pending review (status: ${user.status})`);
       }
-      await repo.review(id, decision, reviewedBy, role);
+      if (
+        decision === "approve" &&
+        role &&
+        !(assignableRolesOnApproval(reviewer.role) as readonly Role[]).includes(role)
+      ) {
+        throw new ForbiddenError(`You cannot approve a user as ${role}`);
+      }
+      await repo.review(id, decision, reviewer.id, role);
       return this.getById(id);
     },
   };

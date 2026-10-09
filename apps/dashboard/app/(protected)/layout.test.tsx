@@ -115,13 +115,13 @@ describe("ProtectedLayout", () => {
     await waitFor(() => expect(screen.getByText("secret")).toBeInTheDocument());
 
     expect(screen.getByText("TORPRECA")).toBeInTheDocument();
-    expect(screen.getByText("Conductores")).toBeInTheDocument();
+    expect(screen.getByText("Usuarios")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Colapsar menú" }));
 
     expect(screen.queryByText("TORPRECA")).not.toBeInTheDocument();
-    expect(screen.queryByText("Conductores")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Conductores" })).toBeInTheDocument();
+    expect(screen.queryByText("Usuarios")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Usuarios" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Expandir menú" }));
     expect(screen.getByText("TORPRECA")).toBeInTheDocument();

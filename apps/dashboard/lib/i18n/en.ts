@@ -14,7 +14,7 @@ export const en: Messages = {
   sidebar: {
     adminPanel: "Administration",
     panelPrincipal: "Dashboard",
-    conductores: "Drivers",
+    conductores: "Users",
     rutas: "Routes",
     vehiculos: "Vehicles",
     reportes: "Reports",
@@ -143,6 +143,7 @@ export const en: Messages = {
     online: "Online",
     offline: "Offline",
     actionsFor: "Actions for",
+    you: "You",
     changeRole: "Change role",
     deactivate: "Deactivate",
     status: {

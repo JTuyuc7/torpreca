@@ -1,5 +1,5 @@
 import { businessDate, type Role } from "@torpreca/shared";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { withQueryClient } from "@/lib/test-utils/query-client";
@@ -331,16 +331,53 @@ describe("UsersPage", () => {
   });
 
   it("hides role options from the actions menu for a non-super_admin viewer", async () => {
-    fetchMock.mockResolvedValue(new Response(JSON.stringify([activeUser]), { status: 200 }));
+    const supervisorRow = { ...activeUser, id: "user-5", name: "Super Visor", role: "supervisor" };
+    fetchMock.mockResolvedValue(new Response(JSON.stringify([supervisorRow]), { status: 200 }));
 
     renderPage("admin");
 
-    await waitFor(() => expect(screen.getByText("Admin Torpreca")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Super Visor")).toBeInTheDocument());
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "Acciones para Admin Torpreca" }));
+    await user.click(screen.getByRole("button", { name: "Acciones para Super Visor" }));
 
     expect(screen.queryByText("Cambiar rol")).not.toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Desactivar" })).toBeInTheDocument();
+  });
+
+  it("an admin viewer gets no actions menu on admin or super_admin rows", async () => {
+    const superAdminRow = { ...activeUser, id: "user-4", name: "Root", role: "super_admin" };
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify([activeUser, superAdminRow]), { status: 200 }),
+    );
+
+    renderPage("admin");
+
+    await waitFor(() => expect(screen.getByText("Root")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /Acciones para/ })).not.toBeInTheDocument();
+  });
+
+  it("marks the signed-in user's own row with a Tú badge and offers no Desactivar on it", async () => {
+    const ownRow = { ...activeUser, id: "current-user", name: "Yo Mismo", role: "super_admin" };
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify([ownRow, driverUser]), { status: 200 }),
+    );
+
+    renderPage("super_admin");
+
+    await waitFor(() => expect(screen.getByText("Yo Mismo")).toBeInTheDocument());
+    expect(screen.getAllByText("Tú")).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Acciones para Yo Mismo" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Acciones para Conductor Uno" })).toBeInTheDocument();
+  });
+
+  it("a supervisor viewer can only approve pending users as driver", async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify([pendingUser]), { status: 200 }));
+
+    renderPage("supervisor");
+
+    await waitFor(() => expect(screen.getByText("Nuevo Driver")).toBeInTheDocument());
+    const options = within(screen.getByLabelText("Aprobar como")).getAllByRole("option");
+    expect(options.map((o) => o.textContent)).toEqual(["driver"]);
   });
 
   it("picking a role from the menu calls the role endpoint and updates the row immediately", async () => {
