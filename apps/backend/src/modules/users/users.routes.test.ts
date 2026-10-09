@@ -258,6 +258,66 @@ describe("users HTTP routes", () => {
     expect(fake.tables.audit_logs ?? []).toHaveLength(0);
   });
 
+  it("DELETE /users/:id as admin on a super_admin returns 403 and does not log", async () => {
+    seedUser("admin");
+    fake.tables.users?.push({
+      id: "user-2",
+      auth_user_id: "auth-2",
+      role: "super_admin",
+      status: "active",
+      deactivated_at: null,
+      deactivated_by: null,
+      reviewed_at: null,
+      reviewed_by: null,
+      created_at: "t",
+      updated_at: "t",
+    });
+    const router = await buildRouter();
+
+    const res = await router.handle(
+      new Request("http://x/users/user-2", {
+        method: "DELETE",
+        headers: { authorization: "Bearer t", "x-forwarded-for": IP },
+      }),
+    );
+
+    expect(res.status).toBe(403);
+    expect(fake.tables.users?.find((u) => u.id === "user-2")?.status).toBe("active");
+    expect(fake.tables.audit_logs ?? []).toHaveLength(0);
+  });
+
+  it("PATCH /users/:id/review as supervisor approving as admin returns 403", async () => {
+    seedUser("supervisor");
+    fake.tables.users?.push({
+      id: "user-2",
+      auth_user_id: "auth-2",
+      role: "driver",
+      status: "pending",
+      deactivated_at: null,
+      deactivated_by: null,
+      reviewed_at: null,
+      reviewed_by: null,
+      created_at: "t",
+      updated_at: "t",
+    });
+    const router = await buildRouter();
+
+    const res = await router.handle(
+      new Request("http://x/users/user-2/review", {
+        method: "PATCH",
+        headers: {
+          authorization: "Bearer t",
+          "x-forwarded-for": IP,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ decision: "approve", role: "admin" }),
+      }),
+    );
+
+    expect(res.status).toBe(403);
+    expect(fake.tables.audit_logs ?? []).toHaveLength(0);
+  });
+
   it("GET /users?status=pending returns only pending rows", async () => {
     seedUser("admin");
     fake.tables.users?.push({

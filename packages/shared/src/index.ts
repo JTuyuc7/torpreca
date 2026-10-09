@@ -8,6 +8,7 @@
 export * from "./constants/audit-events";
 export * from "./constants/roles";
 export * from "./constants/statuses";
+export * from "./permissions/user-permissions";
 export * from "./schemas/audit-log.schema";
 export * from "./schemas/auth-event.schema";
 export * from "./schemas/auth-user.schema";

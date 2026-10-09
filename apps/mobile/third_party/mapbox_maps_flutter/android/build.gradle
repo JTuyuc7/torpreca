@@ -65,7 +65,9 @@ if (file("$rootDir/gradle/ktlint.gradle").exists() && file("$rootDir/gradle/lint
 }
 
 dependencies {
-    implementation "com.mapbox.maps:android:11.13.0"
+    // Torpreca patch (16 KB page size, Play Store): NDK 27 artifact — the default
+    // `android` artifact ships 4 KB-aligned .so files. See third_party/README.md.
+    implementation "com.mapbox.maps:android-ndk27:11.13.0"
 
     implementation "androidx.annotation:annotation:1.5.0"
     implementation "androidx.lifecycle:lifecycle-runtime-ktx:2.6.2"

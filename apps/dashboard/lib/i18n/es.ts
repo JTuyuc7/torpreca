@@ -15,7 +15,7 @@ export const es = {
   sidebar: {
     adminPanel: "Administración",
     panelPrincipal: "Panel Principal",
-    conductores: "Conductores",
+    conductores: "Usuarios",
     rutas: "Rutas",
     vehiculos: "Vehículos",
     reportes: "Reportes",
@@ -145,6 +145,7 @@ export const es = {
     online: "En línea",
     offline: "Fuera de línea",
     actionsFor: "Acciones para",
+    you: "Tú",
     changeRole: "Cambiar rol",
     deactivate: "Desactivar",
     status: {

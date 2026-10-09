@@ -80,6 +80,84 @@ function createFakeRepo(seed: User[] = []): UsersRepository {
   };
 }
 
+const ADMIN = { id: "admin-id", role: "admin" } as const;
+
+function userRow(id: string, role: Role, status: UserStatus = "active"): User {
+  return {
+    id,
+    authUserId: crypto.randomUUID(),
+    name: `User ${id}`,
+    email: `${id}@torpreca.gt`,
+    role,
+    status,
+    deactivatedAt: null,
+    deactivatedBy: null,
+    reviewedAt: null,
+    reviewedBy: null,
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
+  };
+}
+
+describe("users.service permissions", () => {
+  it("admin cannot deactivate a super_admin", async () => {
+    const service = createUsersService(createFakeRepo([userRow("sa", "super_admin")]));
+    await expect(service.deactivate("sa", ADMIN)).rejects.toThrow("cannot deactivate");
+  });
+
+  it("admin cannot deactivate another admin", async () => {
+    const service = createUsersService(createFakeRepo([userRow("a2", "admin")]));
+    await expect(service.deactivate("a2", ADMIN)).rejects.toThrow("cannot deactivate");
+  });
+
+  it("admin can deactivate a supervisor", async () => {
+    const repo = createFakeRepo([userRow("s1", "supervisor")]);
+    await createUsersService(repo).deactivate("s1", ADMIN);
+    expect((await repo.list("all"))[0]?.status).toBe("deactivated");
+  });
+
+  it("super_admin can deactivate an admin", async () => {
+    const repo = createFakeRepo([userRow("a1", "admin")]);
+    await createUsersService(repo).deactivate("a1", { id: "sa", role: "super_admin" });
+    expect((await repo.list("all"))[0]?.status).toBe("deactivated");
+  });
+
+  it("nobody can deactivate themselves", async () => {
+    const service = createUsersService(createFakeRepo([userRow("sa", "super_admin")]));
+    await expect(service.deactivate("sa", { id: "sa", role: "super_admin" })).rejects.toThrow(
+      "cannot deactivate",
+    );
+  });
+
+  it("supervisor cannot approve a user as supervisor or admin", async () => {
+    const service = createUsersService(createFakeRepo([userRow("p", "driver", "pending")]));
+    const supervisor = { id: "sup", role: "supervisor" } as const;
+    await expect(service.review("p", "approve", supervisor, "admin")).rejects.toThrow(
+      "cannot approve",
+    );
+    await expect(service.review("p", "approve", supervisor, "supervisor")).rejects.toThrow(
+      "cannot approve",
+    );
+  });
+
+  it("supervisor can approve a user as driver", async () => {
+    const service = createUsersService(createFakeRepo([userRow("p", "driver", "pending")]));
+    const user = await service.review("p", "approve", { id: "sup", role: "supervisor" }, "driver");
+    expect(user.status).toBe("active");
+  });
+
+  it("admin cannot approve a user as admin", async () => {
+    const service = createUsersService(createFakeRepo([userRow("p", "driver", "pending")]));
+    await expect(service.review("p", "approve", ADMIN, "admin")).rejects.toThrow("cannot approve");
+  });
+
+  it("super_admin can approve a user as admin", async () => {
+    const service = createUsersService(createFakeRepo([userRow("p", "driver", "pending")]));
+    const user = await service.review("p", "approve", { id: "sa", role: "super_admin" }, "admin");
+    expect(user.role).toBe("admin");
+  });
+});
+
 describe("users.service", () => {
   it("invite delegates to the repository and lands active", async () => {
     const service = createUsersService(createFakeRepo());
@@ -164,7 +242,7 @@ describe("users.service", () => {
     ]);
     const service = createUsersService(repo);
 
-    await service.deactivate("1", "admin-id");
+    await service.deactivate("1", ADMIN);
     const [user] = await repo.list("all");
     expect(user?.status).toBe("deactivated");
     expect(user?.deactivatedBy).toBe("admin-id");
@@ -199,7 +277,7 @@ describe("users.service", () => {
     };
     registerConnection(ws);
 
-    await service.deactivate("1", "admin-id");
+    await service.deactivate("1", ADMIN);
 
     expect(closed).toEqual([[4001, "Account deactivated"]]);
   });
@@ -254,20 +332,20 @@ describe("users.service", () => {
 
     it("approve sets status=active and records reviewedBy", async () => {
       const service = createUsersService(pendingRepo());
-      const user = await service.review("1", "approve", "admin-id");
+      const user = await service.review("1", "approve", ADMIN);
       expect(user.status).toBe("active");
       expect(user.reviewedBy).toBe("admin-id");
     });
 
     it("approve with a role promotes the user to it", async () => {
       const service = createUsersService(pendingRepo());
-      const user = await service.review("1", "approve", "admin-id", "supervisor");
+      const user = await service.review("1", "approve", ADMIN, "supervisor");
       expect(user.role).toBe("supervisor");
     });
 
     it("reject sets status=rejected", async () => {
       const service = createUsersService(pendingRepo());
-      const user = await service.review("1", "reject", "admin-id");
+      const user = await service.review("1", "reject", ADMIN);
       expect(user.status).toBe("rejected");
     });
 
@@ -290,7 +368,7 @@ describe("users.service", () => {
       ]);
       const service = createUsersService(repo);
 
-      await expect(service.review("1", "approve", "admin-id")).rejects.toThrow(
+      await expect(service.review("1", "approve", ADMIN)).rejects.toThrow(
         "User is not pending review",
       );
     });
