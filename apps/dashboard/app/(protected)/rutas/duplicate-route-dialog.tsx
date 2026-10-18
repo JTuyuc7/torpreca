@@ -172,6 +172,11 @@ export function DuplicateRouteDialog({
       vehicleId,
       date,
       plannedKm: parsedKm,
+      // The copy keeps the source's A/B so the live map can still draw them.
+      originLat: route.originLat ?? null,
+      originLng: route.originLng ?? null,
+      destinationLat: route.destinationLat ?? null,
+      destinationLng: route.destinationLng ?? null,
       stops: draft.map((s) => ({
         customerName: s.customerName,
         address: s.address,

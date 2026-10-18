@@ -3,7 +3,7 @@
 import "mapbox-gl/dist/mapbox-gl.css";
 
 import type { FavoriteRoute } from "@torpreca/shared";
-import { Eye, EyeOff, Map as MapIcon, MapPin, RotateCcw, Search, X } from "lucide-react";
+import { Eye, EyeOff, Map as MapIcon, RotateCcw, Search, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { Map as MapboxMap, type MapMouseEvent, type MapRef, Marker } from "react-map-gl/mapbox";
 import {
@@ -15,6 +15,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { PointMarker, type PointRole } from "@/components/ui/point-marker";
 import { Spinner } from "@/components/ui/spinner";
 import { useFavoriteRoutes } from "@/lib/hooks/use-favorite-routes";
 import { useTranslation } from "@/lib/i18n/use-translation";
@@ -32,27 +33,18 @@ const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN as string;
 const INITIAL_VIEW = { longitude: -90.5069, latitude: 14.6349, zoom: 11 };
 
 type LngLat = { lng: number; lat: number };
-type PointRole = "origin" | "destination";
 
 function metersToKm(meters: number): number {
   return Math.round(meters / 10) / 100;
 }
 
-function PointMarker({ role }: { role: PointRole }) {
-  const colorClass = role === "origin" ? "text-primary" : "text-error";
-  return (
-    <div className="relative flex flex-col items-center">
-      <span
-        className={`absolute -top-4 rounded-full border border-white px-1 text-[10px] font-bold text-white shadow ${role === "origin" ? "bg-primary" : "bg-error"}`}
-      >
-        {role === "origin" ? "A" : "B"}
-      </span>
-      <MapPin size={34} className={`${colorClass} drop-shadow-lg`} fill="currentColor" strokeWidth={1.5} />
-    </div>
-  );
-}
+export type CalculatedPoints = { origin: LngLat; destination: LngLat };
 
-export function RouteKmCalculatorDialog({ onApply }: { onApply: (km: number) => void }) {
+export function RouteKmCalculatorDialog({
+  onApply,
+}: {
+  onApply: (km: number, points: CalculatedPoints | null) => void;
+}) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [origin, setOrigin] = useState<LngLat | null>(null);
@@ -100,6 +92,22 @@ export function RouteKmCalculatorDialog({ onApply }: { onApply: (km: number) => 
     setFavoriteLabel("");
     setOriginQuery("");
     setDestinationQuery("");
+    setGeocodeError(null);
+  }
+
+  // Drops a single point (the X on its marker) without losing the other one.
+  // The distance belonged to the pair, so it goes too; the next map click then
+  // fills whichever point is missing.
+  function removePoint(role: PointRole) {
+    if (role === "origin") {
+      setOrigin(null);
+      setOriginQuery("");
+    } else {
+      setDestination(null);
+      setDestinationQuery("");
+    }
+    setDistanceKm(null);
+    setCalcError(null);
     setGeocodeError(null);
   }
 
@@ -202,7 +210,7 @@ export function RouteKmCalculatorDialog({ onApply }: { onApply: (km: number) => 
 
   function applyValue() {
     if (distanceKm == null) return;
-    onApply(distanceKm);
+    onApply(distanceKm, origin && destination ? { origin, destination } : null);
     setOpen(false);
     reset();
   }
@@ -419,12 +427,20 @@ export function RouteKmCalculatorDialog({ onApply }: { onApply: (km: number) => 
             >
               {origin && (
                 <Marker longitude={origin.lng} latitude={origin.lat} anchor="bottom">
-                  <PointMarker role="origin" />
+                  <PointMarker
+                    role="origin"
+                    onRemove={() => removePoint("origin")}
+                    removeLabel={t.kmCalculator.removePointA}
+                  />
                 </Marker>
               )}
               {destination && (
                 <Marker longitude={destination.lng} latitude={destination.lat} anchor="bottom">
-                  <PointMarker role="destination" />
+                  <PointMarker
+                    role="destination"
+                    onRemove={() => removePoint("destination")}
+                    removeLabel={t.kmCalculator.removePointB}
+                  />
                 </Marker>
               )}
             </MapboxMap>
