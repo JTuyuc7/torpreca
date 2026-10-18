@@ -12,7 +12,7 @@ import {
 } from "@torpreca/shared";
 import { Route as RouteIcon } from "lucide-react";
 import { useState } from "react";
-import { type Resolver, useForm } from "react-hook-form";
+import { type Resolver, type UseFormSetValue, useForm } from "react-hook-form";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { Input } from "@/components/ui/input";
@@ -28,7 +28,7 @@ import { useUsers } from "@/lib/hooks/use-users";
 import { useVehicles } from "@/lib/hooks/use-vehicles";
 import { DuplicateRouteDialog } from "./duplicate-route-dialog";
 import { generateRouteCode } from "./route-code";
-import { RouteKmCalculatorDialog } from "./route-km-calculator-dialog";
+import { type CalculatedPoints, RouteKmCalculatorDialog } from "./route-km-calculator-dialog";
 import { RouteStopsDialog } from "./route-stops-dialog";
 
 function FieldError({ children }: { children: React.ReactNode }) {
@@ -65,6 +65,18 @@ type RouteFormValues = z.infer<typeof RouteFormSchema>;
 // with Resolver<TFieldValues> — the runtime input is always `number | null`.
 const routeResolver = zodResolver(RouteFormSchema) as Resolver<RouteFormValues>;
 
+// The calculator's A/B go into the form next to the km, so the route is saved
+// with them and the live map can draw them (see the routes.origin_* columns).
+function applyPoints(
+  setValue: UseFormSetValue<RouteFormValues>,
+  { origin, destination }: CalculatedPoints,
+) {
+  setValue("originLat", origin.lat);
+  setValue("originLng", origin.lng);
+  setValue("destinationLat", destination.lat);
+  setValue("destinationLng", destination.lng);
+}
+
 function CreateRouteForm({
   drivers,
   vehicles,
@@ -98,7 +110,16 @@ function CreateRouteForm({
       { ...values, code: generatedCode },
       {
         onSuccess: () =>
-          reset({ driverId: "", vehicleId: null, date: todayIsoDate(), plannedKm: null }),
+          reset({
+            driverId: "",
+            vehicleId: null,
+            date: todayIsoDate(),
+            plannedKm: null,
+            originLat: null,
+            originLng: null,
+            destinationLat: null,
+            destinationLng: null,
+          }),
       },
     );
   }
@@ -169,7 +190,10 @@ function CreateRouteForm({
               className="w-28"
             />
             <RouteKmCalculatorDialog
-              onApply={(km) => setValue("plannedKm", km, { shouldValidate: true })}
+              onApply={(km, points) => {
+                setValue("plannedKm", km, { shouldValidate: true });
+                if (points) applyPoints(setValue, points);
+              }}
             />
           </div>
           {errors.plannedKm && <FieldError>{t.rutas.plannedKmInvalid}</FieldError>}
@@ -265,7 +289,10 @@ function RouteEditRow({
             className="w-24"
           />
           <RouteKmCalculatorDialog
-            onApply={(km) => setValue("plannedKm", km, { shouldValidate: true })}
+            onApply={(km, points) => {
+                setValue("plannedKm", km, { shouldValidate: true });
+                if (points) applyPoints(setValue, points);
+              }}
           />
         </div>
         {errors.plannedKm && <FieldError>{t.rutas.plannedKmInvalidShort}</FieldError>}

@@ -35,9 +35,10 @@ class _RouteWithStops {
 
   /// Every stop was either completed or postponed — nothing left to do, so
   /// the route can be finished. A postponed stop stays "delayed" (it wasn't
-  /// visited) but no longer blocks closing the route.
+  /// visited) but no longer blocks closing the route. A route with no stops at
+  /// all has nothing pending either, so it can be finished too (it can also be
+  /// started without stops — only its GPS km are measured).
   bool get allResolved =>
-      stops.isNotEmpty &&
       stops.every((s) => s.status == StopStatus.completed || s.status == StopStatus.delayed);
 
   /// The stop the driver should go to next: the first one not done or
@@ -721,18 +722,13 @@ class _RouteHeader extends StatelessWidget {
           if (route.isPending) ...[
             const SizedBox(height: 12),
             FilledButton.icon(
-              onPressed: busy || stops.isEmpty || blockedByOther ? null : onStart,
+              onPressed: busy || blockedByOther ? null : onStart,
               icon: busy ? const _ButtonSpinner() : const Icon(Icons.play_arrow),
               label: const Text('Iniciar ruta'),
             ),
-            if (stops.isEmpty || blockedByOther) ...[
+            if (blockedByOther) ...[
               const SizedBox(height: 8),
-              Text(
-                stops.isEmpty
-                    ? 'Necesita al menos una parada para poder iniciarse.'
-                    : 'Finaliza la ruta en curso para iniciar esta.',
-                style: muted,
-              ),
+              Text('Finaliza la ruta en curso para iniciar esta.', style: muted),
             ],
           ],
           if (route.isInProgress) ...[

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/updates/app_update_prompt.dart';
+import '../../../core/updates/app_update_service.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../map/presentation/map_screen.dart';
 import '../../profile/presentation/profile_screen.dart';
@@ -20,9 +22,17 @@ import '../../tracking/data/tracking_service.dart';
 /// checks another tab). This is what makes landing on Paradas actually save
 /// anything: Mapbox never initializes unless the driver opens the Mapa tab.
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key, required this.authRepository});
+  const HomeShell({
+    super.key,
+    required this.authRepository,
+    this.updateService = const PlayAppUpdateService(),
+  });
 
   final AuthRepository authRepository;
+
+  /// Where "is there a newer version?" is answered — Google Play in the app,
+  /// a fake in tests.
+  final AppUpdateService updateService;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -38,6 +48,15 @@ class _HomeShellState extends State<HomeShell> {
 
   /// The running route's next stop: Paradas publishes it, Mapa draws it.
   final NextStopController _nextStop = NextStopController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Once per launch, after the first frame so the dialog has a Navigator.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) promptForUpdate(context, widget.updateService);
+    });
+  }
 
   @override
   void dispose() {

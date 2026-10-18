@@ -4,12 +4,14 @@ import "mapbox-gl/dist/mapbox-gl.css";
 
 import type { Route } from "@torpreca/shared";
 import { Circle, Route as RouteIcon } from "lucide-react";
+import Link from "next/link";
 import { useRef, useState } from "react";
 import { Map as MapboxMap, type MapRef, Marker } from "react-map-gl/mapbox";
 import { useAuthUser } from "@/app/(protected)/auth-context";
 import { AddressSearch } from "@/components/ui/address-search";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorBanner } from "@/components/ui/error-banner";
+import { PointMarker } from "@/components/ui/point-marker";
 import { Section } from "@/components/ui/section";
 import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -33,12 +35,16 @@ const DEFAULT_VIEW = { longitude: -90.5069, latitude: 14.6349, zoom: 11 };
 
 const MAP_VIEW_ROLES = new Set(["admin", "supervisor", "super_admin"]);
 
-function MetricCard({ label, value }: { label: string; value: number }) {
+// Each card links to the screen where that number can be dug into.
+function MetricCard({ label, value, href }: { label: string; value: number; href: string }) {
   return (
-    <div className="flex flex-col gap-1 rounded-lg border border-outline/20 bg-surface p-4">
+    <Link
+      href={href}
+      className="flex flex-col gap-1 rounded-lg border border-outline/20 bg-surface p-4 transition-colors hover:border-primary hover:bg-outline/5"
+    >
       <span className="text-xs text-outline">{label}</span>
       <span className="text-2xl font-semibold text-text">{value}</span>
-    </div>
+    </Link>
   );
 }
 
@@ -144,6 +150,7 @@ export default function HomePage() {
 
   const driverNames = new Map((users ?? []).map((u) => [u.id, u.name]));
   const activeRoutes = (routes ?? []).filter((r) => r.status === "in_progress");
+  const selectedRoute = activeRoutes.find((r) => r.driverId === selectedDriverId);
   const locationByDriver = new Map(locations.map((l) => [l.driverId, l]));
 
   function handleSaveCurrentView() {
@@ -190,11 +197,11 @@ export default function HomePage() {
 
       {summary && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 animate-fade-in">
-          <MetricCard label={t.panel.routesInProgress} value={summary.routesInProgress} />
-          <MetricCard label={t.panel.routesPendingToday} value={summary.routesPendingToday} />
-          <MetricCard label={t.panel.driversOnline} value={summary.driversOnline} />
-          <MetricCard label={t.panel.driversActive} value={summary.driversActive} />
-          <MetricCard label={t.panel.vehiclesActive} value={summary.vehiclesActive} />
+          <MetricCard label={t.panel.routesInProgress} value={summary.routesInProgress} href="/rutas" />
+          <MetricCard label={t.panel.routesPendingToday} value={summary.routesPendingToday} href="/rutas" />
+          <MetricCard label={t.panel.driversOnline} value={summary.driversOnline} href="/users" />
+          <MetricCard label={t.panel.driversActive} value={summary.driversActive} href="/users" />
+          <MetricCard label={t.panel.vehiclesActive} value={summary.vehiclesActive} href="/vehiculos" />
         </div>
       )}
 
@@ -270,6 +277,24 @@ export default function HomePage() {
                   />
                 </Marker>
               ))}
+              {selectedRoute?.originLat != null && selectedRoute.originLng != null && (
+                <Marker
+                  longitude={selectedRoute.originLng}
+                  latitude={selectedRoute.originLat}
+                  anchor="bottom"
+                >
+                  <PointMarker role="origin" />
+                </Marker>
+              )}
+              {selectedRoute?.destinationLat != null && selectedRoute.destinationLng != null && (
+                <Marker
+                  longitude={selectedRoute.destinationLng}
+                  latitude={selectedRoute.destinationLat}
+                  anchor="bottom"
+                >
+                  <PointMarker role="destination" />
+                </Marker>
+              )}
               {searchedAddress && (
                 <Marker longitude={searchedAddress.lng} latitude={searchedAddress.lat}>
                   <div

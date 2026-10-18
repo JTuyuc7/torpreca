@@ -11,6 +11,10 @@ function toRoute(row: Record<string, unknown>): Route {
     date: row.date as string,
     status: row.status as Route["status"],
     plannedKm: row.planned_km as number | null,
+    originLat: (row.origin_lat as number | null) ?? null,
+    originLng: (row.origin_lng as number | null) ?? null,
+    destinationLat: (row.destination_lat as number | null) ?? null,
+    destinationLng: (row.destination_lng as number | null) ?? null,
     drivenKm: row.driven_km as number,
     startTime: row.start_time as string | null,
     endTime: row.end_time as string | null,
@@ -97,6 +101,10 @@ export const routesRepository: RoutesRepository = {
         created_by: createdBy,
         date: input.date,
         planned_km: input.plannedKm,
+        origin_lat: input.originLat ?? null,
+        origin_lng: input.originLng ?? null,
+        destination_lat: input.destinationLat ?? null,
+        destination_lng: input.destinationLng ?? null,
       })
       .select("*")
       .single();
@@ -111,6 +119,10 @@ export const routesRepository: RoutesRepository = {
     if (patch.vehicleId !== undefined) row.vehicle_id = patch.vehicleId;
     if (patch.date !== undefined) row.date = patch.date;
     if (patch.plannedKm !== undefined) row.planned_km = patch.plannedKm;
+    if (patch.originLat !== undefined) row.origin_lat = patch.originLat;
+    if (patch.originLng !== undefined) row.origin_lng = patch.originLng;
+    if (patch.destinationLat !== undefined) row.destination_lat = patch.destinationLat;
+    if (patch.destinationLng !== undefined) row.destination_lng = patch.destinationLng;
 
     const { data, error } = await supabaseAdmin
       .from("routes")
