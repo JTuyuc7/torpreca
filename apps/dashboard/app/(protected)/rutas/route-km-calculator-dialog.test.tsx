@@ -150,7 +150,42 @@ describe("RouteKmCalculatorDialog", () => {
     await waitFor(() => expect(useButton).not.toBeDisabled());
     fireEvent.click(useButton);
 
-    expect(onApply).toHaveBeenCalledWith(10);
+    expect(onApply).toHaveBeenCalledWith(10, {
+      origin: { lng: -90.5069, lat: 14.6349 },
+      destination: { lng: -90.5322, lat: 14.6115 },
+    });
+  });
+
+  it("the X on a marker removes only that point and clears the distance", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ code: "Ok", routes: [{ distance: 10000 }] }), { status: 200 }),
+    );
+    openDialog();
+
+    nextClicks = [
+      { lng: -90.5069, lat: 14.6349 },
+      { lng: -90.5322, lat: 14.6115 },
+    ];
+    const map = screen.getByTestId("calc-map");
+    fireEvent.click(map);
+    fireEvent.click(map);
+    await waitFor(() => expect(screen.getByText("Distancia: 10 km")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "Quitar punto B" }));
+
+    expect(screen.queryByText("Distancia: 10 km")).not.toBeInTheDocument();
+    expect(screen.getAllByTestId("marker")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Quitar punto A" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Usar este valor" })).toBeDisabled();
+
+    // The next map click fills the point that was removed.
+    nextClicks = [{ lng: -90.53, lat: 14.61 }];
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ code: "Ok", routes: [{ distance: 5000 }] }), { status: 200 }),
+    );
+    fireEvent.click(map);
+    await waitFor(() => expect(screen.getByText("Distancia: 5 km")).toBeInTheDocument());
+    expect(screen.getAllByTestId("marker")).toHaveLength(2);
   });
 
   it("selecting a favorite fills the distance and address inputs without calling the Directions API", async () => {

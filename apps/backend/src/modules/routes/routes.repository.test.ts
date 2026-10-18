@@ -67,6 +67,53 @@ describe("routesRepository", () => {
     expect(rejected).toBeNull();
   });
 
+  it("create() stores the origin/destination points and defaults them to null", async () => {
+    const { routesRepository } = await import("./routes.repository");
+
+    const withPoints = await routesRepository.create(
+      {
+        code: "R-2",
+        driverId: "driver-1",
+        vehicleId: null,
+        date: "2026-08-22",
+        plannedKm: 3,
+        originLat: 14.64,
+        originLng: -90.51,
+        destinationLat: 14.62,
+        destinationLng: -90.53,
+      },
+      "admin-1",
+    );
+    expect(withPoints).toMatchObject({
+      originLat: 14.64,
+      originLng: -90.51,
+      destinationLat: 14.62,
+      destinationLng: -90.53,
+    });
+
+    const without = await routesRepository.create(
+      { code: "R-3", driverId: "driver-1", vehicleId: null, date: "2026-08-22", plannedKm: null },
+      "admin-1",
+    );
+    expect(without).toMatchObject({
+      originLat: null,
+      originLng: null,
+      destinationLat: null,
+      destinationLng: null,
+    });
+  });
+
+  it("update() can set and clear the origin/destination points", async () => {
+    const { routesRepository } = await import("./routes.repository");
+    fake.reset({ routes: [BASE_ROW] });
+
+    const set = await routesRepository.update("r1", { originLat: 1, originLng: 2 });
+    expect(set).toMatchObject({ originLat: 1, originLng: 2, destinationLat: null });
+
+    const cleared = await routesRepository.update("r1", { originLat: null, originLng: null });
+    expect(cleared).toMatchObject({ originLat: null, originLng: null });
+  });
+
   it("start() only succeeds for the owning driver while pending", async () => {
     const { routesRepository } = await import("./routes.repository");
     fake.reset({ routes: [BASE_ROW] });

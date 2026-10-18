@@ -11,6 +11,12 @@ export const RouteSchema = z.object({
   date: z.iso.date(),
   status: z.enum(ROUTE_STATUSES),
   plannedKm: z.number().nonnegative().nullable(),
+  // Origin (A) / destination (B) picked in the km calculator — optional so
+  // routes created before they existed (all NULL) stay valid.
+  originLat: z.number().min(-90).max(90).nullish(),
+  originLng: z.number().min(-180).max(180).nullish(),
+  destinationLat: z.number().min(-90).max(90).nullish(),
+  destinationLng: z.number().min(-180).max(180).nullish(),
   drivenKm: z.number().nonnegative(),
   startTime: z.iso.datetime().nullable(),
   endTime: z.iso.datetime().nullable(),
@@ -26,6 +32,10 @@ export const CreateRouteSchema = RouteSchema.pick({
   vehicleId: true,
   date: true,
   plannedKm: true,
+  originLat: true,
+  originLng: true,
+  destinationLat: true,
+  destinationLng: true,
 });
 
 export type CreateRouteInput = z.infer<typeof CreateRouteSchema>;

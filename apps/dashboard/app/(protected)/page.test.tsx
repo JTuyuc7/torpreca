@@ -189,6 +189,55 @@ describe("HomePage", () => {
     );
   });
 
+  it("draws the selected route's A and B points on the map", () => {
+    useRoutes.mockReturnValue({
+      routes: [
+        {
+          ...activeRoute,
+          originLat: 14.64,
+          originLng: -90.51,
+          destinationLat: 14.62,
+          destinationLng: -90.53,
+        },
+      ],
+    });
+    useUsers.mockReturnValue({ users: [driverUser] });
+    useLiveLocations.mockReturnValue({ locations: [location1], status: "connected" });
+
+    render(<HomePage />);
+    // Nothing is drawn until a route is selected.
+    expect(screen.queryByText("A")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /R-20260912-1/ }));
+
+    expect(screen.getByText("A")).toBeInTheDocument();
+    expect(screen.getByText("B")).toBeInTheDocument();
+    const points = screen.getAllByTestId("marker").filter((m) => m.dataset.lng === "-90.51");
+    expect(points).toHaveLength(1);
+  });
+
+  it("selecting a route without A/B points draws no extra markers", () => {
+    useRoutes.mockReturnValue({ routes: [activeRoute] });
+    useUsers.mockReturnValue({ users: [driverUser] });
+    useLiveLocations.mockReturnValue({ locations: [location1], status: "connected" });
+
+    render(<HomePage />);
+    fireEvent.click(screen.getByRole("button", { name: /R-20260912-1/ }));
+
+    expect(screen.getAllByTestId("marker")).toHaveLength(1);
+  });
+
+  it("metric cards link to the screen behind each number", () => {
+    render(<HomePage />);
+
+    const href = (label: string) => screen.getByText(label).closest("a")?.getAttribute("href");
+    expect(href("Rutas en progreso")).toBe("/rutas");
+    expect(href("Rutas pendientes hoy")).toBe("/rutas");
+    expect(href("Conductores en línea")).toBe("/users");
+    expect(href("Conductores activos")).toBe("/users");
+    expect(href("Vehículos activos")).toBe("/vehiculos");
+  });
+
   it("disables a route with no recent location instead of flying nowhere", () => {
     useRoutes.mockReturnValue({ routes: [activeRoute] });
     useUsers.mockReturnValue({ users: [driverUser] });
