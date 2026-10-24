@@ -6,10 +6,20 @@ interface Bucket {
   resetAt: number;
 }
 
+const allBuckets: Map<string, Bucket>[] = [];
+
+// Test-only: every limiter instance is module-level state shared by the whole
+// `bun test` process, so requests without an x-forwarded-for all land in the
+// same "unknown" bucket across test files. See test-support/preload.ts.
+export function resetRateLimits() {
+  for (const buckets of allBuckets) buckets.clear();
+}
+
 // In-memory: good enough for the MVP on a single instance (Render/Railway).
 // If this scales to multiple instances, move it to Redis.
 export function rateLimit(maxRequests: number, windowMs: number): Middleware {
   const buckets = new Map<string, Bucket>();
+  allBuckets.push(buckets);
 
   return async (ctx, next) => {
     const ip = ctx.req.headers.get("x-forwarded-for") ?? "unknown";

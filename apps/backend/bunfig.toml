@@ -1,4 +1,5 @@
 [test]
+preload = ["./src/test-support/preload.ts"]
 coverageReporter = ["text", "lcov"]
 coverageDir = "coverage"
 coveragePathIgnorePatterns = ["**/*.test.ts", "test-support/**"]
