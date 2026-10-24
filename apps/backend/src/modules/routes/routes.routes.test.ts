@@ -132,6 +132,38 @@ describe("routes HTTP routes", () => {
     expect(fake.tables.audit_logs?.[0]).toMatchObject({ action: "route.created" });
   });
 
+  it("POST /routes stores the A/B points and returns them", async () => {
+    asAdmin();
+    const router = await buildRouter();
+
+    const res = await router.handle(
+      new Request("http://x/routes", {
+        method: "POST",
+        headers: { authorization: "Bearer t", "content-type": "application/json" },
+        body: JSON.stringify({
+          code: "R-1",
+          driverId: crypto.randomUUID(),
+          vehicleId: null,
+          date: "2026-08-22",
+          plannedKm: 5,
+          originLat: 14.64,
+          originLng: -90.51,
+          destinationLat: 14.62,
+          destinationLng: -90.53,
+        }),
+      }),
+    );
+
+    expect(res.status).toBe(201);
+    expect(await res.json()).toMatchObject({
+      originLat: 14.64,
+      originLng: -90.51,
+      destinationLat: 14.62,
+      destinationLng: -90.53,
+    });
+    expect(fake.tables.routes?.[0]).toMatchObject({ origin_lat: 14.64, destination_lng: -90.53 });
+  });
+
   it("PATCH /routes/:id as supervisor edits a pending route and logs route.updated", async () => {
     fake.tables.users!.push({
       id: "sup-1",

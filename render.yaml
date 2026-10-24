@@ -69,6 +69,8 @@ services:
   - type: web
     name: torpreca-dashboard-staging
     runtime: node
+    # Node 22 (lts/jod, see .nvmrc). Render can't read nvm aliases, so the major
+    # is pinned via NODE_VERSION and resolves to the latest 22.x (must be >= 22.23.4).
     # Repo root, not apps/dashboard — pnpm-workspace.yaml lives at the root
     # and packages/shared is a workspace member (its own runtime deps, e.g.
     # zod, must actually get installed; a plain subdirectory install can't
@@ -81,6 +83,8 @@ services:
     autoDeploy: true
     healthCheckPath: /login
     envVars:
+      - key: NODE_VERSION
+        value: "22"
       - key: NEXT_PUBLIC_SUPABASE_URL
         sync: false
       - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -99,6 +103,8 @@ services:
   - type: web
     name: torpreca-dashboard-production
     runtime: node
+    # Node 22 (lts/jod, see .nvmrc). Render can't read nvm aliases, so the major
+    # is pinned via NODE_VERSION and resolves to the latest 22.x (must be >= 22.23.4).
     buildCommand: pnpm install --frozen-lockfile && pnpm --filter dashboard build
     startCommand: pnpm --filter dashboard start
     plan: starter
@@ -107,6 +113,8 @@ services:
     autoDeploy: true
     healthCheckPath: /login
     envVars:
+      - key: NODE_VERSION
+        value: "22"
       - key: NEXT_PUBLIC_SUPABASE_URL
         sync: false
       - key: NEXT_PUBLIC_SUPABASE_ANON_KEY

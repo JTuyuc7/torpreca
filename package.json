@@ -17,9 +17,9 @@
     "test:coverage": "bun run test:coverage:backend && bun run test:coverage:shared && bun run test:coverage:dashboard"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.9",
+    "@biomejs/biome": "^2.5.11",
     "husky": "^9.1.7",
-    "lint-staged": "^17.3.0"
+    "lint-staged": "^17.4.1"
   },
   "lint-staged": {
     "apps/backend/src/**/*.ts": [

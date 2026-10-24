@@ -2,7 +2,7 @@
 # The backend consumes @torpreca/shared via bun's `workspace:*` protocol,
 # which only resolves if `bun install` runs where the root package.json's
 # `workspaces` array is visible, i.e. at the repo root.
-FROM oven/bun:1
+FROM oven/bun:1.3.14
 
 WORKDIR /app
 
