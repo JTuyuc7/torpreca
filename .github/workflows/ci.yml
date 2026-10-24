@@ -71,7 +71,7 @@ jobs:
           # never actually exercised by CI before this PR: the "dashboard"
           # job only runs when apps/dashboard files change, and none of the
           # PRs since ci.yml was added had touched any until this one.
-          node-version: 22
+          node-version-file: .nvmrc
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
