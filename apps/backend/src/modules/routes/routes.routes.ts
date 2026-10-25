@@ -1,9 +1,11 @@
 import {
-  CreateRouteSchema,
+  type CreateRouteWithStopsInput,
+  CreateRouteWithStopsSchema,
   DuplicateRouteSchema,
   endOfBusinessDay,
   FinishRouteSchema,
   ListRouteHistoryQuerySchema,
+  ListRoutesQuerySchema,
   ROUTE_STATUSES,
   type Route,
   type RouteStatus,
@@ -138,6 +140,21 @@ export function registerRoutesRoutes(router: Routable) {
     return Response.json(await service.list(ctx.user!, date, statusParam(ctx.req)));
   });
 
+  // Registered before "/routes/:id" so "search" isn't taken for an id.
+  router.get(
+    "/routes/search",
+    auth,
+    requireRole("admin", "supervisor", "super_admin"),
+    rateLimitGeneral,
+    async (ctx) => {
+      const params = Object.fromEntries(new URL(ctx.req.url).searchParams);
+      const parsed = ListRoutesQuerySchema.safeParse(params);
+      if (!parsed.success) throw new ValidationError("Invalid query", parsed.error.issues);
+
+      return Response.json(await service.search(parsed.data));
+    },
+  );
+
   router.get("/routes/:id", auth, rateLimitGeneral, async (ctx) => {
     return Response.json(await service.getById(ctx.params.id!, ctx.user!));
   });
@@ -147,9 +164,10 @@ export function registerRoutesRoutes(router: Routable) {
     auth,
     requireRole("admin", "supervisor", "super_admin"),
     rateLimitGeneral,
-    validateBody(CreateRouteSchema),
+    validateBody(CreateRouteWithStopsSchema),
     async (ctx) => {
-      const route = await service.create(ctx.body as never, ctx.user!.id);
+      const { stops = [], ...routeInput } = ctx.body as CreateRouteWithStopsInput;
+      const route = await duplication.createWithStops(routeInput, stops, ctx.user!.id);
 
       await logEvent({
         userId: ctx.user!.id,

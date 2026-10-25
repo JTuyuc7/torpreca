@@ -6,7 +6,11 @@
 
 export type Row = Record<string, unknown>;
 
-type Filter = { op: "eq" | "neq" | "gte" | "lt" | "lte" | "in"; col: string; val: unknown };
+type Filter = {
+  op: "eq" | "neq" | "gte" | "lt" | "lte" | "in" | "ilike";
+  col: string;
+  val: unknown;
+};
 
 type PostgrestResult = { data: unknown; error: { message: string } | null; count?: number };
 
@@ -27,6 +31,7 @@ class FakeQueryBuilder implements PromiseLike<PostgrestResult> {
   constructor(
     private readonly source: Row[],
     private readonly insertDefaults: Row = {},
+    private readonly generatesRouteCode = false,
   ) {}
 
   select(_columns?: string, opts?: { count?: "exact" | "planned" | "estimated" }) {
@@ -68,6 +73,12 @@ class FakeQueryBuilder implements PromiseLike<PostgrestResult> {
 
   in(col: string, val: unknown[]) {
     this.filters.push({ op: "in", col, val });
+    return this;
+  }
+
+  // Only the `%term%` shape the repositories use: a case-insensitive "contains".
+  ilike(col: string, pattern: string) {
+    this.filters.push({ op: "ilike", col, val: pattern });
     return this;
   }
 
@@ -121,6 +132,10 @@ class FakeQueryBuilder implements PromiseLike<PostgrestResult> {
           return rowVal <= filterVal;
         case "in":
           return (f.val as unknown[]).includes(rowVal);
+        case "ilike":
+          return String(rowVal)
+            .toLowerCase()
+            .includes(String(f.val).replaceAll("%", "").toLowerCase());
         default:
           return false;
       }
@@ -149,6 +164,10 @@ class FakeQueryBuilder implements PromiseLike<PostgrestResult> {
         ...this.insertDefaults,
         ...this.insertPayload,
       };
+      // Emulates the `routes.code` column default (sequence-backed in Postgres).
+      if (this.generatesRouteCode && row.code === undefined) {
+        row.code = `R-${String(this.source.length + 1).padStart(5, "0")}`;
+      }
       this.source.push(row);
       return this.wrap([row]);
     }
@@ -270,7 +289,7 @@ export function createFakeSupabase(
   const client: FakeSupabaseClient = {
     from(table) {
       if (!tables[table]) tables[table] = [];
-      return new FakeQueryBuilder(tables[table], insertDefaults[table]);
+      return new FakeQueryBuilder(tables[table], insertDefaults[table], table === "routes");
     },
     rpc(name, args = {}) {
       const handler = rpcHandlers[name];

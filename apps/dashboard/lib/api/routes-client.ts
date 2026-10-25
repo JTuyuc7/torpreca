@@ -1,7 +1,9 @@
 import type {
-  CreateRouteInput,
+  CreateRouteWithStopsInput,
   DuplicateRouteInput,
   Route,
+  RoutesPage,
+  RouteStatusFilter,
   UpdateRouteInput,
 } from "@torpreca/shared";
 
@@ -24,9 +26,42 @@ export async function listRoutes(): Promise<RoutesResult> {
   }
 }
 
+// Filters of the Rutas table (see ListRoutesQuerySchema in @torpreca/shared).
+export type RoutesSearchFilter = {
+  q?: string;
+  status?: RouteStatusFilter;
+  driverId?: string;
+  vehicleId?: string;
+  from?: string;
+  to?: string;
+  limit: number;
+  offset: number;
+};
+
+export type RoutesSearchResult = { ok: true; page: RoutesPage } | { ok: false; status: number };
+
+export async function searchRoutes(filter: RoutesSearchFilter): Promise<RoutesSearchResult> {
+  try {
+    const params = new URLSearchParams();
+    for (const key of ["q", "status", "driverId", "vehicleId", "from", "to"] as const) {
+      const value = filter[key];
+      if (value) params.set(key, value);
+    }
+    params.set("limit", String(filter.limit));
+    params.set("offset", String(filter.offset));
+
+    const res = await fetch(`/api/routes/search?${params.toString()}`);
+    if (!res.ok) return { ok: false, status: res.status };
+    const page = (await res.json()) as RoutesPage;
+    return { ok: true, page };
+  } catch {
+    return { ok: false, status: 0 };
+  }
+}
+
 export type CreateRouteResult = { ok: true; route: Route } | { ok: false; status: number };
 
-export async function createRoute(input: CreateRouteInput): Promise<CreateRouteResult> {
+export async function createRoute(input: CreateRouteWithStopsInput): Promise<CreateRouteResult> {
   try {
     const res = await fetch("/api/routes", {
       method: "POST",

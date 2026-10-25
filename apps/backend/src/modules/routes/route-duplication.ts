@@ -1,4 +1,9 @@
-import type { DuplicateRouteInput, Route } from "@torpreca/shared";
+import type {
+  CreateRouteInput,
+  DuplicateRouteInput,
+  Route,
+  UpdateStopInput,
+} from "@torpreca/shared";
 import { NotFoundError } from "../../core/errors/app-error";
 import type { StopsRepository } from "../stops/stops.repository";
 import type { RoutesRepository } from "./routes.repository";
@@ -9,15 +14,36 @@ import type { RoutesRepository } from "./routes.repository";
 // dialog. Always created `pending`, with every stop `pending` too, whatever
 // state the source was in.
 //
-// Two repositories, one operation: the route row is created first and the
-// stops after it. If any stop fails, the route is deleted again (its stops go
-// with it, ON DELETE CASCADE) so a failed duplicate never leaves a half-built
-// route behind.
+// Two repositories, one operation — see createWithStops below.
 export function createRouteDuplicationService(
   routesRepo: RoutesRepository,
   stopsRepo: StopsRepository,
 ) {
+  // Route first, stops after; a failing stop deletes the route again (its
+  // stops go with it, ON DELETE CASCADE) so nothing half-built is left behind.
+  async function createWithStops(
+    routeInput: CreateRouteInput,
+    stops: UpdateStopInput[],
+    createdBy: string,
+  ): Promise<Route> {
+    const route = await routesRepo.create(routeInput, createdBy);
+
+    try {
+      for (const [index, stop] of stops.entries()) {
+        await stopsRepo.create({ ...stop, routeId: route.id, order: index + 1 });
+      }
+    } catch (error) {
+      await routesRepo.delete(route.id).catch(() => {});
+      throw error;
+    }
+
+    return route;
+  }
+
   return {
+    // "Nueva ruta" (dashboard): same operation as a duplicate, minus the source.
+    createWithStops,
+
     async duplicate(
       sourceId: string,
       input: DuplicateRouteInput,
@@ -28,18 +54,7 @@ export function createRouteDuplicationService(
       if (!(await routesRepo.getById(sourceId))) throw new NotFoundError("Route not found");
 
       const { stops, ...routeInput } = input;
-      const route = await routesRepo.create(routeInput, createdBy);
-
-      try {
-        for (const [index, stop] of stops.entries()) {
-          await stopsRepo.create({ ...stop, routeId: route.id, order: index + 1 });
-        }
-      } catch (error) {
-        await routesRepo.delete(route.id).catch(() => {});
-        throw error;
-      }
-
-      return route;
+      return createWithStops(routeInput, stops, createdBy);
     },
   };
 }
