@@ -26,8 +26,9 @@ export const RouteSchema = z.object({
 
 export type Route = z.infer<typeof RouteSchema>;
 
+// `code` is not an input: the database generates it (R-00123, see the
+// `next_route_code` migration), so clients can never send or edit one.
 export const CreateRouteSchema = RouteSchema.pick({
-  code: true,
   driverId: true,
   vehicleId: true,
   date: true,
@@ -39,6 +40,16 @@ export const CreateRouteSchema = RouteSchema.pick({
 });
 
 export type CreateRouteInput = z.infer<typeof CreateRouteSchema>;
+
+// Body of `POST /routes`: the route's own fields plus, optionally, the stops
+// it is created with (the dashboard's "Nueva ruta" modal builds them in the
+// same form). Omitted or empty means a route without stops, which the driver
+// app already supports. Stops are always created `pending`.
+export const CreateRouteWithStopsSchema = CreateRouteSchema.extend({
+  stops: z.array(UpdateStopSchema).max(200).optional(),
+});
+
+export type CreateRouteWithStopsInput = z.infer<typeof CreateRouteWithStopsSchema>;
 
 // Every field optional: a PATCH can touch just one of them (e.g. only
 // reassigning the vehicle). Only allowed while the route is still `pending`
@@ -76,3 +87,29 @@ export const ListRouteHistoryQuerySchema = z.object({
 });
 
 export type ListRouteHistoryQuery = z.infer<typeof ListRouteHistoryQuerySchema>;
+
+// Query of `GET /routes/search` (dashboard "Rutas" table): every filter is
+// optional and they combine (AND). `status` also takes `overdue` — the derived
+// "sin completar" state (see isRouteOverdue), which has no value in the
+// `route_status` enum. `q` matches part of the route code. Paged with
+// `limit`/`offset`, newest first.
+export const ROUTE_STATUS_FILTERS = [...ROUTE_STATUSES, "overdue"] as const;
+
+export const ListRoutesQuerySchema = z.object({
+  driverId: z.uuid().optional(),
+  vehicleId: z.uuid().optional(),
+  status: z.enum(ROUTE_STATUS_FILTERS).optional(),
+  from: z.iso.date().optional(),
+  to: z.iso.date().optional(),
+  q: z.string().trim().min(1).max(50).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(10),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+export type ListRoutesQuery = z.infer<typeof ListRoutesQuerySchema>;
+
+// One page of the result plus how many routes match in total, so the table can
+// show "1–10 of 48" and know when the last page is reached.
+export type RoutesPage = { items: Route[]; total: number };
+
+export type RouteStatusFilter = (typeof ROUTE_STATUS_FILTERS)[number];

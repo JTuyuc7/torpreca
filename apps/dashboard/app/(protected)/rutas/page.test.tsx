@@ -1,5 +1,5 @@
 import { businessDate } from "@torpreca/shared";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { withQueryClient } from "@/lib/test-utils/query-client";
 
@@ -16,6 +16,25 @@ vi.mock("@/components/ui/address-search", () => ({
       mock-address-search
     </button>
   ),
+}));
+
+// The real calculator needs a Mapbox canvas — stand in with a button that
+// applies a fixed result, the way "Usar este valor" does.
+vi.mock("./route-km-calculator-dialog", () => ({
+  RouteKmCalculatorDialog: ({ onApply }: { onApply: (km: number, points: null) => void }) => (
+    <button type="button" onClick={() => onApply(12.5, null)}>
+      mock-calculator
+    </button>
+  ),
+}));
+
+// The filters live in the URL (like the logs screen): stand in for the app router.
+const replace = vi.fn();
+let searchParams = new URLSearchParams();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace }),
+  usePathname: () => "/rutas",
+  useSearchParams: () => searchParams,
 }));
 
 import RutasPage from "./page";
@@ -68,10 +87,18 @@ function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status });
 }
 
+// What the "server" currently has: the table's filtered search reads it, so a
+// test can change it after a POST.
+let serverRoutes: unknown[] = [];
+
 function mockFetchRoutes(routes: unknown[]) {
+  serverRoutes = routes;
   fetchMock.mockImplementation((url: string) => {
-    if (url.startsWith("/api/routes/")) return Promise.resolve(jsonResponse(routes[0]));
-    if (url.startsWith("/api/routes")) return Promise.resolve(jsonResponse(routes));
+    if (url.startsWith("/api/routes/search")) {
+      return Promise.resolve(jsonResponse({ items: serverRoutes, total: serverRoutes.length }));
+    }
+    if (url.startsWith("/api/routes/")) return Promise.resolve(jsonResponse(serverRoutes[0]));
+    if (url.startsWith("/api/routes")) return Promise.resolve(jsonResponse(serverRoutes));
     if (url.startsWith("/api/users")) return Promise.resolve(jsonResponse([driver]));
     if (url.startsWith("/api/vehicles")) return Promise.resolve(jsonResponse([vehicle]));
     throw new Error(`unexpected fetch: ${url}`);
@@ -79,9 +106,16 @@ function mockFetchRoutes(routes: unknown[]) {
 }
 
 beforeEach(() => {
+  replace.mockReset();
+  searchParams = new URLSearchParams();
   fetchMock.mockReset();
   vi.stubGlobal("fetch", fetchMock);
 });
+
+// The filters bar repeats words the modal and the table also use ("Conductor",
+// "Pendiente", "Sin completar"...): scope the queries to the part under test.
+const modal = () => within(screen.getByRole("dialog"));
+const table = () => within(screen.getByRole("table"));
 
 function renderPage() {
   return render(withQueryClient(<RutasPage />));
@@ -103,49 +137,113 @@ describe("RutasPage", () => {
 
     await waitFor(() => expect(screen.getByRole("cell", { name: "Carlos Pérez" })).toBeInTheDocument());
     expect(screen.getByText("R-20260910-01")).toBeInTheDocument();
-    expect(screen.getByText("Pendiente")).toBeInTheDocument();
+    expect(table().getByText("Pendiente")).toBeInTheDocument();
   });
 
-  it("disables 'Crear ruta' until the required fields are filled", async () => {
+  // The modal's driver <select> can get its options after the routes load
+  // (useUsers() may resolve later) — wait for the option before selecting it,
+  // or the <select> silently ignores a value with no matching <option> yet.
+  async function openCreateDialog() {
+    await waitFor(() => expect(screen.getByRole("button", { name: "Nueva ruta" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Nueva ruta" }));
+    await waitFor(() => expect(modal().getByRole("option", { name: "Carlos Pérez" })).toBeInTheDocument());
+    fireEvent.change(modal().getByLabelText("Conductor"), {
+      target: { value: "11111111-1111-4111-8111-111111111111" },
+    });
+  }
+
+  it("keeps 'Crear ruta' disabled until driver, km and stops (or 'Sin paradas') are set", async () => {
+    mockFetchRoutes([]);
+
+    renderPage();
+    await openCreateDialog();
+    const submit = modal().getByRole("button", { name: "Crear ruta" });
+
+    // Driver chosen, but no km and no stops yet.
+    expect(submit).toBeDisabled();
+    fireEvent.click(modal().getByText("mock-calculator"));
+    expect(submit).toBeDisabled();
+    fireEvent.click(modal().getByLabelText("Sin paradas"));
+    await waitFor(() => expect(submit).not.toBeDisabled());
+
+    // The code isn't shown while the route doesn't exist yet.
+    expect(modal().queryByLabelText("Código (autogenerado)")).not.toBeInTheDocument();
+  });
+
+  it("rejects a past date", async () => {
+    mockFetchRoutes([]);
+
+    renderPage();
+    await openCreateDialog();
+    fireEvent.click(modal().getByText("mock-calculator"));
+    fireEvent.click(modal().getByLabelText("Sin paradas"));
+    const submit = modal().getByRole("button", { name: "Crear ruta" });
+    await waitFor(() => expect(submit).not.toBeDisabled());
+
+    fireEvent.change(modal().getByLabelText("Fecha"), { target: { value: "2020-01-01" } });
+
+    expect(await modal().findByText("No puedes elegir una fecha pasada.")).toBeInTheDocument();
+    expect(submit).toBeDisabled();
+  });
+
+  it("creating a route without stops sends no code (the server generates it) and prepends it to the list", async () => {
     mockFetchRoutes([]);
 
     renderPage();
     await waitFor(() => expect(screen.getByText("No hay rutas registradas.")).toBeInTheDocument());
-    // useUsers() (drivers for the dropdown) can resolve after useRoutes() —
-    // wait for the option to exist before selecting it, or the <select>
-    // silently ignores a value with no matching <option> yet.
-    await waitFor(() => expect(screen.getByRole("option", { name: "Carlos Pérez" })).toBeInTheDocument());
+    await openCreateDialog();
 
-    const submitButton = screen.getByRole("button", { name: "Crear ruta" });
-    expect(submitButton).toBeDisabled();
+    fireEvent.click(modal().getByText("mock-calculator"));
+    fireEvent.click(modal().getByLabelText("Sin paradas"));
 
-    fireEvent.change(screen.getByLabelText("Conductor"), { target: { value: "11111111-1111-4111-8111-111111111111" } });
-
-    await waitFor(() => expect(submitButton).not.toBeDisabled());
-  });
-
-  it("creating a route sends the autogenerated code and prepends it to the list", async () => {
-    mockFetchRoutes([]);
-    fetchMock.mockImplementationOnce(() => Promise.resolve(jsonResponse([])));
-
-    renderPage();
-    await waitFor(() => expect(screen.getByText("No hay rutas registradas.")).toBeInTheDocument());
-    await waitFor(() => expect(screen.getByRole("option", { name: "Carlos Pérez" })).toBeInTheDocument());
-
-    fireEvent.change(screen.getByLabelText("Conductor"), { target: { value: "11111111-1111-4111-8111-111111111111" } });
-
-    const submitButton = screen.getByRole("button", { name: "Crear ruta" });
-    await waitFor(() => expect(submitButton).not.toBeDisabled());
-
-    fetchMock.mockImplementationOnce(() => Promise.resolve(jsonResponse(pendingRoute, 201)));
-    fireEvent.click(submitButton);
+    fetchMock.mockImplementationOnce(() => {
+      serverRoutes = [pendingRoute];
+      return Promise.resolve(jsonResponse(pendingRoute, 201));
+    });
+    fireEvent.click(modal().getByRole("button", { name: "Crear ruta" }));
 
     await waitFor(() => expect(screen.getByRole("cell", { name: "Carlos Pérez" })).toBeInTheDocument());
     const postCall = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
     expect(postCall).toBeDefined();
     const body = JSON.parse((postCall?.[1] as RequestInit).body as string);
-    expect(body).toMatchObject({ driverId: "11111111-1111-4111-8111-111111111111", vehicleId: null });
-    expect(body.code).toMatch(/^R-\d{8}-01$/);
+    expect(body).toMatchObject({
+      driverId: "11111111-1111-4111-8111-111111111111",
+      vehicleId: null,
+      plannedKm: 12.5,
+      stops: [],
+    });
+    expect(body).not.toHaveProperty("code");
+  });
+
+  it("creating a route sends the stops added in the modal, in order", async () => {
+    mockFetchRoutes([]);
+
+    renderPage();
+    await waitFor(() => expect(screen.getByText("No hay rutas registradas.")).toBeInTheDocument());
+    await openCreateDialog();
+
+    fireEvent.click(modal().getByText("mock-calculator"));
+    for (const customer of ["Tienda A", "Tienda B"]) {
+      fireEvent.change(modal().getAllByLabelText("Cliente")[0] as HTMLElement, {
+        target: { value: customer },
+      });
+      fireEvent.click(modal().getByText("mock-address-search"));
+      fireEvent.click(modal().getByRole("button", { name: "Agregar a la lista" }));
+    }
+
+    fetchMock.mockImplementationOnce(() => {
+      serverRoutes = [pendingRoute];
+      return Promise.resolve(jsonResponse(pendingRoute, 201));
+    });
+    fireEvent.click(modal().getByRole("button", { name: "Crear ruta" }));
+
+    await waitFor(() => expect(screen.getByRole("cell", { name: "Carlos Pérez" })).toBeInTheDocument());
+    const postCall = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
+    const body = JSON.parse((postCall?.[1] as RequestInit).body as string);
+    expect(body.stops.map((st: { customerName: string }) => st.customerName)).toEqual([
+      "Tienda A",
+      "Tienda B",
+    ]);
   });
 
   it("only shows 'Editar' for pending routes", async () => {
@@ -202,8 +300,8 @@ describe("RutasPage", () => {
 
       renderPage();
 
-      await waitFor(() => expect(screen.getByText("Sin completar")).toBeInTheDocument());
-      expect(screen.queryByText("Pendiente")).not.toBeInTheDocument();
+      await waitFor(() => expect(table().getByText("Sin completar")).toBeInTheDocument());
+      expect(table().queryByText("Pendiente")).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Editar" })).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Duplicar" })).toBeInTheDocument();
       expect(screen.getByText(/solo de lectura/)).toBeInTheDocument();
@@ -216,9 +314,9 @@ describe("RutasPage", () => {
 
       renderPage();
 
-      await waitFor(() => expect(screen.getByText("Pendiente")).toBeInTheDocument());
+      await waitFor(() => expect(table().getByText("Pendiente")).toBeInTheDocument());
       expect(screen.getByRole("button", { name: "Editar" })).toBeInTheDocument();
-      expect(screen.queryByText("Sin completar")).not.toBeInTheDocument();
+      expect(table().queryByText("Sin completar")).not.toBeInTheDocument();
     });
 
     it("closing an overdue in-progress route asks for confirmation, then PATCHes /close", async () => {
@@ -230,9 +328,12 @@ describe("RutasPage", () => {
       fireEvent.click(closeButton);
       expect(fetchMock.mock.calls.some(([, init]) => init?.method === "PATCH")).toBe(false);
 
-      fetchMock.mockImplementationOnce(() =>
-        Promise.resolve(jsonResponse({ ...overdueRunning, status: "cancelled", drivenKm: 3.2 })),
-      );
+      // The table is refetched after the close, so the server now has it cancelled.
+      const closed = { ...overdueRunning, status: "cancelled", drivenKm: 3.2 };
+      fetchMock.mockImplementationOnce(() => {
+        serverRoutes = [closed];
+        return Promise.resolve(jsonResponse(closed));
+      });
       fireEvent.click(screen.getByRole("button", { name: "¿Cerrar ruta?" }));
 
       await waitFor(() => {
@@ -284,6 +385,9 @@ describe("RutasPage", () => {
           return Promise.resolve(
             jsonResponse({ ...pendingRoute, id: "r5", code: "R-new", plannedKm: 10 }, 201),
           );
+        }
+        if (url.startsWith("/api/routes/search")) {
+          return Promise.resolve(jsonResponse({ items: [overduePending], total: 1 }));
         }
         if (url.startsWith("/api/routes")) return Promise.resolve(jsonResponse([overduePending]));
         if (url.startsWith("/api/users")) return Promise.resolve(jsonResponse([driver]));
@@ -338,7 +442,7 @@ describe("RutasPage", () => {
       // The stops go over as plain data — no state, no ids: the copy starts over.
       expect(body.stops[0]).not.toHaveProperty("status");
       expect(body.stops[0]).not.toHaveProperty("id");
-      expect(body.code).toMatch(/^R-\d{8}-01$/);
+      expect(body).not.toHaveProperty("code");
     });
   });
 });

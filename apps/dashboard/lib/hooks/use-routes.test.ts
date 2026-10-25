@@ -19,7 +19,6 @@ import { useRoutes } from "./use-routes";
 
 const pendingRoute = {
   id: "r1",
-  code: "R-20260910-01",
   driverId: "driver-1",
   vehicleId: null,
   createdBy: "admin-1",
@@ -72,7 +71,6 @@ describe("useRoutes", () => {
     await waitFor(() => expect(result.current.routes).toEqual([]));
 
     result.current.createRoute.mutate({
-      code: "R-20260910-01",
       driverId: "driver-1",
       vehicleId: null,
       date: "2026-09-10",
@@ -121,7 +119,6 @@ describe("useRoutes", () => {
     await waitFor(() => expect(result.current.routes).toEqual([pendingRoute]));
 
     const input = {
-      code: "R-20260927-01",
       driverId: "driver-1",
       vehicleId: null,
       date: "2026-09-27",
@@ -144,7 +141,6 @@ describe("useRoutes", () => {
     result.current.duplicateRoute.mutate({
       id: pendingRoute.id,
       input: {
-        code: "R-1",
         driverId: "driver-1",
         vehicleId: null,
         date: "2026-09-27",

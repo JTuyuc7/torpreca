@@ -1,5 +1,5 @@
 import type {
-  CreateRouteInput,
+  CreateRouteWithStopsInput,
   DuplicateRouteInput,
   Route,
   UpdateRouteInput,
@@ -12,16 +12,20 @@ import {
   listRoutes,
   updateRoute,
 } from "@/lib/api/routes-client";
+import { routesSearchKey } from "@/lib/hooks/use-routes-search";
 
 const routesQueryKey = ["routes"] as const;
 
 // Same pattern as lib/hooks/use-users.ts (TOR-42): the screen stays JSX,
 // fetch/mutation logic lives here.
-export function useRoutes() {
+// `list: false` is for screens that only need the mutations (the Rutas table
+// pages through /routes/search instead of loading every route).
+export function useRoutes({ list = true }: { list?: boolean } = {}) {
   const queryClient = useQueryClient();
 
   const routesQuery = useQuery({
     queryKey: routesQueryKey,
+    enabled: list,
     queryFn: async () => {
       const result = await listRoutes();
       if (!result.ok) throw new Error("No se pudieron cargar las rutas.");
@@ -30,7 +34,7 @@ export function useRoutes() {
   });
 
   const createRouteMutation = useMutation({
-    mutationFn: async (input: CreateRouteInput) => {
+    mutationFn: async (input: CreateRouteWithStopsInput) => {
       const result = await createRoute(input);
       if (!result.ok) {
         throw new Error(
@@ -42,6 +46,7 @@ export function useRoutes() {
       return result.route;
     },
     onSuccess: (route) => {
+      queryClient.invalidateQueries({ queryKey: routesSearchKey });
       queryClient.setQueryData<Route[]>(routesQueryKey, (prev) =>
         prev ? [route, ...prev] : [route],
       );
@@ -61,6 +66,7 @@ export function useRoutes() {
       return result.route;
     },
     onSuccess: (route) => {
+      queryClient.invalidateQueries({ queryKey: routesSearchKey });
       queryClient.setQueryData<Route[]>(routesQueryKey, (prev) =>
         prev?.map((r) => (r.id === route.id ? route : r)),
       );
@@ -83,6 +89,7 @@ export function useRoutes() {
       return result.route;
     },
     onSuccess: (route) => {
+      queryClient.invalidateQueries({ queryKey: routesSearchKey });
       queryClient.setQueryData<Route[]>(routesQueryKey, (prev) =>
         prev ? [route, ...prev] : [route],
       );
@@ -103,6 +110,7 @@ export function useRoutes() {
       return result.route;
     },
     onSuccess: (route) => {
+      queryClient.invalidateQueries({ queryKey: routesSearchKey });
       queryClient.setQueryData<Route[]>(routesQueryKey, (prev) =>
         prev?.map((r) => (r.id === route.id ? route : r)),
       );

@@ -98,7 +98,6 @@ describe("routes HTTP routes", () => {
         method: "POST",
         headers: { authorization: "Bearer t", "content-type": "application/json" },
         body: JSON.stringify({
-          code: "R-1",
           driverId: crypto.randomUUID(),
           vehicleId: null,
           date: "2026-08-22",
@@ -110,6 +109,28 @@ describe("routes HTTP routes", () => {
     expect(res.status).toBe(403);
   });
 
+  it("POST /routes returns a database-generated code and ignores a client-sent one", async () => {
+    asAdmin();
+    const router = await buildRouter();
+
+    const res = await router.handle(
+      new Request("http://x/routes", {
+        method: "POST",
+        headers: { authorization: "Bearer t", "content-type": "application/json" },
+        body: JSON.stringify({
+          code: "HACKED",
+          driverId: crypto.randomUUID(),
+          vehicleId: null,
+          date: "2026-08-22",
+          plannedKm: 10,
+        }),
+      }),
+    );
+
+    expect(res.status).toBe(201);
+    expect(((await res.json()) as { code: string }).code).toBe("R-00001");
+  });
+
   it("POST /routes as admin creates a route and logs route.created", async () => {
     asAdmin();
     const router = await buildRouter();
@@ -119,7 +140,6 @@ describe("routes HTTP routes", () => {
         method: "POST",
         headers: { authorization: "Bearer t", "content-type": "application/json" },
         body: JSON.stringify({
-          code: "R-1",
           driverId: crypto.randomUUID(),
           vehicleId: null,
           date: "2026-08-22",
@@ -141,7 +161,6 @@ describe("routes HTTP routes", () => {
         method: "POST",
         headers: { authorization: "Bearer t", "content-type": "application/json" },
         body: JSON.stringify({
-          code: "R-1",
           driverId: crypto.randomUUID(),
           vehicleId: null,
           date: "2026-08-22",
@@ -439,6 +458,111 @@ describe("routes HTTP routes", () => {
     );
 
     expect(res.status).toBe(403);
+  });
+
+  describe("GET /routes/search (dashboard table)", () => {
+    const D1 = "11111111-1111-4111-8111-111111111111";
+    const D2 = "22222222-2222-4222-8222-222222222222";
+    const V1 = "33333333-3333-4333-8333-333333333333";
+
+    // created_at follows the day: the fake sorts by its last order() column only
+    // (created_at), where the real query sorts by date and then created_at.
+    function route(id: string, overrides: Record<string, unknown> = {}) {
+      const day = (overrides.date as string | undefined) ?? "2999-01-01";
+      return {
+        id,
+        code: `R-${id}`,
+        driver_id: D1,
+        vehicle_id: null,
+        created_by: "admin-1",
+        date: "2999-01-01",
+        status: "pending",
+        planned_km: 10,
+        driven_km: 0,
+        start_time: null,
+        end_time: null,
+        created_at: day,
+        updated_at: "t",
+        ...overrides,
+      };
+    }
+
+    function search(query = "") {
+      return new Request(`http://x/routes/search${query}`, {
+        headers: { authorization: "Bearer t" },
+      });
+    }
+
+    async function ids(res: Response) {
+      const body = (await res.json()) as { items: { id: string }[]; total: number };
+      return { ids: body.items.map((r) => r.id), total: body.total };
+    }
+
+    beforeEach(() => {
+      fake.tables.routes = [
+        route("a", { driver_id: D1, vehicle_id: V1, date: "2999-01-03" }),
+        route("b", { driver_id: D2, date: "2999-01-02", status: "completed" }),
+        route("c", { driver_id: D1, date: "2020-01-01", status: "in_progress" }),
+        route("d", { driver_id: D2, date: "2020-01-02", status: "cancelled" }),
+        route("e", { driver_id: D1, date: "2999-01-01" }),
+      ];
+      asAdmin();
+    });
+
+    it("returns the page and the total, newest day first", async () => {
+      const router = await buildRouter();
+      const res = await router.handle(search("?limit=2&offset=0"));
+
+      expect(res.status).toBe(200);
+      expect(await ids(res)).toEqual({ ids: ["a", "b"], total: 5 });
+
+      const next = await ids(await router.handle(search("?limit=2&offset=2")));
+      expect(next).toEqual({ ids: ["e", "d"], total: 5 });
+    });
+
+    it("filters by driver, vehicle, status and date range, combined", async () => {
+      const router = await buildRouter();
+
+      expect((await ids(await router.handle(search(`?driverId=${D2}`)))).ids).toEqual(["b", "d"]);
+      expect((await ids(await router.handle(search(`?vehicleId=${V1}`)))).ids).toEqual(["a"]);
+      expect((await ids(await router.handle(search("?status=completed")))).ids).toEqual(["b"]);
+      expect(
+        (await ids(await router.handle(search("?from=2999-01-02&to=2999-01-03")))).ids,
+      ).toEqual(["a", "b"]);
+      expect(
+        (await ids(await router.handle(search(`?driverId=${D1}&status=pending`)))).ids,
+      ).toEqual(["a", "e"]);
+    });
+
+    it("status=overdue returns open routes of a past day only", async () => {
+      const router = await buildRouter();
+      const res = await router.handle(search("?status=overdue"));
+
+      // c is in progress on a past day; d is cancelled (finished); the rest are future.
+      expect(await ids(res)).toEqual({ ids: ["c"], total: 1 });
+    });
+
+    it("q matches part of the code, case-insensitively", async () => {
+      fake.tables.routes?.push(route("zz", { code: "R-00123" }));
+      const router = await buildRouter();
+
+      expect((await ids(await router.handle(search("?q=r-001")))).ids).toEqual(["zz"]);
+    });
+
+    it("rejects an invalid query with 400", async () => {
+      const router = await buildRouter();
+
+      expect((await router.handle(search("?driverId=nope"))).status).toBe(400);
+      expect((await router.handle(search("?status=flying"))).status).toBe(400);
+      expect((await router.handle(search("?limit=0"))).status).toBe(400);
+    });
+
+    it("is closed to drivers (403)", async () => {
+      asDriver();
+      const router = await buildRouter();
+
+      expect((await router.handle(search())).status).toBe(403);
+    });
   });
 
   describe("driver app start/finish (TOR-138)", () => {
@@ -742,7 +866,6 @@ describe("routes HTTP routes", () => {
     });
 
     const duplicateBody = (stops: unknown[]) => ({
-      code: "R-20260927-01",
       driverId: crypto.randomUUID(),
       vehicleId: null,
       date: "2026-09-27",
@@ -801,6 +924,55 @@ describe("routes HTTP routes", () => {
       );
 
       expect(res.status).toBe(404);
+    });
+
+    it("POST /routes creates the route with its stops, in order", async () => {
+      asAdmin();
+      const router = await buildRouter();
+
+      const res = await router.handle(
+        request("POST", "/routes", duplicateBody([stopBody("A"), stopBody("B")])),
+      );
+
+      expect(res.status).toBe(201);
+      const created = (await res.json()) as { id: string; status: string };
+      expect(created.status).toBe("pending");
+      expect(
+        fake.tables.stops?.map((st) => [st.route_id, st.order_index, st.customer_name, st.status]),
+      ).toEqual([
+        [created.id, 1, "A", "pending"],
+        [created.id, 2, "B", "pending"],
+      ]);
+      expect(fake.tables.audit_logs?.[0]).toMatchObject({
+        action: "route.created",
+        entity_id: created.id,
+      });
+    });
+
+    it("POST /routes without stops creates a route with none", async () => {
+      asAdmin();
+      const router = await buildRouter();
+      const { stops: _stops, ...body } = duplicateBody([]);
+
+      const res = await router.handle(request("POST", "/routes", body));
+
+      expect(res.status).toBe(201);
+      expect(fake.tables.routes).toHaveLength(1);
+      expect(fake.tables.stops ?? []).toHaveLength(0);
+    });
+
+    it("POST /routes deletes the new route again if a stop fails", async () => {
+      failAtStop = 2;
+      asAdmin();
+      const router = await buildRouter();
+
+      const res = await router.handle(
+        request("POST", "/routes", duplicateBody([stopBody("A"), stopBody("B")])),
+      );
+
+      expect(res.status).toBe(500);
+      expect(fake.tables.routes ?? []).toHaveLength(0);
+      expect(fake.tables.audit_logs ?? []).toHaveLength(0);
     });
 
     it("POST /routes/:id/duplicate as a driver returns 403", async () => {

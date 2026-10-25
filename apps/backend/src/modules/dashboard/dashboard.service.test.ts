@@ -22,6 +22,7 @@ function fakeRoutesRepo(seed: Route[]): RoutesRepository {
     finish: notUsed,
     close: notUsed,
     delete: notUsed,
+    page: notUsed,
   };
 }
 

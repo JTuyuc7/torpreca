@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { withQueryClient } from "@/lib/test-utils/query-client";
 
@@ -25,6 +25,19 @@ vi.mock("./route-km-calculator-dialog", () => ({
       mock-calculator
     </button>
   ),
+}));
+
+// The modal's stops editor embeds AddressSearch (Mapbox SearchBox web
+// component, not implemented by jsdom) — see page.test.tsx.
+vi.mock("@/components/ui/address-search", () => ({ AddressSearch: () => null }));
+
+// The filters live in the URL (like the logs screen): stand in for the app router.
+const replace = vi.fn();
+const searchParams = new URLSearchParams();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace }),
+  usePathname: () => "/rutas",
+  useSearchParams: () => searchParams,
 }));
 
 import RutasPage from "./page";
@@ -56,6 +69,9 @@ beforeEach(() => {
     if (init?.method === "POST") {
       return Promise.resolve(jsonResponse({ id: "r1", ...JSON.parse(init.body as string) }, 201));
     }
+    if (url.startsWith("/api/routes/search")) {
+      return Promise.resolve(jsonResponse({ items: [], total: 0 }));
+    }
     if (url.startsWith("/api/users")) return Promise.resolve(jsonResponse([driver]));
     if (url.startsWith("/api/vehicles")) return Promise.resolve(jsonResponse([]));
     return Promise.resolve(jsonResponse([]));
@@ -63,19 +79,21 @@ beforeEach(() => {
   vi.stubGlobal("fetch", fetchMock);
 });
 
+const modal = () => within(screen.getByRole("dialog"));
+
 describe("RutasPage — A/B points", () => {
   it("creating a route after using the calculator sends the A/B points too", async () => {
     render(withQueryClient(<RutasPage />));
+    fireEvent.click(await screen.findByRole("button", { name: "Nueva ruta" }));
     await waitFor(() =>
-      expect(screen.getByRole("option", { name: "Carlos Pérez" })).toBeInTheDocument(),
+      expect(modal().getByRole("option", { name: "Carlos Pérez" })).toBeInTheDocument(),
     );
 
-    fireEvent.change(screen.getByLabelText("Conductor"), { target: { value: driver.id } });
-    fireEvent.click(screen.getByText("mock-calculator"));
+    fireEvent.change(modal().getByLabelText("Conductor"), { target: { value: driver.id } });
+    fireEvent.click(modal().getByText("mock-calculator"));
+    fireEvent.click(modal().getByLabelText("Sin paradas"));
 
-    const submit = screen.getByRole("button", { name: "Crear ruta" });
-    await waitFor(() => expect(submit).not.toBeDisabled());
-    fireEvent.click(submit);
+    fireEvent.click(modal().getByRole("button", { name: "Crear ruta" }));
 
     await waitFor(() =>
       expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(true),

@@ -32,6 +32,9 @@ function fakeRoutesRepo(routes: Route[]): RoutesRepository {
     async close() {
       throw new Error("not used in these tests");
     },
+    async page() {
+      throw new Error("not used in these tests");
+    },
     async delete() {
       throw new Error("not used in these tests");
     },

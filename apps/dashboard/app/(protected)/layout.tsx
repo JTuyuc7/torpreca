@@ -60,7 +60,7 @@ const NAV_ITEMS: {
   { key: "conductores", href: "/users", enabled: true, icon: Users },
   { key: "rutas", href: "/rutas", enabled: true, icon: Route },
   { key: "vehiculos", href: "/vehiculos", enabled: true, icon: Truck },
-  { key: "reportes", href: "/reportes", enabled: false, icon: FileText },
+  { key: "reportes", href: "/reportes", enabled: true, icon: FileText },
   { key: "logsDelSistema", href: "/logs", enabled: true, icon: ScrollText, superAdminOnly: true },
   { key: "ajustes", href: "/ajustes", enabled: true, icon: Settings },
 ];
@@ -87,7 +87,7 @@ function Sidebar({
 
   return (
     <aside
-      className={`flex flex-col justify-between overflow-hidden bg-brand transition-[width] duration-200 ${collapsed ? "w-16" : "w-60"}`}
+      className={`flex flex-col justify-between overflow-hidden bg-brand print:hidden transition-[width] duration-200 ${collapsed ? "w-16" : "w-60"}`}
     >
       <div>
         <div
@@ -327,14 +327,16 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
           never scrolls with the page. min-h-0 on the content pane is the
           usual flexbox fix needed for its own overflow-y-auto to actually
           kick in instead of growing the row past h-screen. */}
-      <div className="flex h-screen bg-background">
+      <div className="flex h-screen bg-background print:block print:h-auto">
         <Sidebar
           authUser={authUser}
           onLogout={handleLogout}
           collapsed={collapsed}
           onToggleCollapsed={toggleCollapsed}
         />
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</div>
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto print:block print:overflow-visible">
+          {children}
+        </div>
       </div>
     </AuthUserProvider>
   );

@@ -1,10 +1,13 @@
 import {
   type AuthUser,
+  businessDate,
   type CreateRouteInput,
   isRouteOverdue,
   type ListRouteHistoryQuery,
+  type ListRoutesQuery,
   type Route,
   type RouteStatus,
+  type RoutesPage,
   type UpdateRouteInput,
 } from "@torpreca/shared";
 import { AppError, ForbiddenError, NotFoundError } from "../../core/errors/app-error";
@@ -17,6 +20,15 @@ export function createRoutesService(repo: RoutesRepository) {
     async list(user: AuthUser, date?: string, status?: RouteStatus): Promise<Route[]> {
       return repo.list(
         user.role === "driver" ? { driverId: user.id, date, status } : { date, status },
+      );
+    },
+
+    // The dashboard table: filtered, paged, with the total.
+    async search(query: ListRoutesQuery): Promise<RoutesPage> {
+      const { status, ...rest } = query;
+      // "Sin completar" isn't a stored status: it's a past day still open.
+      return repo.page(
+        status === "overdue" ? { ...rest, overdueBefore: businessDate() } : { ...rest, status },
       );
     },
 
