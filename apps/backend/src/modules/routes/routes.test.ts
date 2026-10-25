@@ -22,7 +22,7 @@ function createFakeRepo(seed: Route[] = []): RoutesRepository {
     async create(input, createdBy) {
       const created: Route = {
         id: crypto.randomUUID(),
-        code: input.code,
+        code: `R-${String(routes.length + 1).padStart(5, "0")}`,
         driverId: input.driverId,
         vehicleId: input.vehicleId,
         createdBy,
@@ -71,6 +71,10 @@ function createFakeRepo(seed: Route[] = []): RoutesRepository {
       route.drivenKm = drivenKm;
       return route;
     },
+    async page(filter) {
+      const items = await this.list(filter);
+      return { items, total: items.length };
+    },
     async delete(id) {
       const index = routes.findIndex((r) => r.id === id);
       if (index !== -1) routes.splice(index, 1);
@@ -86,11 +90,11 @@ describe("routes.service", () => {
   it("creates a new route", async () => {
     const service = createRoutesService(createFakeRepo());
     const route = await service.create(
-      { code: "R-1", driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: 10 },
+      { driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: 10 },
       admin.id,
     );
 
-    expect(route.code).toBe("R-1");
+    expect(route.code).toBe("R-00001");
     expect(route.status).toBe("pending");
     expect(route.createdBy).toBe(admin.id);
   });
@@ -99,12 +103,11 @@ describe("routes.service", () => {
     const repo = createFakeRepo();
     const service = createRoutesService(repo);
     await service.create(
-      { code: "R-1", driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: null },
+      { driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: null },
       admin.id,
     );
     await service.create(
       {
-        code: "R-2",
         driverId: otherDriver.id,
         vehicleId: null,
         date: "2026-08-21",
@@ -126,7 +129,6 @@ describe("routes.service", () => {
     const service = createRoutesService(repo);
     const route = await service.create(
       {
-        code: "R-1",
         driverId: otherDriver.id,
         vehicleId: null,
         date: "2026-08-21",
@@ -149,7 +151,7 @@ describe("routes.service", () => {
     const repo = createFakeRepo();
     const service = createRoutesService(repo);
     const route = await service.create(
-      { code: "R-1", driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: 10 },
+      { driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: 10 },
       admin.id,
     );
 
@@ -162,7 +164,7 @@ describe("routes.service", () => {
     const repo = createFakeRepo();
     const service = createRoutesService(repo);
     const route = await service.create(
-      { code: "R-1", driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: null },
+      { driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: null },
       admin.id,
     );
     await service.start(route.id, driver.id);
@@ -181,7 +183,7 @@ describe("routes.service", () => {
     const repo = createFakeRepo();
     const service = createRoutesService(repo);
     const route = await service.create(
-      { code: "R-1", driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: null },
+      { driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: null },
       admin.id,
     );
 
@@ -195,7 +197,6 @@ describe("routes.service", () => {
     const service = createRoutesService(repo);
     const route = await service.create(
       {
-        code: "R-1",
         driverId: otherDriver.id,
         vehicleId: null,
         date: "2026-08-21",
@@ -213,7 +214,7 @@ describe("routes.service", () => {
     const repo = createFakeRepo();
     const service = createRoutesService(repo);
     const route = await service.create(
-      { code: "R-1", driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: null },
+      { driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: null },
       admin.id,
     );
     await service.start(route.id, driver.id);
@@ -227,7 +228,7 @@ describe("routes.service", () => {
     const repo = createFakeRepo();
     const service = createRoutesService(repo);
     const route = await service.create(
-      { code: "R-1", driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: null },
+      { driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: null },
       admin.id,
     );
     await service.start(route.id, driver.id);
@@ -241,7 +242,7 @@ describe("routes.service", () => {
     const repo = createFakeRepo();
     const service = createRoutesService(repo);
     const route = await service.create(
-      { code: "R-1", driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: null },
+      { driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: null },
       admin.id,
     );
 
@@ -255,7 +256,6 @@ describe("routes.service", () => {
     const service = createRoutesService(repo);
     const route = await service.create(
       {
-        code: "R-1",
         driverId: otherDriver.id,
         vehicleId: null,
         date: "2026-08-21",
@@ -273,23 +273,23 @@ describe("routes.service", () => {
   it("filters list() by status", async () => {
     const service = createRoutesService(createFakeRepo());
     const running = await service.create(
-      { code: "R-1", driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: null },
+      { driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: null },
       admin.id,
     );
     await service.create(
-      { code: "R-2", driverId: driver.id, vehicleId: null, date: "2026-08-22", plannedKm: null },
+      { driverId: driver.id, vehicleId: null, date: "2026-08-22", plannedKm: null },
       admin.id,
     );
     await service.start(running.id, driver.id);
 
     const open = await service.list(driver, undefined, "in_progress");
-    expect(open.map((r) => r.code)).toEqual(["R-1"]);
+    expect(open.map((r) => r.code)).toEqual(["R-00001"]);
   });
 
   it("finishes a route at the given end time", async () => {
     const service = createRoutesService(createFakeRepo());
     const route = await service.create(
-      { code: "R-1", driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: null },
+      { driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: null },
       admin.id,
     );
     await service.start(route.id, driver.id);
@@ -303,7 +303,7 @@ describe("routes.service", () => {
 
     async function overdueInProgress(service: ReturnType<typeof createRoutesService>) {
       const route = await service.create(
-        { code: "R-1", driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: null },
+        { driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: null },
         admin.id,
       );
       await service.start(route.id, driver.id);
@@ -341,7 +341,6 @@ describe("routes.service", () => {
       const service = createRoutesService(createFakeRepo());
       const route = await service.create(
         {
-          code: "R-1",
           driverId: driver.id,
           vehicleId: null,
           date: businessDate(),
@@ -359,7 +358,7 @@ describe("routes.service", () => {
     it("rejects closing an overdue route that never started", async () => {
       const service = createRoutesService(createFakeRepo());
       const route = await service.create(
-        { code: "R-1", driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: null },
+        { driverId: driver.id, vehicleId: null, date: "2026-08-21", plannedKm: null },
         admin.id,
       );
 

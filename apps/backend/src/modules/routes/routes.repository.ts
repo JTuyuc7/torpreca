@@ -1,4 +1,10 @@
-import type { CreateRouteInput, Route, RouteStatus, UpdateRouteInput } from "@torpreca/shared";
+import type {
+  CreateRouteInput,
+  Route,
+  RouteStatus,
+  RoutesPage,
+  UpdateRouteInput,
+} from "@torpreca/shared";
 import { supabaseAdmin } from "../../core/db/supabase";
 
 function toRoute(row: Record<string, unknown>): Route {
@@ -25,6 +31,12 @@ function toRoute(row: Record<string, unknown>): Route {
 
 export interface RouteFilter {
   driverId?: string;
+  vehicleId?: string;
+  // Part of the route code, case-insensitive.
+  q?: string;
+  // Only routes that were never finished and whose day is before this date
+  // (still pending or in progress) — the dashboard's "sin completar".
+  overdueBefore?: string;
   date?: string;
   status?: RouteStatus;
   // Any of these statuses (the history asks for completed + cancelled).
@@ -39,6 +51,9 @@ export interface RouteFilter {
 
 export interface RoutesRepository {
   list(filter?: RouteFilter): Promise<Route[]>;
+  // Same filters as list(), but also says how many routes match in total
+  // (ignoring limit/offset).
+  page(filter?: RouteFilter): Promise<RoutesPage>;
   getById(id: string): Promise<Route | null>;
   create(input: CreateRouteInput, createdBy: string): Promise<Route>;
   // Only succeeds while the route is still `pending` — same eq()-as-guard
@@ -56,29 +71,49 @@ export interface RoutesRepository {
   delete(id: string): Promise<void>;
 }
 
+// `%` and `_` are wildcards in ILIKE and `\` escapes them: a search for "R_1"
+// should find that literal text, not "R" + any character + "1".
+function escapeLike(term: string): string {
+  return term.replace(/[\\%_]/g, (char) => `\\${char}`);
+}
+
+function buildListQuery(filter: RouteFilter, withCount: boolean) {
+  // Newest first, and within a day the most recently created route first —
+  // without a tiebreaker the order of same-day routes was up to Postgres.
+  let query = supabaseAdmin
+    .from("routes")
+    .select("*", withCount ? { count: "exact" } : undefined)
+    .order("date", { ascending: false })
+    .order("created_at", { ascending: false });
+  if (filter.driverId) query = query.eq("driver_id", filter.driverId);
+  if (filter.vehicleId) query = query.eq("vehicle_id", filter.vehicleId);
+  if (filter.date) query = query.eq("date", filter.date);
+  if (filter.status) query = query.eq("status", filter.status);
+  if (filter.statuses) query = query.in("status", filter.statuses);
+  if (filter.overdueBefore) {
+    query = query.in("status", ["pending", "in_progress"]).lt("date", filter.overdueBefore);
+  }
+  if (filter.from) query = query.gte("date", filter.from);
+  if (filter.to) query = query.lte("date", filter.to);
+  if (filter.q) query = query.ilike("code", `%${escapeLike(filter.q)}%`);
+  if (filter.limit !== undefined) {
+    const offset = filter.offset ?? 0;
+    query = query.range(offset, offset + filter.limit - 1);
+  }
+  return query;
+}
+
 export const routesRepository: RoutesRepository = {
   async list(filter = {}) {
-    // Newest first, and within a day the most recently created route first —
-    // without a tiebreaker the order of same-day routes was up to Postgres.
-    let query = supabaseAdmin
-      .from("routes")
-      .select("*")
-      .order("date", { ascending: false })
-      .order("created_at", { ascending: false });
-    if (filter.driverId) query = query.eq("driver_id", filter.driverId);
-    if (filter.date) query = query.eq("date", filter.date);
-    if (filter.status) query = query.eq("status", filter.status);
-    if (filter.statuses) query = query.in("status", filter.statuses);
-    if (filter.from) query = query.gte("date", filter.from);
-    if (filter.to) query = query.lte("date", filter.to);
-    if (filter.limit !== undefined) {
-      const offset = filter.offset ?? 0;
-      query = query.range(offset, offset + filter.limit - 1);
-    }
-
-    const { data, error } = await query;
+    const { data, error } = await buildListQuery(filter, false);
     if (error) throw error;
     return data.map(toRoute);
+  },
+
+  async page(filter = {}) {
+    const { data, error, count } = await buildListQuery(filter, true);
+    if (error) throw error;
+    return { items: data.map(toRoute), total: count ?? data.length };
   },
 
   async getById(id) {
@@ -95,7 +130,6 @@ export const routesRepository: RoutesRepository = {
     const { data, error } = await supabaseAdmin
       .from("routes")
       .insert({
-        code: input.code,
         driver_id: input.driverId,
         vehicle_id: input.vehicleId,
         created_by: createdBy,
@@ -114,7 +148,6 @@ export const routesRepository: RoutesRepository = {
 
   async update(id, patch) {
     const row: Record<string, unknown> = {};
-    if (patch.code !== undefined) row.code = patch.code;
     if (patch.driverId !== undefined) row.driver_id = patch.driverId;
     if (patch.vehicleId !== undefined) row.vehicle_id = patch.vehicleId;
     if (patch.date !== undefined) row.date = patch.date;

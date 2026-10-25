@@ -20,6 +20,7 @@ import { registerFavoriteRoutesRoutes } from "./modules/favorite-routes/favorite
 import { locationsRepository } from "./modules/locations/locations.repository";
 import { registerLocationsRoutes } from "./modules/locations/locations.routes";
 import { createLocationsService } from "./modules/locations/locations.service";
+import { registerReportsRoutes } from "./modules/reports/reports.routes";
 import { routesRepository } from "./modules/routes/routes.repository";
 import { registerMobileRoutesRoutes, registerRoutesRoutes } from "./modules/routes/routes.routes";
 import { registerMobileStopsRoutes, registerStopsRoutes } from "./modules/stops/stops.routes";
@@ -56,6 +57,7 @@ registerStopsRoutes(v1);
 registerMobileStopsRoutes(v1);
 registerLocationsRoutes(v1);
 registerDashboardRoutes(v1);
+registerReportsRoutes(v1);
 registerWsTicketsRoutes(v1);
 registerMobileWsTicketsRoutes(v1);
 registerSyncQueueRoutes(v1);

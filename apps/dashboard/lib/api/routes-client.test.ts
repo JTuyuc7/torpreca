@@ -10,7 +10,6 @@ beforeEach(() => {
 
 const route = {
   id: "r1",
-  code: "R-20260910-01",
   driverId: "driver-1",
   vehicleId: null,
   createdBy: "admin-1",
@@ -56,7 +55,6 @@ describe("createRoute", () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify(route), { status: 201 }));
 
     const result = await createRoute({
-      code: "R-20260910-01",
       driverId: "driver-1",
       vehicleId: null,
       date: "2026-09-10",
@@ -69,7 +67,6 @@ describe("createRoute", () => {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          code: "R-20260910-01",
           driverId: "driver-1",
           vehicleId: null,
           date: "2026-09-10",
@@ -84,7 +81,6 @@ describe("createRoute", () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 400 }));
 
     const result = await createRoute({
-      code: "R-1",
       driverId: "driver-1",
       vehicleId: null,
       date: "2026-09-10",
@@ -124,7 +120,6 @@ describe("updateRoute", () => {
 
 describe("duplicateRoute", () => {
   const input = {
-    code: "R-20260927-01",
     driverId: "driver-1",
     vehicleId: null,
     date: "2026-09-27",

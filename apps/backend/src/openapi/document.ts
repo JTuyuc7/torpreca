@@ -7,7 +7,7 @@ export const openApiDocument = new OpenApiGeneratorV31(registry.definitions).gen
   openapi: "3.1.0",
   info: {
     title: "Torpreca API",
-    version: "1.0.0",
+    version: "1.1.0",
     description: "REST API for Torpreca fleet route management (PG2 — UMG).",
   },
   servers: [{ url: `http://localhost:${env.PORT}`, description: "Local" }],

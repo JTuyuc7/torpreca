@@ -7,7 +7,7 @@ import {
 import {
   AUDIT_EVENTS,
   AuditLogsPageSchema,
-  CreateRouteSchema,
+  CreateRouteWithStopsSchema,
   CreateStopBodySchema,
   CreateUserSchema,
   CreateVehicleSchema,
@@ -18,6 +18,7 @@ import {
   ReviewUserSchema,
   ROUTE_STATUSES,
   RouteSchema,
+  RoutesReportSchema,
   StopSchema,
   UpdateRouteSchema,
   UpdateStopSchema,
@@ -68,7 +69,7 @@ const User = registry.register("User", UserSchema);
 const CreateUser = registry.register("CreateUser", CreateUserSchema);
 const ReviewUser = registry.register("ReviewUser", ReviewUserSchema);
 const Route = registry.register("Route", RouteSchema);
-const CreateRoute = registry.register("CreateRoute", CreateRouteSchema);
+const CreateRoute = registry.register("CreateRoute", CreateRouteWithStopsSchema);
 const UpdateRoute = registry.register("UpdateRoute", UpdateRouteSchema);
 const DuplicateRoute = registry.register("DuplicateRoute", DuplicateRouteSchema);
 const FinishRoute = registry.register("FinishRoute", FinishRouteSchema);
@@ -265,7 +266,7 @@ path({
   method: "patch",
   path: "/routes/{id}",
   tags: ["Routes"],
-  summary: "Edit a pending route (reassign driver/vehicle, change code/date/plannedKm)",
+  summary: "Edit a pending route (reassign driver/vehicle, change date/plannedKm)",
   request: {
     params: IdParam,
     body: { content: { "application/json": { schema: UpdateRoute } } },
@@ -465,6 +466,39 @@ path({
   summary: "Fleet-wide counts for the dashboard home screen",
   responses: {
     200: jsonResponse("Summary", DashboardSummary),
+    401: unauthorized,
+    403: forbidden,
+  },
+});
+
+// --- reports ---
+const RoutesReport = registry.register("RoutesReport", RoutesReportSchema);
+const ReportRange = z.object({
+  from: z.iso.date().describe("First day of the range (inclusive)"),
+  to: z.iso.date().describe("Last day of the range (inclusive, at most 366 days after `from`)"),
+});
+path({
+  method: "get",
+  path: "/reports/routes",
+  tags: ["Reports"],
+  summary: "Routes aggregated by status, day, driver and vehicle over a date range",
+  request: { query: ReportRange },
+  responses: {
+    200: jsonResponse("Report", RoutesReport),
+    400: errorResponse("Missing, inverted or too long range"),
+    401: unauthorized,
+    403: forbidden,
+  },
+});
+path({
+  method: "get",
+  path: "/reports/routes/csv",
+  tags: ["Reports"],
+  summary: "One CSV line per route of the date range (download)",
+  request: { query: ReportRange },
+  responses: {
+    200: { description: "CSV file", content: { "text/csv": { schema: z.string() } } },
+    400: errorResponse("Missing, inverted or too long range"),
     401: unauthorized,
     403: forbidden,
   },

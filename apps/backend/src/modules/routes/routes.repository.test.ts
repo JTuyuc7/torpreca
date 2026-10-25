@@ -31,12 +31,11 @@ describe("routesRepository", () => {
     const { routesRepository } = await import("./routes.repository");
 
     const route = await routesRepository.create(
-      { code: "R-1", driverId: "driver-1", vehicleId: null, date: "2026-08-22", plannedKm: 10 },
+      { driverId: "driver-1", vehicleId: null, date: "2026-08-22", plannedKm: 10 },
       "admin-1",
     );
 
     expect(route).toMatchObject({
-      code: "R-1",
       driverId: "driver-1",
       status: "pending",
       drivenKm: 0,
@@ -72,7 +71,6 @@ describe("routesRepository", () => {
 
     const withPoints = await routesRepository.create(
       {
-        code: "R-2",
         driverId: "driver-1",
         vehicleId: null,
         date: "2026-08-22",
@@ -92,7 +90,7 @@ describe("routesRepository", () => {
     });
 
     const without = await routesRepository.create(
-      { code: "R-3", driverId: "driver-1", vehicleId: null, date: "2026-08-22", plannedKm: null },
+      { driverId: "driver-1", vehicleId: null, date: "2026-08-22", plannedKm: null },
       "admin-1",
     );
     expect(without).toMatchObject({

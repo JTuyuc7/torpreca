@@ -16,6 +16,7 @@ export * from "./schemas/daily-report.schema";
 export * from "./schemas/dashboard.schema";
 export * from "./schemas/favorite-route.schema";
 export * from "./schemas/location.schema";
+export * from "./schemas/report.schema";
 export * from "./schemas/route.schema";
 export * from "./schemas/stop.schema";
 export * from "./schemas/sync-event.schema";
